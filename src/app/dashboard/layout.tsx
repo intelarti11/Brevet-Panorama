@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Database, LayoutGrid, PanelLeft, FileUp, Filter } from 'lucide-react';
+import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle } from 'lucide-react';
 
 import Logo from '@/components/logo';
 import {
@@ -38,6 +38,7 @@ interface DashboardLayoutProps {
 function SidebarFilters() {
   const {
     isLoading,
+    error: filterContextError,
     availableAcademicYears, selectedAcademicYear, setSelectedAcademicYear,
     availableSerieTypes, selectedSerieType, setSelectedSerieType,
     availableEstablishments, selectedEstablishment, setSelectedEstablishment
@@ -54,6 +55,20 @@ function SidebarFilters() {
           <Skeleton className="h-8 w-full" />
           <Skeleton className="h-8 w-full" />
           <Skeleton className="h-8 w-full" />
+        </div>
+      </SidebarGroup>
+    );
+  }
+
+  if (filterContextError) {
+    return (
+      <SidebarGroup>
+        <SidebarGroupLabel className="flex items-center gap-2 text-destructive">
+          <AlertTriangle className="h-4 w-4" />
+          Erreur Chargement Filtres
+        </SidebarGroupLabel>
+        <div className="p-2 text-xs text-destructive-foreground bg-destructive/20 rounded-md border border-destructive/50">
+          {filterContextError}
         </div>
       </SidebarGroup>
     );

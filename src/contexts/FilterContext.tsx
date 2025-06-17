@@ -58,8 +58,6 @@ const normalizeTextForComparison = (text: string | undefined): string => {
     .replace(/[\u0300-\u036f]/g, "");
 };
 
-// Adjusted parsing function: primarily extracts serieType from the original 'serie' field.
-// Academic year extraction is a fallback if `anneeScolaireImportee` is missing.
 const parseOriginalSerieField = (rawSerieOriginale: string | undefined): { academicYearFallback: string; serieType: string } => {
   if (!rawSerieOriginale) return { academicYearFallback: "N/A", serieType: "N/A" };
 
@@ -81,14 +79,10 @@ const parseOriginalSerieField = (rawSerieOriginale: string | undefined): { acade
       const originalKeywordRegex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       const originalKeywordMatch = serieTypePart.match(originalKeywordRegex);
       foundSerieKeyword = originalKeywordMatch ? originalKeywordMatch[0] : keyword;
-      // Do not remove the keyword from serieTypePart if it's the only content left, or if it's a multi-word keyword.
-      // This part might need refinement based on actual data variations.
-      // For now, if a keyword is found, we assume it's the serie type.
       break;
     }
   }
   
-  // If no keyword was found but there's text left in serieTypePart, use that text as serieType.
   if (foundSerieKeyword === "N/A" && serieTypePart && serieTypePart.trim() !== "") {
       foundSerieKeyword = serieTypePart.trim();
   }
@@ -113,17 +107,24 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true); // Set loading true at the start of fetch
+      setError(null); // Reset error
+
       if (!db) {
-        setError("La base de données Firestore n'est pas initialisée.");
+        setError("La base de données Firestore n'est pas initialisée. Vérifiez la configuration Firebase (src/lib/firebase.ts) et votre connexion internet. Assurez-vous que Firestore est activé dans votre projet Firebase et que les règles de sécurité autorisent la lecture.");
         setIsLoading(false);
         return;
       }
-      setIsLoading(true);
-      setError(null);
+      
       try {
         const studentCollectionRef = collection(db, 'brevetResults');
         const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(studentCollectionRef);
         
+        if (querySnapshot.empty) {
+          // setError("Aucune donnée élève trouvée dans la base de données. Veuillez en importer.");
+          // No error, but filters will be empty. User should import data.
+        }
+
         const students: ProcessedStudentData[] = [];
         const academicYearsSet = new Set<string>();
         const serieTypesSet = new Set<string>();
@@ -131,8 +132,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          const anneeOriginaleField = data.serie || ""; // The original 'serie' field from Excel/Firestore
-          const importedYear = data.anneeScolaireImportee; // The new dedicated year field
+          const anneeOriginaleField = data.serie || ""; 
+          const importedYear = data.anneeScolaireImportee; 
 
           const { academicYearFallback, serieType } = parseOriginalSerieField(anneeOriginaleField);
           
@@ -154,19 +155,26 @@ export function FilterProvider({ children }: { children: ReactNode }) {
             scoreSciences: data.scoreSciences !== undefined && data.scoreSciences !== null ? Number(data.scoreSciences) : undefined,
           });
 
-          if (finalAcademicYear && finalAcademicYear !== "N/A") academicYearsSet.add(finalAcademicYear);
-          if (serieType && serieType !== "N/A") serieTypesSet.add(serieType);
-          if (data.libelleEtablissement) establishmentsSet.add(data.libelleEtablissement);
+          if (finalAcademicYear && finalAcademicYear !== "N/A" && String(finalAcademicYear).trim() !== "") {
+             academicYearsSet.add(String(finalAcademicYear).trim());
+          }
+          if (serieType && serieType !== "N/A" && String(serieType).trim() !== "") {
+            serieTypesSet.add(String(serieType).trim());
+          }
+          if (data.libelleEtablissement && String(data.libelleEtablissement).trim() !== "") {
+            establishmentsSet.add(String(data.libelleEtablissement).trim());
+          }
         });
 
         setAllProcessedStudents(students);
         
         const sortedAcademicYears = Array.from(academicYearsSet).sort((a, b) => {
-            // Custom sort for "YYYY-YYYY" and "YYYY"
-            const yearA = parseInt(a.substring(0,4));
-            const yearB = parseInt(b.substring(0,4));
-            if (yearB !== yearA) return yearB - yearA; // Sort by start year descending
-            return b.localeCompare(a); // Fallback for same start year or other formats
+            if (!a || !b) return 0; // Should not happen with the trim() and !== "" checks
+            const yearAVal = parseInt(String(a).substring(0,4));
+            const yearBVal = parseInt(String(b).substring(0,4));
+            if (isNaN(yearAVal) || isNaN(yearBVal)) return String(b).localeCompare(String(a));
+            if (yearBVal !== yearAVal) return yearBVal - yearAVal; 
+            return String(b).localeCompare(String(a)); 
         });
 
         setAvailableAcademicYears(sortedAcademicYears);
@@ -189,17 +197,15 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         
         const sortedEstablishments = Array.from(establishmentsSet).sort();
         setAvailableEstablishments(sortedEstablishments);
-        // Default to first establishment if available, otherwise "All"
         if (sortedEstablishments.length > 0) {
-           setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE); // Default to all establishments now for broader initial view
+           setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE); 
         } else {
            setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE);
         }
 
-
       } catch (err: any) {
         console.error("Erreur de récupération des données Firestore:", err);
-        setError(`Impossible de charger les données: ${err.message}.`);
+        setError(`Impossible de charger les données des filtres: ${err.message}. Vérifiez les règles de sécurité Firestore et la console du navigateur pour plus de détails.`);
       } finally {
         setIsLoading(false);
       }
