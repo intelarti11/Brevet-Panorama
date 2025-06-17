@@ -1,10 +1,19 @@
 
 import { z } from 'zod';
 
+// Helper to convert various inputs to string or undefined
+const preprocessToStringOptional = (val: unknown): string | undefined => {
+  if (val === undefined || val === null) return undefined;
+  const strVal = String(val).trim();
+  return strVal === '' ? undefined : strVal;
+};
+
+// Helper to parse score-like values (e.g., "X/Y" or just "X") to number or undefined
 const parseScoreValue = (valueWithMax: string | number | undefined): number | undefined => {
   if (valueWithMax === undefined || valueWithMax === null || String(valueWithMax).trim() === '') return undefined;
   const s = String(valueWithMax).split('/')[0].replace(',', '.').trim();
-  if (s === 'AB' || s === 'DI' || s === 'NE' || s === 'EA') return undefined;
+  // Handle common non-numeric grade abbreviations
+  if (['AB', 'DI', 'NE', 'EA', 'DISP', 'ABS'].includes(s.toUpperCase())) return undefined;
   const num = parseFloat(s);
   return isNaN(num) ? undefined : num;
 };
@@ -14,21 +23,16 @@ const preprocessOptionalStringToNumber = (val: unknown) => {
   return parseScoreValue(String(val));
 };
 
-const preprocessToStringOptional = (val: unknown) => {
-  if (val === undefined || val === null) return undefined;
-  return String(val).trim() === '' ? undefined : String(val).trim();
-};
-
 
 export const studentDataSchema = z.object({
   'Série': z.preprocess(preprocessToStringOptional, z.string().optional()),
-  anneeScolaireImportee: z.string(), // This is added by the app, should always be a string
+  'anneeScolaireImportee': z.string().min(1, "Année scolaire d'importation requise"),
   'Code Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
   'Libellé Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
   'Commune Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
   'Division de classe': z.preprocess(preprocessToStringOptional, z.string().optional()),
   'Catégorie candidat': z.preprocess(preprocessToStringOptional, z.string().optional()),
-  'Numéro Candidat': z.preprocess(preprocessToStringOptional, z.string().optional()),
+  'Numéro Candidat': z.preprocess(preprocessToStringOptional, z.string().optional()), // Handles number or string
   'INE': z.preprocess(preprocessToStringOptional, z.string().min(1, "INE requis")),
   'Nom candidat': z.preprocess(preprocessToStringOptional, z.string().min(1, "Nom candidat requis")),
   'Prénom candidat': z.preprocess(preprocessToStringOptional, z.string().min(1, "Prénom candidat requis")),
@@ -39,6 +43,7 @@ export const studentDataSchema = z.object({
   'TOTAL POUR MENTION': z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
   'Moyenne sur 20': z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
 
+  // Score fields remain as they were, assuming their Excel headers are complex and mapping is specific
   scoreFrancais: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
   scoreMaths: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
   scoreHistoireGeo: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
@@ -52,7 +57,8 @@ export const studentDataSchema = z.object({
   scoreSciencesVie: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
 
   options: z.record(z.string()).optional(),
-  rawRowData: z.any().optional(),
+  rawRowData: z.any().optional(), // To store the original raw row for any unmapped fields
 });
 
 export type StudentData = z.infer<typeof studentDataSchema>;
+

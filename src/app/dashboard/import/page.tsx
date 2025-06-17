@@ -26,10 +26,16 @@ export default function ImportPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const currentMonth = new Date().getMonth();
-    let academicYearStart = new Date().getFullYear();
-    if (currentMonth < 7) {
-        academicYearStart--;
+    const currentMonth = new Date().getMonth(); // 0 (Jan) to 11 (Dec)
+    const currentYear = new Date().getFullYear();
+    let academicYearStart;
+
+    // Academic year typically starts around August/September (index 7 or 8)
+    // If current month is before August, assume current academic year started last calendar year
+    if (currentMonth < 7) { // Before August
+        academicYearStart = currentYear - 1;
+    } else { // August or later
+        academicYearStart = currentYear;
     }
     setImportYear(`${academicYearStart}-${academicYearStart + 1}`);
 
@@ -67,24 +73,22 @@ export default function ImportPage() {
     let documentsAddedToBatch = 0;
 
     dataToImport.forEach(student => {
-      const docId = student['INE'];
-      if (docId && String(docId).trim() !== "") {
-        const studentRef = doc(collectionRef, String(docId).trim());
-        const { rawRowData, ...studentDataForFirestore } = student;
-
-        const finalStudentData = {
-            ...JSON.parse(JSON.stringify(studentDataForFirestore)), 
-            anneeScolaireImportee: yearToImport 
-        };
-        batch.set(studentRef, finalStudentData);
+      // student['INE'] is now guaranteed by Zod to be a string if parsing was successful
+      const docId = student['INE']; 
+      if (docId) { // No need to check for trim or empty string, Zod handles .min(1)
+        const studentRef = doc(collectionRef, docId);
+        // The student object already matches the Firestore structure due to Zod schema
+        // and is guaranteed to have anneeScolaireImportee
+        batch.set(studentRef, student);
         documentsAddedToBatch++;
       } else {
-        console.warn("Skipping student due to missing or invalid INE for document ID:", student);
+        // This case should ideally not be reached if Zod validation is strict and INE is required.
+        console.warn("Skipping student due to missing or invalid INE (should be caught by Zod):", student);
       }
     });
 
     if (documentsAddedToBatch === 0) {
-      setError("Aucun élève avec un INE valide n'a été trouvé dans les données pour l'importation.");
+      setError("Aucun élève avec un INE valide n'a été trouvé dans les données pour l'importation. Vérifiez le fichier Excel.");
       toast({ variant: "destructive", title: "Importation Annulée", description: "Aucun élève avec un INE valide à importer.", duration: 7000 });
       setIsImporting(false);
       return;
@@ -142,20 +146,25 @@ export default function ImportPage() {
 
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          const dataObjects = XLSX.utils.sheet_to_json<any>(worksheet);
+          // Get raw JSON data, Zod will handle type coercion and validation
+          const rawDataObjects = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false, defval: undefined });
 
-          if (dataObjects.length === 0) {
+
+          if (rawDataObjects.length === 0) {
             throw new Error("Aucune donnée trouvée dans la première feuille du fichier Excel. Assurez-vous que la première ligne contient les en-têtes.");
           }
 
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
 
-           const mainHeadersForOptionsLogic = new Set([
+          // Define a set of known main headers that are explicitly mapped.
+          // All other headers will be collected into the 'options' field.
+          const explicitlyMappedHeaders = new Set([
             'Série', 'Code Etablissement', 'Libellé Etablissement', 'Commune Etablissement',
             'Division de classe', 'Catégorie candidat', 'Numéro Candidat', 'INE',
             'Nom candidat', 'Prénom candidat', 'Date de naissance', 'Résultat',
             'TOTAL GENERAL', 'TOTAL POUR MENTION', 'Moyenne sur 20',
+            // Explicit score headers
             '001 - 1 - Français - Ponctuel',
             '002 - 1 - Mathématiques - Ponctuel',
             '003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel',
@@ -169,66 +178,57 @@ export default function ImportPage() {
             'Sci Vie01A /50'
           ]);
 
-          dataObjects.forEach((rawRow, index) => {
-            const getExcelVal = (headerName: string) => rawRow[headerName];
 
-            const ine = String(getExcelVal('INE') || '').trim();
-            const nomCandidat = String(getExcelVal('Nom candidat') || '').trim();
-            const prenomsCandidat = String(getExcelVal('Prénom candidat') || '').trim();
-
-            if (!ine || !nomCandidat || !prenomsCandidat) {
-              console.warn(`Ligne ${index + 2} ignorée : INE, Nom candidat ou Prénom candidat manquant.`);
-              return;
-            }
-
+          rawDataObjects.forEach((rawRow, index) => {
             const studentInput: any = {
-              'Série': getExcelVal('Série'),
-              anneeScolaireImportee: importYear,
-              'Code Etablissement': getExcelVal('Code Etablissement'),
-              'Libellé Etablissement': getExcelVal('Libellé Etablissement'),
-              'Commune Etablissement': getExcelVal('Commune Etablissement'),
-              'Division de classe': getExcelVal('Division de classe'),
-              'Catégorie candidat': getExcelVal('Catégorie candidat'),
-              'Numéro Candidat': getExcelVal('Numéro Candidat'),
-              'INE': ine,
-              'Nom candidat': nomCandidat,
-              'Prénom candidat': prenomsCandidat,
-              'Date de naissance': getExcelVal('Date de naissance') instanceof Date
-                                 ? (getExcelVal('Date de naissance') as Date).toLocaleDateString('fr-FR')
-                                 : getExcelVal('Date de naissance'),
-              'Résultat': getExcelVal('Résultat'),
-              'TOTAL GENERAL': getExcelVal('TOTAL GENERAL'),
-              'TOTAL POUR MENTION': getExcelVal('TOTAL POUR MENTION'),
-              'Moyenne sur 20': getExcelVal('Moyenne sur 20'),
+              'anneeScolaireImportee': importYear, // Added by the app
+              // Direct mapping based on harmonized field names in Zod schema
+              'Série': rawRow['Série'],
+              'Code Etablissement': rawRow['Code Etablissement'],
+              'Libellé Etablissement': rawRow['Libellé Etablissement'],
+              'Commune Etablissement': rawRow['Commune Etablissement'],
+              'Division de classe': rawRow['Division de classe'],
+              'Catégorie candidat': rawRow['Catégorie candidat'],
+              'Numéro Candidat': rawRow['Numéro Candidat'],
+              'INE': rawRow['INE'],
+              'Nom candidat': rawRow['Nom candidat'],
+              'Prénom candidat': rawRow['Prénom candidat'],
+              'Date de naissance': rawRow['Date de naissance'], // Zod preprocesses this
+              'Résultat': rawRow['Résultat'],
+              'TOTAL GENERAL': rawRow['TOTAL GENERAL'], // Zod preprocesses this
+              'TOTAL POUR MENTION': rawRow['TOTAL POUR MENTION'], // Zod preprocesses this
+              'Moyenne sur 20': rawRow['Moyenne sur 20'], // Zod preprocesses this
 
-              scoreFrancais: getExcelVal('001 - 1 - Français - Ponctuel'),
-              scoreMaths: getExcelVal('002 - 1 - Mathématiques - Ponctuel'),
-              scoreHistoireGeo: getExcelVal('003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel'),
-              scoreSciences: getExcelVal('004 - 1 - Sciences - Ponctuel'),
-              scoreOralDNB: getExcelVal('005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année'),
-              scoreLVE: getExcelVal('007AB - 1 - Langues étrangères ou régionales - Contrôle continu'),
-              scoreArtsPlastiques: getExcelVal('007AD - 1 - Langages des arts et du corps - Contrôle continu'),
-              scoreEducationMusicale: getExcelVal('Edu Mus01A /50'),
-              scoreEPS: getExcelVal('EPS CCF01A /100'),
-              scorePhysiqueChimie: getExcelVal('Phy Chi01A /50'),
-              scoreSciencesVie: getExcelVal('Sci Vie01A /50'),
-
-              options: {},
-              rawRowData: rawRow,
+              // Explicit score fields
+              scoreFrancais: rawRow['001 - 1 - Français - Ponctuel'],
+              scoreMaths: rawRow['002 - 1 - Mathématiques - Ponctuel'],
+              scoreHistoireGeo: rawRow['003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel'],
+              scoreSciences: rawRow['004 - 1 - Sciences - Ponctuel'],
+              scoreOralDNB: rawRow['005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année'],
+              scoreLVE: rawRow['007AB - 1 - Langues étrangères ou régionales - Contrôle continu'],
+              scoreArtsPlastiques: rawRow['007AD - 1 - Langages des arts et du corps - Contrôle continu'],
+              scoreEducationMusicale: rawRow['Edu Mus01A /50'],
+              scoreEPS: rawRow['EPS CCF01A /100'],
+              scorePhysiqueChimie: rawRow['Phy Chi01A /50'],
+              scoreSciencesVie: rawRow['Sci Vie01A /50'],
+              
+              rawRowData: rawRow, // Keep the full raw row for debugging or future use
+              options: {} // Initialize options
             };
-
+            
+            // Collect any other columns into the 'options' field
             const currentOptions: Record<string, string> = {};
-            Object.keys(rawRow).forEach(excelHeader => {
-                if (!mainHeadersForOptionsLogic.has(excelHeader)) {
-                    const value = rawRow[excelHeader];
-                    if (value !== undefined && value !== null && String(value).trim() !== '') {
-                        currentOptions[excelHeader] = String(value);
-                    }
+            for (const excelHeader in rawRow) {
+              if (rawRow.hasOwnProperty(excelHeader) && !explicitlyMappedHeaders.has(excelHeader)) {
+                const value = rawRow[excelHeader];
+                // Ensure value is not undefined/null and convert to string for options
+                if (value !== undefined && value !== null) {
+                    currentOptions[excelHeader] = String(value);
                 }
-            });
-
-             if (Object.keys(currentOptions).length > 0) {
-                studentInput.options = currentOptions;
+              }
+            }
+            if (Object.keys(currentOptions).length > 0) {
+              studentInput.options = currentOptions;
             }
 
             const validationResult = studentDataSchema.safeParse(studentInput);
@@ -249,18 +249,19 @@ export default function ImportPage() {
                 return `${field}: Erreur de validation inconnue`;
               })
               .join('; ');
-            // console.error("Erreurs de validation:", validationErrors); // Removed verbose logging
             throw new Error(`Validation échouée pour certaines lignes. Ex: Ligne ${firstError.row}: ${errorMessages}`);
           }
 
           if (transformedData.length > 0) {
             await handleImportToFirestore(transformedData, importYear);
-          } else if (error) {
-            // Critical error already set
-          } else if (dataObjects.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
+          } else if (error) { // If a critical error was set before this stage
+            // Do nothing, error is already set and will be displayed
+          } else if (rawDataObjects.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
+             // This case indicates all rows were skipped, likely due to missing critical fields not caught by Zod structure but by logic (e.g. all INE were blank but Zod only validates if field exists)
+             // However, with current Zod schema, INE, Nom, Prénom are required, so this implies a deeper issue if reached.
              throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'INE', 'Nom candidat', et 'Prénom candidat' sont présentes, correctement nommées et remplies dans le fichier Excel.");
-          } else {
-            throw new Error("Aucune donnée valide trouvée dans le fichier Excel après parsing.");
+          } else { // No data and no specific validation errors thrown, but no transformed data.
+            throw new Error("Aucune donnée valide trouvée dans le fichier Excel après parsing. Vérifiez le format du fichier et la présence de données.");
           }
 
         } catch (parseOrImportError: any) {
@@ -288,11 +289,20 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-6 p-1 md:p-4">
-      <h1 className="text-2xl font-semibold text-foreground">Importer les Données du Brevet (Excel)</h1>
-      <Card className="shadow-lg">
+      <header className="mb-6">
+        <h1 className="text-3xl font-bold text-foreground tracking-tight">Importer les Données du Brevet</h1>
+        <p className="text-muted-foreground mt-1">
+          Téléversez un fichier Excel (.xlsx, .xls) avec les résultats des élèves et spécifiez l'année scolaire.
+        </p>
+      </header>
+      <Card className="shadow-lg rounded-lg">
         <CardHeader>
-          <CardTitle>Téléverser et Importer un fichier Excel</CardTitle>
-          <CardDescription>Sélectionnez un fichier .xlsx ou .xls contenant les résultats des élèves, et spécifiez l'année scolaire pour ces données.</CardDescription>
+          <CardTitle className="text-xl">Téléversement et Importation</CardTitle>
+          <CardDescription>
+            Sélectionnez votre fichier Excel et l'année scolaire correspondante.
+            Les en-têtes de colonnes dans Excel doivent correspondre aux champs attendus 
+            (ex: 'INE', 'Nom candidat', 'Moyenne sur 20', etc.).
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -310,30 +320,26 @@ export default function ImportPage() {
                 />
             </div>
             <p className="text-xs text-muted-foreground">
-              Indiquez l'année scolaire (ex: "2023-2024" ou "2024") pour les données de ce fichier.
+              Format suggéré: AAAA-AAAA (ex: 2023-2024) ou AAAA (ex: 2024). Ce champ est obligatoire.
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 items-start">
-            <label htmlFor="file-upload" className="flex-grow w-full sm:w-auto">
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto] items-end">
+            <div className="space-y-2">
+              <Label htmlFor="file-upload" className="text-sm font-medium">Fichier Excel</Label>
               <Input
                 id="file-upload"
                 type="file"
                 accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
                 onChange={handleFileChange}
-                className="hidden"
+                className="w-full"
                 disabled={isLoading || isImporting}
               />
-              <Button asChild variant="outline" className="w-full sm:w-auto cursor-pointer" disabled={isLoading || isImporting}>
-                <div>
-                  <UploadCloud className="mr-2 h-4 w-4" />
-                  {fileName || "Choisir un fichier Excel..."}
-                </div>
-              </Button>
-            </label>
+               {fileName && <p className="text-xs text-muted-foreground">Fichier sélectionné : {fileName}</p>}
+            </div>
             <Button onClick={parseAndImportData} disabled={!file || isLoading || isImporting || !importYear.trim()} className="w-full sm:w-auto">
               {(isLoading || isImporting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />}
-              {isLoading ? "Lecture du fichier..." : (isImporting ? "Importation en cours..." : "Importer le Fichier")}
+              {isLoading ? "Lecture..." : (isImporting ? "Importation..." : "Importer")}
             </Button>
           </div>
           {error && (
