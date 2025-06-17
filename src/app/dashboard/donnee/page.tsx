@@ -8,41 +8,88 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Search, SlidersHorizontal, Loader2, AlertTriangle } from 'lucide-react';
+import { getFirestore, collection, getDocs, QuerySnapshot, DocumentData } from 'firebase/firestore';
+import { app, db } from '@/lib/firebase'; // Ensure db is exported from firebase.ts
 
 interface DisplayStudentData {
-  id: string; 
+  id: string;
   nom: string;
   prenom: string;
   etablissement: string;
-  annee: string; 
-  resultat: string; 
+  annee: string; // This will come from 'serie' field in Firestore
+  resultat: string;
   moyenne?: number;
 }
-
-const FAKE_YEARS = ["2024-2025", "2023-2024", "2022-2023", "2021-2022"];
-const FAKE_ESTABLISHMENTS = ["Collège A. Camus", "Collège V. Hugo", "Lycée J. Moulin", "Collège P. Valéry"];
-
-const FAKE_STUDENT_DATA: DisplayStudentData[] = [
-  { id: '123456789AB', nom: 'Dupont', prenom: 'Jean', etablissement: 'Collège A. Camus', annee: '2023-2024', resultat: 'Admis Mention Bien', moyenne: 15.5 },
-  { id: '987654321CD', nom: 'Martin', prenom: 'Alice', etablissement: 'Collège V. Hugo', annee: '2023-2024', resultat: 'Admis', moyenne: 12.0 },
-  { id: '112233445EF', nom: 'Durand', prenom: 'Paul', etablissement: 'Collège A. Camus', annee: '2022-2023', resultat: 'Refusé', moyenne: 8.5 },
-  { id: '556677889GH', nom: 'Petit', prenom: 'Clara', etablissement: 'Lycée J. Moulin', annee: '2023-2024', resultat: 'Admis Mention Très Bien', moyenne: 17.0 },
-  { id: 'AB9876543XY', nom: 'Leroy', prenom: 'Lucas', etablissement: 'Collège P. Valéry', annee: '2022-2023', resultat: 'Admis Mention Assez Bien', moyenne: 13.2 },
-  { id: 'CD1234567ZA', nom: 'Moreau', prenom: 'Manon', etablissement: 'Collège V. Hugo', annee: '2024-2025', resultat: 'Admis', moyenne: 11.8 },
-];
 
 const ALL_YEARS_VALUE = "__ALL_YEARS__";
 const ALL_ESTABLISHMENTS_VALUE = "__ALL_ESTABLISHMENTS__";
 
 export default function DonneePage() {
+  const [allStudentsData, setAllStudentsData] = useState<DisplayStudentData[]>([]);
+  const [filteredData, setFilteredData] = useState<DisplayStudentData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedYear, setSelectedYear] = useState<string>(''); // Empty string for placeholder
-  const [selectedEstablishment, setSelectedEstablishment] = useState<string>(''); // Empty string for placeholder
-  const [filteredData, setFilteredData] = useState<DisplayStudentData[]>(FAKE_STUDENT_DATA);
+  const [selectedYear, setSelectedYear] = useState<string>(ALL_YEARS_VALUE);
+  const [selectedEstablishment, setSelectedEstablishment] = useState<string>(ALL_ESTABLISHMENTS_VALUE);
+
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const [availableEstablishments, setAvailableEstablishments] = useState<string[]>([]);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let data = FAKE_STUDENT_DATA;
+    const fetchData = async () => {
+      if (!db) {
+        setError("La base de données Firestore n'est pas initialisée. Vérifiez la configuration Firebase.");
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      setError(null);
+      try {
+        const studentCollectionRef = collection(db, 'brevetResults');
+        const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(studentCollectionRef);
+        
+        const students: DisplayStudentData[] = [];
+        const years = new Set<string>();
+        const establishments = new Set<string>();
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const studentToAdd: DisplayStudentData = {
+            id: doc.id, // numeroCandidatINE is the doc ID
+            nom: data.nomCandidat || 'N/A',
+            prenom: data.prenomsCandidat || 'N/A',
+            etablissement: data.libelleEtablissement || 'N/A',
+            annee: data.serie || 'N/A', // Using 'serie' for 'annee'
+            resultat: data.resultat || 'N/A',
+            moyenne: data.totalPourcentage !== undefined && data.totalPourcentage !== null ? Number(data.totalPourcentage) : undefined,
+          };
+          students.push(studentToAdd);
+          if (data.serie) years.add(data.serie);
+          if (data.libelleEtablissement) establishments.add(data.libelleEtablissement);
+        });
+
+        setAllStudentsData(students);
+        setFilteredData(students); // Initialize filteredData with all students
+        setAvailableYears(Array.from(years).sort());
+        setAvailableEstablishments(Array.from(establishments).sort());
+
+      } catch (err: any) {
+        console.error("Erreur de récupération des données Firestore:", err);
+        setError(`Impossible de charger les données des élèves: ${err.message}. Vérifiez la console pour plus de détails et assurez-vous que la collection 'brevetResults' existe et que les règles de sécurité le permettent.`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    let data = [...allStudentsData]; // Start with a fresh copy of all data
+
     if (selectedYear && selectedYear !== ALL_YEARS_VALUE) {
       data = data.filter(student => student.annee === selectedYear);
     }
@@ -58,7 +105,7 @@ export default function DonneePage() {
       );
     }
     setFilteredData(data);
-  }, [searchTerm, selectedYear, selectedEstablishment]);
+  }, [searchTerm, selectedYear, selectedEstablishment, allStudentsData]);
 
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
@@ -70,6 +117,25 @@ export default function DonneePage() {
     if (lowerResultat.includes('admis')) return "default";
     return "secondary";
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] p-1 md:p-4">
+        <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Chargement des données des élèves...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] p-1 md:p-4 text-center">
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold text-destructive mb-2">Erreur de chargement</h2>
+        <p className="text-muted-foreground max-w-md">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-1 md:p-4">
@@ -108,14 +174,14 @@ export default function DonneePage() {
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="year" className="block text-sm font-medium text-foreground">Année Scolaire</label>
+              <label htmlFor="year" className="block text-sm font-medium text-foreground">Série / Année</label>
               <Select value={selectedYear} onValueChange={setSelectedYear}>
                 <SelectTrigger id="year" className="w-full">
-                  <SelectValue placeholder="Sélectionner une année" />
+                  <SelectValue placeholder="Sélectionner une série/année" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_YEARS_VALUE}>Toutes les années</SelectItem>
-                  {FAKE_YEARS.map(year => (
+                  <SelectItem value={ALL_YEARS_VALUE}>Toutes les séries/années</SelectItem>
+                  {availableYears.map(year => (
                     <SelectItem key={year} value={year}>{year}</SelectItem>
                   ))}
                 </SelectContent>
@@ -130,7 +196,7 @@ export default function DonneePage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL_ESTABLISHMENTS_VALUE}>Tous les établissements</SelectItem>
-                  {FAKE_ESTABLISHMENTS.map(est => (
+                  {availableEstablishments.map(est => (
                     <SelectItem key={est} value={est}>{est}</SelectItem>
                   ))}
                 </SelectContent>
@@ -144,7 +210,7 @@ export default function DonneePage() {
         <CardHeader>
           <CardTitle className="text-xl">Résultats des Élèves</CardTitle>
           <CardDescription>
-            Liste des élèves correspondant aux critères de recherche et filtres sélectionnés.
+            Liste des élèves correspondant aux critères de recherche et filtres sélectionnés. Affichage de {filteredData.length} sur {allStudentsData.length} élèves.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -157,7 +223,7 @@ export default function DonneePage() {
                     <TableHead>Nom</TableHead>
                     <TableHead>Prénom</TableHead>
                     <TableHead>Établissement</TableHead>
-                    <TableHead>Année</TableHead>
+                    <TableHead>Série/Année</TableHead>
                     <TableHead>Résultat</TableHead>
                     <TableHead className="text-right">Moyenne (/20)</TableHead>
                   </TableRow>
@@ -176,7 +242,7 @@ export default function DonneePage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {student.moyenne !== undefined ? student.moyenne.toFixed(2) : 'N/A'}
+                        {student.moyenne !== undefined && student.moyenne !== null ? student.moyenne.toFixed(2) : 'N/A'}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -188,7 +254,7 @@ export default function DonneePage() {
               <Search className="w-16 h-16 text-muted-foreground/50 mb-4" />
               <p className="text-lg font-medium text-muted-foreground">Aucun élève trouvé</p>
               <p className="text-sm text-muted-foreground">
-                Veuillez ajuster vos filtres ou votre terme de recherche.
+                Veuillez ajuster vos filtres ou votre terme de recherche. Il se peut aussi qu'aucune donnée n'ait été importée.
               </p>
             </div>
           )}
