@@ -29,12 +29,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <Sidebar collapsible="none"> {/* Changed from "icon" to "none" */}
-        <SidebarHeader className="flex items-center p-4"> {/* Removed justify-between */}
+      <Sidebar collapsible="none">
+        <SidebarHeader className="flex items-center p-4">
           <div className="group-[[data-collapsible=icon][data-state=collapsed]]:hidden">
             <Logo className="text-2xl" />
           </div>
-          {/* SidebarTrigger for desktop collapse removed */}
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu className="p-2">
@@ -80,11 +79,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-          <SidebarTrigger className="md:hidden" asChild> {/* This trigger is for mobile sheet menu */}
-            <Button size="icon" variant="outline">
-              <PanelLeft className="h-5 w-5" />
-              <span className="sr-only">Toggle Menu</span>
-            </Button>
+          {/* Updated mobile SidebarTrigger */}
+          <SidebarTrigger className="md:hidden" variant="outline" size="icon">
+            <PanelLeft className="h-5 w-5" />
+            <span className="sr-only">Toggle Menu</span>
           </SidebarTrigger>
           <div className="md:hidden">
             <Logo />
