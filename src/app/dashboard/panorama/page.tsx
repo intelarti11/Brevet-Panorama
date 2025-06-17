@@ -194,7 +194,7 @@ export default function PanoramaPage() {
       return;
     }
 
-    const newStats: Stats = { ...initialStats }; // Start with initialStats to ensure all fields are present
+    const newStats: Stats = { ...initialStats, mentions: { ...initialStats.mentions }, mentionPercentages: { ...initialStats.mentionPercentages} };
     newStats.totalStudents = filteredStudentsData.length;
 
     const normalizedAdmisStr = normalizeForComparison('admis');
@@ -266,6 +266,8 @@ export default function PanoramaPage() {
       newStats.mentionPercentages.bien = parseFloat(((newStats.mentions.bien / newStats.admis) * 100).toFixed(1));
       newStats.mentionPercentages.assezBien = parseFloat(((newStats.mentions.assezBien / newStats.admis) * 100).toFixed(1));
       newStats.mentionPercentages.sansMention = parseFloat(((newStats.mentions.sansMention / newStats.admis) * 100).toFixed(1));
+    } else {
+      newStats.mentionPercentages = { tresBien: 0, bien: 0, assezBien: 0, sansMention: 0 };
     }
 
     newStats.averageOverallScoreAdmitted = countOverallScoresAdmitted > 0 ? parseFloat((sumOverallScoresAdmitted / countOverallScoresAdmitted).toFixed(1)) : undefined;
@@ -288,10 +290,10 @@ export default function PanoramaPage() {
   ].filter(item => item.value > 0), [stats.admis, stats.refuse]);
 
   const mentionsChartData = useMemo(() => [
-    { name: 'TB', value: stats.mentions.tresBien, fill: CHART_COLORS.tresBien, percentage: stats.mentionPercentages.tresBien },
-    { name: 'B', value: stats.mentions.bien, fill: CHART_COLORS.bien, percentage: stats.mentionPercentages.bien },
-    { name: 'AB', value: stats.mentions.assezBien, fill: CHART_COLORS.assezBien, percentage: stats.mentionPercentages.assezBien },
-    { name: 'SM', value: stats.mentions.sansMention, fill: CHART_COLORS.sansMention, percentage: stats.mentionPercentages.sansMention },
+    { name: 'Très Bien', value: stats.mentions.tresBien, fill: CHART_COLORS.tresBien, percentage: stats.mentionPercentages.tresBien },
+    { name: 'Assez Bien', value: stats.mentions.assezBien, fill: CHART_COLORS.assezBien, percentage: stats.mentionPercentages.assezBien },
+    { name: 'Bien', value: stats.mentions.bien, fill: CHART_COLORS.bien, percentage: stats.mentionPercentages.bien },
+    { name: 'Sans Mention', value: stats.mentions.sansMention, fill: CHART_COLORS.sansMention, percentage: stats.mentionPercentages.sansMention },
   ].filter(item => item.value > 0), [stats.mentions, stats.mentionPercentages]);
 
 
@@ -433,14 +435,14 @@ export default function PanoramaPage() {
               <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.tresBien : 0}% des admis</p>
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">Bien</p>
-              <p className="text-2xl font-bold">{stats.mentions.bien}</p>
-              <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.bien : 0}% des admis</p>
-            </div>
-            <div>
               <p className="text-sm font-semibold text-foreground">Assez Bien</p>
               <p className="text-2xl font-bold">{stats.mentions.assezBien}</p>
               <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.assezBien : 0}% des admis</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Bien</p>
+              <p className="text-2xl font-bold">{stats.mentions.bien}</p>
+              <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.bien : 0}% des admis</p>
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Sans Mention</p>
@@ -565,7 +567,7 @@ export default function PanoramaPage() {
                               <ChartTooltipContent 
                                   formatter={(value, name, props) => (
                                       <div className="flex flex-col p-1">
-                                          <span className="font-semibold">{props.payload.name === "SM" ? "Sans Mention" : (props.payload.name === "TB" ? "Très Bien" : (props.payload.name === "AB" ? "Assez Bien" : "Bien" ))}</span>
+                                          <span className="font-semibold">{props.payload.name}</span>
                                           <span>Effectif: {value}</span>
                                           <span>{props.payload.percentage}% des admis</span>
                                       </div>
