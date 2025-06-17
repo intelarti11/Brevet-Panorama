@@ -1,11 +1,11 @@
 
 import { z } from 'zod';
 
-// Helper to convert various inputs to string or undefined
-const preprocessToStringOptional = (val: unknown): string | undefined => {
-  if (val === undefined || val === null) return undefined;
+// Helper to convert various inputs to string or null
+const preprocessToStringOptional = (val: unknown): string | null => {
+  if (val === undefined || val === null) return null;
   const strVal = String(val).trim();
-  return strVal === '' ? undefined : strVal;
+  return strVal === '' ? null : strVal;
 };
 
 // Helper to parse score-like values (e.g., "X/Y" or just "X") to number or undefined
@@ -18,9 +18,17 @@ const parseScoreValue = (valueWithMax: string | number | undefined): number | un
   return isNaN(num) ? undefined : num;
 };
 
-const preprocessOptionalStringToNumber = (val: unknown) => {
-  if (val === undefined || val === null || String(val).trim() === '') return undefined;
-  return parseScoreValue(String(val));
+// Helper to convert optional string/number input from Excel to a number or null
+const preprocessOptionalStringToNumber = (val: unknown): number | null => {
+  if (val === undefined || val === null) {
+    return null; 
+  }
+  const strVal = String(val).trim();
+  if (strVal === '') {
+    return null; 
+  }
+  const parsedNum = parseScoreValue(strVal); 
+  return parsedNum === undefined ? null : parsedNum; 
 };
 
 
@@ -28,37 +36,38 @@ export const studentDataSchema = z.object({
   'anneeScolaireImportee': z.string().min(1, "Année scolaire d'importation requise"),
   
   // Fields matching Excel headers exactly
-  'Série': z.preprocess(preprocessToStringOptional, z.string().optional()),
-  'Code Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
-  'Libellé Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
-  'Commune Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
-  'Division de classe': z.preprocess(preprocessToStringOptional, z.string().optional()),
-  'Catégorie candidat': z.preprocess(preprocessToStringOptional, z.string().optional()),
-  'Numéro Candidat': z.preprocess(preprocessToStringOptional, z.string().optional()), // Handles number or string
+  'Série': z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  'Code Etablissement': z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  'Libellé Etablissement': z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  'Commune Etablissement': z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  'Division de classe': z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  'Catégorie candidat': z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  'Numéro Candidat': z.preprocess(preprocessToStringOptional, z.string().min(1, "Numéro candidat ne peut pas être vide si fourni").nullable().optional()),
   'INE': z.preprocess(preprocessToStringOptional, z.string().min(1, "INE requis")),
   'Nom candidat': z.preprocess(preprocessToStringOptional, z.string().min(1, "Nom candidat requis")),
   'Prénom candidat': z.preprocess(preprocessToStringOptional, z.string().min(1, "Prénom candidat requis")),
-  'Date de naissance': z.preprocess(preprocessToStringOptional, z.string().optional()),
-  'Résultat': z.preprocess(preprocessToStringOptional, z.string().optional()),
-  'TOTAL GENERAL': z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  'Moyenne sur 20': z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  // 'TOTAL POUR MENTION' is removed as it's always empty
+  'Date de naissance': z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  'Résultat': z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  'TOTAL GENERAL': z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  'Moyenne sur 20': z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  // 'TOTAL POUR MENTION' was removed as it's always empty
 
   // Score fields retain camelCase names from original complex headers
-  scoreFrancais: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  scoreMaths: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  scoreHistoireGeo: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  scoreSciences: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  scoreOralDNB: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  scoreLVE: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  scoreArtsPlastiques: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  scoreEducationMusicale: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  scoreEPS: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  scorePhysiqueChimie: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  scoreSciencesVie: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
+  scoreFrancais: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  scoreMaths: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  scoreHistoireGeo: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  scoreSciences: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  scoreOralDNB: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  scoreLVE: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  scoreArtsPlastiques: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  scoreEducationMusicale: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  scoreEPS: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  scorePhysiqueChimie: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
+  scoreSciencesVie: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
 
-  options: z.record(z.string()).optional(),
-  rawRowData: z.any().optional(), 
+  options: z.record(z.string()).optional(), // This stores any other columns
+  rawRowData: z.any().optional(), // Store the original raw row for debugging or future use
 });
 
 export type StudentData = z.infer<typeof studentDataSchema>;
+
