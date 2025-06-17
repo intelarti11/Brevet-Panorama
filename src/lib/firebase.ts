@@ -4,21 +4,19 @@ import { getFirestore } from 'firebase/firestore';
 // import { getAuth } from 'firebase/auth'; // If you need auth
 // import { getStorage } from 'firebase/storage'; // If you need storage
 
-// --- IMPORTANT ---
-// Replace the placeholder values below with your ACTUAL Firebase project configuration.
-// You can find these details in your Firebase project console:
-// Project settings > General > Your apps > SDK setup and configuration
+// Your web app's Firebase configuration
 const firebaseConfig: FirebaseOptions = {
-  apiKey: "YOUR_API_KEY", // Replace with your Firebase API Key
-  authDomain: "YOUR_AUTH_DOMAIN", // Replace with your Firebase Auth Domain
-  projectId: "YOUR_PROJECT_ID", // Replace with your Firebase Project ID
-  storageBucket: "YOUR_STORAGE_BUCKET", // Replace with your Firebase Storage Bucket
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // Replace with your Firebase Messaging Sender ID
-  appId: "YOUR_APP_ID", // Replace with your Firebase App ID
-  // measurementId: "YOUR_MEASUREMENT_ID", // Optional: Replace if you use Google Analytics
+  apiKey: "AIzaSyAB1KxMlcTkqUoFXJojlRco3AOTpk9jkaw",
+  authDomain: "brevet-panorama.firebaseapp.com",
+  projectId: "brevet-panorama",
+  storageBucket: "brevet-panorama.appspot.com", // Corrected from .firebasestorage.app to .appspot.com
+  messagingSenderId: "486402169414",
+  appId: "1:486402169414:web:67ccb79f3c06722fcdc847"
+  // measurementId: "YOUR_MEASUREMENT_ID", // Optional: Add if you use Google Analytics
 };
 
 // Check if essential Firebase config values are present (after you've replaced placeholders)
+// This check is now less critical if the user provides the full config directly, but good for general template.
 if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.projectId === "YOUR_PROJECT_ID" || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
   console.error(
     "ERREUR DE CONFIGURATION FIREBASE : Clé API ou ID de projet manquant ou non remplacé. " +
