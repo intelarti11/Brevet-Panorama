@@ -65,7 +65,6 @@ export default function ImportPage() {
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           
-          // Get raw data as array of arrays to find header row
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null }); 
 
           if (jsonData.length === 0) {
@@ -94,7 +93,7 @@ export default function ImportPage() {
           });
           
           const dataRows = XLSX.utils.sheet_to_json(worksheet, {
-            header: headers, // Use trimmed headers
+            header: headers, 
             range: headerRowIndex + 1, 
             defval: null, 
             cellDates: true
@@ -104,18 +103,29 @@ export default function ImportPage() {
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
 
+          const mainDataKeysFromCsv = [
+            'Série', 'Code Etablissement', 'Libellé Etablissement', 'Commune Etablissement',
+            'Division de classe', 'Catégorie candidat', 'Numéro Candidat', 'INE', 'Nom candidat',
+            'Prénom candidat', 'Date de naissance', 'Résultat', 'TOTAL GENERAL', 'TOTAL POUR MENTION',
+            'Moyenne sur 20', '001 - 1 - Français - Ponctuel', '002 - 1 - Mathématiques - Ponctuel',
+            '003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel',
+            '004 - 1 - Sciences - Ponctuel', 
+            '005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année'
+            // Add other specific score/data columns if they become primary later
+          ];
+
+
           dataRows.forEach((rawRow, index) => {
             const getVal = (keys: string[]) => {
               for (const key of keys) {
-                // rawRow keys are now trimmed because `headers` was trimmed
                 if (rawRow[key] !== undefined && rawRow[key] !== null) return rawRow[key];
               }
               return undefined;
             };
             
-            const ine = String(getVal(['Numéro Cand. INE', 'Numero Cand. INE']) || '').trim();
+            const ine = String(getVal(['INE', 'Numéro Cand. INE']) || '').trim();
             const nom = String(getVal(['Nom candidat']) || '').trim();
-            const prenoms = String(getVal(['Prénom(s) candidat', 'Prenom(s) candidat']) || '').trim();
+            const prenoms = String(getVal(['Prénom candidat', 'Prénom(s) candidat']) || '').trim();
 
             if (!ine || !nom || !prenoms) {
               // console.log(`Skipping row ${index + headerRowIndex + 2} due to missing essential identifier(s). INE: '${ine}', Nom: '${nom}', Prenoms: '${prenoms}'`);
@@ -123,54 +133,42 @@ export default function ImportPage() {
             }
             
             const studentInput = {
-              serie: getVal(['Série', 'Serie']),
-              codeEtablissement: getVal(['Code Établis.', 'Code Etablis.']),
-              libelleEtablissement: getVal(['Libellé Établis.', 'Libelle Etablis.']),
-              communeEtablissement: getVal(['Commune Établis.', 'Commune Etablis.']),
-              divisionEleve: getVal(['Division Élève', 'Division Eleve']),
-              categorieSocioPro: getVal(['Catégorie socio-prof.', 'Categorie socio-prof.']),
+              serie: getVal(['Série']),
+              codeEtablissement: getVal(['Code Etablissement', 'Code Établis.']),
+              libelleEtablissement: getVal(['Libellé Etablissement', 'Libellé Établis.']),
+              communeEtablissement: getVal(['Commune Etablissement', 'Commune Établis.']),
+              divisionEleve: getVal(['Division de classe', 'Division Élève']),
+              categorieSocioPro: getVal(['Catégorie candidat', 'Catégorie socio-prof.']),
               numeroCandidatINE: ine,
               nomCandidat: nom,
               prenomsCandidat: prenoms,
-              dateNaissance: getVal(['Dt nais. Cand.']) instanceof Date ? (getVal(['Dt nais. Cand.']) as Date).toLocaleDateString('fr-FR') : String(getVal(['Dt nais. Cand.']) || ''),
-              resultat: getVal(['Résultat', 'Resultat']),
-              totalGeneral: getVal(['TOTAL GÉNÉRAL /800,0', 'TOTAL GENERAL /800,0']),
-              totalPourcentage: getVal(['TOTAL POURCENTAGE /20']),
-              scoreFrancais: getVal(['Fra LV001 /50']),
-              scoreMaths: getVal(['Mat LV001 /50']),
-              scoreHistoireGeo: getVal(['His Geo01A /50']),
-              scoreSciencesVie: getVal(['Sci Vie01A /50']),
-              scorePhysiqueChimie: getVal(['Phy Chi01A /50']),
-              scoreLVE: getVal(['LVE Ang01A /50']),
-              scoreArtsPlastiques: getVal(['ArtsPla01A /50']),
+              dateNaissance: getVal(['Date de naissance', 'Dt nais. Cand.']) instanceof Date ? (getVal(['Date de naissance', 'Dt nais. Cand.']) as Date).toLocaleDateString('fr-FR') : String(getVal(['Date de naissance', 'Dt nais. Cand.']) || ''),
+              resultat: getVal(['Résultat']),
+              totalGeneral: getVal(['TOTAL GENERAL', 'TOTAL GÉNÉRAL /800,0']),
+              totalPourcentage: getVal(['Moyenne sur 20', 'TOTAL POURCENTAGE /20']),
+              scoreFrancais: getVal(['001 - 1 - Français - Ponctuel', 'Fra LV001 /50']),
+              scoreMaths: getVal(['002 - 1 - Mathématiques - Ponctuel', 'Mat LV001 /50']),
+              scoreHistoireGeo: getVal(['003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel', 'His Geo01A /50']),
+              scoreSciences: getVal(['004 - 1 - Sciences - Ponctuel']), // New mapping
+              scoreOralDNB: getVal(['005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année', 'OralDNB01A /100']),
+              
+              // These will likely be undefined or non-numeric with the new headers
+              scoreLVE: getVal(['LVE Ang01A /50', '007AB - 1 - Langues étrangères ou régionales - Contrôle continu']), 
+              scoreArtsPlastiques: getVal(['ArtsPla01A /50', '007AD - 1 - Langages des arts et du corps - Contrôle continu']), // This might be a broader category
               scoreEducationMusicale: getVal(['Edu Mus01A /50']),
               scoreEPS: getVal(['EPS CCF01A /100']),
-              scoreOralDNB: getVal(['OralDNB01A /100']),
+              scorePhysiqueChimie: getVal(['Phy Chi01A /50']),
+              scoreSciencesVie: getVal(['Sci Vie01A /50']),
               options: {}, 
               rawRowData: rawRow, 
             };
             
-            const knownMainHeaders = Object.keys(studentInput).filter(k => k !== 'options' && k !== 'rawRowData');
-            const optionHeadersFromExcel = [
-              'LCA001AR', 'LCA001AC', 'LCA001AL', 'LCA001AG', 'LCA001FT', 'LCA001BI', 'LCA001CH',
-              'LCE001AN', 'LCE001AL', 'LCE001ES', 'LCE001IT', 'les comprofessionnels' 
-            ];
-
             const currentOptions: Record<string, string> = {};
-            optionHeadersFromExcel.forEach(optHeader => {
-              const val = getVal([optHeader, `${optHeader} /20`, `${optHeader} /50`]);
-              if (val !== undefined && val !== null) {
-                currentOptions[optHeader.split(' ')[0]] = String(val);
-              }
-            });
             Object.keys(rawRow).forEach(excelHeader => {
-                // excelHeader is now a trimmed key from the `headers` array
-                if (!knownMainHeaders.some(mainHeaderKey => {
-                    const mainHeaderInExcelCouldBe = [mainHeaderKey, mainHeaderKey.replace(/\./g, '')]; // e.g. 'Code Établis.' vs 'Code Etablis'
-                    return mainHeaderInExcelCouldBe.some(mh => excelHeader.toLowerCase().includes(mh.toLowerCase())) ||
-                           (studentInput as any)[mainHeaderKey] === rawRow[excelHeader];
-                  }) && 
-                    !optionHeadersFromExcel.some(optKey => excelHeader.toLowerCase().startsWith(optKey.toLowerCase().split(' ')[0]))
+                // excelHeader is a trimmed key from the `headers` array
+                // Check if this header was NOT one of the main data keys we explicitly mapped above
+                if (!mainDataKeysFromCsv.includes(excelHeader) && 
+                    !Object.values(studentInput).includes(rawRow[excelHeader]) // rough check if value was already used
                    ) {
                     const value = rawRow[excelHeader];
                     if (value !== undefined && value !== null && String(value).trim() !== '') {
@@ -179,11 +177,9 @@ export default function ImportPage() {
                 }
             });
 
-
              if (Object.keys(currentOptions).length > 0) {
                 studentInput.options = currentOptions;
             }
-
 
             const validationResult = studentDataSchema.safeParse(studentInput);
             if (validationResult.success) {
@@ -213,7 +209,7 @@ export default function ImportPage() {
           } else if (error) {
             // Don't override existing critical error like "header not found"
           } else if (dataRows.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
-            throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'Numéro Cand. INE', 'Nom candidat', et 'Prénom(s) candidat' sont présentes et remplies.");
+            throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'INE', 'Nom candidat', et 'Prénom candidat' (ou leurs équivalents) sont présentes, correctement nommées et remplies dans le fichier Excel.");
           }
           else {
             throw new Error("Aucune donnée valide trouvée dans le fichier après parsing.");
