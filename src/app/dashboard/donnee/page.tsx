@@ -8,16 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, SlidersHorizontal, Loader2, AlertTriangle } from 'lucide-react';
+import { Search, SlidersHorizontal, Loader2, AlertTriangle, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import { getFirestore, collection, getDocs, QuerySnapshot, DocumentData } from 'firebase/firestore';
-import { app, db } from '@/lib/firebase'; // Ensure db is exported from firebase.ts
+import { app, db } from '@/lib/firebase'; 
 
 interface DisplayStudentData {
   id: string;
   nom: string;
   prenom: string;
   etablissement: string;
-  annee: string; // This will come from 'serie' field in Firestore
+  annee: string; 
   resultat: string;
   moyenne?: number;
 }
@@ -25,8 +25,8 @@ interface DisplayStudentData {
 const ALL_YEARS_VALUE = "__ALL_YEARS__";
 const ALL_ESTABLISHMENTS_VALUE = "__ALL_ESTABLISHMENTS__";
 
-// Helper function to normalize text (lowercase and remove accents)
 const normalizeText = (text: string): string => {
+  if (text === null || text === undefined) return "";
   return text
     .toLowerCase()
     .normalize("NFD")
@@ -39,6 +39,8 @@ export default function DonneePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedYear, setSelectedYear] = useState<string>(ALL_YEARS_VALUE);
   const [selectedEstablishment, setSelectedEstablishment] = useState<string>(ALL_ESTABLISHMENTS_VALUE);
+  
+  const [sortConfig, setSortConfig] = useState<{ key: keyof DisplayStudentData | null; direction: 'ascending' | 'descending' }>({ key: null, direction: 'ascending' });
 
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [availableEstablishments, setAvailableEstablishments] = useState<string[]>([]);
@@ -66,11 +68,11 @@ export default function DonneePage() {
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           const studentToAdd: DisplayStudentData = {
-            id: doc.id, // numeroCandidatINE is the doc ID
+            id: doc.id, 
             nom: data.nomCandidat || 'N/A',
             prenom: data.prenomsCandidat || 'N/A',
             etablissement: data.libelleEtablissement || 'N/A',
-            annee: data.serie || 'N/A', // Using 'serie' for 'annee'
+            annee: data.serie || 'N/A', 
             resultat: data.resultat || 'N/A',
             moyenne: data.totalPourcentage !== undefined && data.totalPourcentage !== null ? Number(data.totalPourcentage) : undefined,
           };
@@ -80,7 +82,6 @@ export default function DonneePage() {
         });
 
         setAllStudentsData(students);
-        setFilteredData(students); // Initialize filteredData with all students
         setAvailableYears(Array.from(years).sort());
         setAvailableEstablishments(Array.from(establishments).sort());
 
@@ -112,11 +113,44 @@ export default function DonneePage() {
         normalizeText(student.id).includes(normalizedSearchTerm)
       );
     }
+
+    if (sortConfig.key) {
+      const sortKey = sortConfig.key;
+      data.sort((a, b) => {
+        const valA = a[sortKey];
+        const valB = b[sortKey];
+
+        if (valA === null || valA === undefined) {
+          return (valB === null || valB === undefined) ? 0 : 1;
+        }
+        if (valB === null || valB === undefined) {
+          return -1;
+        }
+
+        let comparison = 0;
+        if (sortKey === 'moyenne') {
+          comparison = (valA as number) - (valB as number);
+        } else {
+          comparison = normalizeText(String(valA)).localeCompare(normalizeText(String(valB)));
+        }
+
+        return sortConfig.direction === 'ascending' ? comparison : -comparison;
+      });
+    }
+
     setFilteredData(data);
-  }, [searchTerm, selectedYear, selectedEstablishment, allStudentsData]);
+  }, [searchTerm, selectedYear, selectedEstablishment, allStudentsData, sortConfig]);
 
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
+  };
+
+  const handleSort = (key: keyof DisplayStudentData) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
   };
 
   const getBadgeVariant = (resultat: string): "default" | "secondary" | "destructive" | "outline" => {
@@ -124,6 +158,15 @@ export default function DonneePage() {
     if (lowerResultat.includes('refusé')) return "destructive";
     if (lowerResultat.includes('admis')) return "default";
     return "secondary";
+  };
+
+  const renderSortIcon = (columnKey: keyof DisplayStudentData) => {
+    if (sortConfig.key !== columnKey) {
+      return <ChevronsUpDown className="ml-2 h-4 w-4 text-muted-foreground/60" />;
+    }
+    return sortConfig.direction === 'ascending' 
+      ? <ArrowUp className="ml-2 h-4 w-4 text-foreground" /> 
+      : <ArrowDown className="ml-2 h-4 w-4 text-foreground" />;
   };
 
   if (isLoading) {
@@ -150,7 +193,7 @@ export default function DonneePage() {
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-foreground tracking-tight">Gestion des Données Élèves</h1>
         <p className="text-muted-foreground mt-1">
-          Recherchez, filtrez et consultez les résultats détaillés des élèves au brevet.
+          Recherchez, filtrez, triez et consultez les résultats détaillés des élèves au brevet.
         </p>
       </header>
 
@@ -227,13 +270,27 @@ export default function DonneePage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="w-[120px]">INE</TableHead>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Prénom</TableHead>
-                    <TableHead>Établissement</TableHead>
-                    <TableHead>Série/Année</TableHead>
-                    <TableHead>Résultat</TableHead>
-                    <TableHead className="text-right">Moyenne (/20)</TableHead>
+                    <TableHead className="w-[120px] cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('id')}>
+                      <div className="flex items-center">INE{renderSortIcon('id')}</div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('nom')}>
+                      <div className="flex items-center">Nom{renderSortIcon('nom')}</div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('prenom')}>
+                      <div className="flex items-center">Prénom{renderSortIcon('prenom')}</div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('etablissement')}>
+                      <div className="flex items-center">Établissement{renderSortIcon('etablissement')}</div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('annee')}>
+                      <div className="flex items-center">Série/Année{renderSortIcon('annee')}</div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('resultat')}>
+                      <div className="flex items-center">Résultat{renderSortIcon('resultat')}</div>
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('moyenne')}>
+                      <div className="flex items-center justify-end">Moyenne (/20){renderSortIcon('moyenne')}</div>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -271,3 +328,4 @@ export default function DonneePage() {
     </div>
   );
 }
+
