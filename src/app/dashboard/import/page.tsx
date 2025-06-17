@@ -136,15 +136,28 @@ export default function ImportPage() {
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
           
-          const mainDataKeysFromCsv = [
+          // Define the set of Excel headers that are explicitly mapped to studentInput fields
+          const mappedExcelHeaders = new Set([
             'Série', 'Code Etablissement', 'Libellé Etablissement', 'Commune Etablissement',
-            'Division de classe', 'Catégorie candidat', 'Numéro Candidat', 'INE', 'Nom candidat',
-            'Prénom candidat', 'Date de naissance', 'Résultat', 'TOTAL GENERAL', 'TOTAL POUR MENTION',
-            'Moyenne sur 20', '001 - 1 - Français - Ponctuel', '002 - 1 - Mathématiques - Ponctuel',
+            'Division de classe', 'Catégorie candidat', 
+            // 'Numéro Candidat' and 'INE' are used for ine
+            'Numéro Candidat', 'INE', 
+            'Nom candidat', // used for nom
+            'Prénom candidat', // used for prenoms
+            'Date de naissance', 'Résultat', 'TOTAL GENERAL', 'Moyenne sur 20',
+            '001 - 1 - Français - Ponctuel', 
+            '002 - 1 - Mathématiques - Ponctuel',
             '003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel',
             '004 - 1 - Sciences - Ponctuel', 
-            '005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année'
-          ];
+            '005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année',
+            '007AB - 1 - Langues étrangères ou régionales - Contrôle continu', // For scoreLVE
+            '007AD - 1 - Langages des arts et du corps - Contrôle continu', // For scoreArtsPlastiques
+            'Edu Mus01A /50', // For scoreEducationMusicale
+            'EPS CCF01A /100', // For scoreEPS
+            'Phy Chi01A /50', // For scorePhysiqueChimie
+            'Sci Vie01A /50', // For scoreSciencesVie
+            // Add any other headers that are directly used by getVal for studentInput fields
+          ]);
 
 
           dataRows.forEach((rawRow, index) => {
@@ -194,9 +207,7 @@ export default function ImportPage() {
             
             const currentOptions: Record<string, string> = {};
             Object.keys(rawRow).forEach(excelHeader => {
-                if (!mainDataKeysFromCsv.includes(excelHeader) && 
-                    !Object.values(studentInput).some(val => val === rawRow[excelHeader])
-                   ) {
+                if (!mappedExcelHeaders.has(excelHeader)) { // Optimized check
                     const value = rawRow[excelHeader];
                     if (value !== undefined && value !== null && String(value).trim() !== '') {
                         currentOptions[excelHeader] = String(value);
@@ -234,6 +245,7 @@ export default function ImportPage() {
           if (transformedData.length > 0) {
             await handleImportToFirestore(transformedData);
           } else if (error) { 
+            // If 'error' state is already set (e.g. header not found), don't override it.
           } else if (dataRows.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
             throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'INE', 'Nom candidat', et 'Prénom candidat' (ou leurs équivalents) sont présentes, correctement nommées et remplies dans le fichier Excel.");
           } else {
