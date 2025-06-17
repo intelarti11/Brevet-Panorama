@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import type { StudentData } from '@/lib/excel-types';
 import { studentDataSchema } from '@/lib/excel-types';
-import { Loader2, UploadCloud, FileImport, AlertTriangle, DatabaseZap } from 'lucide-react';
+import { Loader2, UploadCloud, Import, AlertTriangle } from 'lucide-react'; // Changed FileImport to Import
 
 import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
@@ -54,7 +54,7 @@ export default function ImportPage() {
     dataToImport.forEach(student => {
       if (student.numeroCandidatINE && student.numeroCandidatINE.trim() !== "") {
         const studentRef = doc(collectionRef, student.numeroCandidatINE);
-        const { rawRowData, ...studentToSave } = student;
+        const { rawRowData, ...studentToSave } = student; // Exclude rawRowData
         batch.set(studentRef, studentToSave);
       } else {
         console.warn("Skipping student due to missing or invalid INE:", student);
@@ -70,7 +70,7 @@ export default function ImportPage() {
       console.error("Erreur d'importation Firestore:", importError);
       setError(`Échec de l'importation: ${importError.message}`);
       toast({ variant: "destructive", title: "Erreur d'Importation", description: `Échec de l'importation: ${importError.message}`, duration: 7000 });
-      throw importError; // Re-throw to indicate failure to parseExcelData
+      throw importError; // Re-throw to indicate failure to parseAndImportData
     } finally {
       setIsImporting(false);
     }
@@ -119,15 +119,17 @@ export default function ImportPage() {
             if (typeof h === 'string') {
               return h.trim();
             }
-            return String(h || '').trim();
+            return String(h || '').trim(); // Ensure h is treated as string and trim
           });
 
+
           const dataRows = XLSX.utils.sheet_to_json(worksheet, {
-            header: headers,
-            range: headerRowIndex + 1,
-            defval: null,
-            cellDates: true
+            header: headers, // Use the trimmed headers for parsing rows
+            range: headerRowIndex + 1, // Start reading data from the row after headers
+            defval: null, // Ensure empty cells are parsed as null
+            cellDates: true // Attempt to parse dates
           }) as any[];
+
 
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
@@ -142,9 +144,11 @@ export default function ImportPage() {
             '005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année'
           ];
 
+
           dataRows.forEach((rawRow, index) => {
             const getVal = (keys: string[]) => {
               for (const key of keys) {
+                // Ensure we check against trimmed headers if the keys in rawRow are also trimmed
                 if (rawRow[key] !== undefined && rawRow[key] !== null) return rawRow[key];
               }
               return undefined;
@@ -154,7 +158,7 @@ export default function ImportPage() {
             const nom = String(getVal(['Nom candidat']) || '').trim();
             const prenoms = String(getVal(['Prénom candidat']) || '').trim();
 
-            if (!ine || !nom || !prenoms) {
+            if (!ine || !nom || !prenoms) { // Skip rows where essential identifiers are missing
               return;
             }
 
@@ -171,26 +175,31 @@ export default function ImportPage() {
               dateNaissance: getVal(['Date de naissance']) instanceof Date ? (getVal(['Date de naissance']) as Date).toLocaleDateString('fr-FR') : String(getVal(['Date de naissance']) || ''),
               resultat: getVal(['Résultat']),
               totalGeneral: getVal(['TOTAL GENERAL']),
-              totalPourcentage: getVal(['Moyenne sur 20']),
+              totalPourcentage: getVal(['Moyenne sur 20']), // This was "TOTAL POUR MENTION" earlier, ensuring it's Moyenne sur 20 now
               scoreFrancais: getVal(['001 - 1 - Français - Ponctuel']),
               scoreMaths: getVal(['002 - 1 - Mathématiques - Ponctuel']),
               scoreHistoireGeo: getVal(['003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel']),
-              scoreSciences: getVal(['004 - 1 - Sciences - Ponctuel']),
+              scoreSciences: getVal(['004 - 1 - Sciences - Ponctuel']), // Added based on CSV headers
               scoreOralDNB: getVal(['005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année']),
+
               scoreLVE: getVal(['007AB - 1 - Langues étrangères ou régionales - Contrôle continu']),
               scoreArtsPlastiques: getVal(['007AD - 1 - Langages des arts et du corps - Contrôle continu']),
-              scoreEducationMusicale: getVal(['Edu Mus01A /50']),
-              scoreEPS: getVal(['EPS CCF01A /100']),
-              scorePhysiqueChimie: getVal(['Phy Chi01A /50']),
-              scoreSciencesVie: getVal(['Sci Vie01A /50']),
+              // Placeholder for others that might not be directly in the main list, or need specific mapping
+              scoreEducationMusicale: getVal(['Edu Mus01A /50']), // Example if such header exists
+              scoreEPS: getVal(['EPS CCF01A /100']), // Example
+              scorePhysiqueChimie: getVal(['Phy Chi01A /50']), // Example
+              scoreSciencesVie: getVal(['Sci Vie01A /50']), // Example
+
               options: {},
-              rawRowData: rawRow,
+              rawRowData: rawRow, // For debugging
             };
             
+            // Populate options from remaining keys
             const currentOptions: Record<string, string> = {};
             Object.keys(rawRow).forEach(excelHeader => {
+                // Check if excelHeader (trimmed) is NOT one of the main keys we've already mapped
                 if (!mainDataKeysFromCsv.includes(excelHeader) && 
-                    !Object.values(studentInput).some(val => val === rawRow[excelHeader]) 
+                    !Object.values(studentInput).some(val => val === rawRow[excelHeader]) // Avoid duplicating values already mapped
                    ) {
                     const value = rawRow[excelHeader];
                     if (value !== undefined && value !== null && String(value).trim() !== '') {
@@ -216,6 +225,7 @@ export default function ImportPage() {
             const firstError = validationErrors[0];
             const errorMessages = Object.entries(firstError.errors.fieldErrors)
               .map(([field, messages]) => {
+                // Ensure messages is an array and get the first message
                 if (messages && messages.length > 0) {
                   return `${field}: ${messages[0]}`;
                 }
@@ -228,11 +238,13 @@ export default function ImportPage() {
 
           if (transformedData.length > 0) {
             await handleImportToFirestore(transformedData);
-          } else if (error) {
+          } else if (error) { // An error might have been set by handleImportToFirestore if it was called with empty data earlier or another critical error
             // Don't override existing critical error
           } else if (dataRows.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
+            // This case means all rows were filtered out by the pre-filter (missing INE, Nom, or Prénom)
             throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'INE', 'Nom candidat', et 'Prénom candidat' (ou leurs équivalents) sont présentes, correctement nommées et remplies dans le fichier Excel.");
           } else {
+            // This case means no data rows were found or something else went wrong before validation
             throw new Error("Aucune donnée valide trouvée dans le fichier après parsing.");
           }
 
@@ -241,7 +253,7 @@ export default function ImportPage() {
           setError(`Erreur: ${parseOrImportError.message}`);
           toast({ variant: "destructive", title: "Erreur", description: parseOrImportError.message, duration: 7000 });
         } finally {
-          setIsLoading(false); 
+          setIsLoading(false); // Stop loading indicator for file reading
         }
       };
       reader.onerror = () => {
@@ -286,7 +298,7 @@ export default function ImportPage() {
               </Button>
             </label>
             <Button onClick={parseAndImportData} disabled={!file || isLoading || isImporting} className="w-full sm:w-auto">
-              {(isLoading || isImporting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileImport className="mr-2 h-4 w-4" />}
+              {(isLoading || isImporting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />} {/* Changed FileImport to Import */}
               {isLoading ? "Lecture du fichier..." : (isImporting ? "Importation en cours..." : "Importer le Fichier")}
             </Button>
           </div>
@@ -300,5 +312,4 @@ export default function ImportPage() {
     </div>
   );
 }
-
     
