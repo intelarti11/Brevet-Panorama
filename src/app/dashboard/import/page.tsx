@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { StudentData } from '@/lib/excel-types';
 import { studentDataSchema } from '@/lib/excel-types';
 import { Loader2, UploadCloud, Import, AlertTriangle } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
@@ -25,15 +26,17 @@ export default function ImportPage() {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
-      if (selectedFile.type === 'text/csv' || selectedFile.name.endsWith('.csv')) {
+      const fileType = selectedFile.type;
+      const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
+      if (validTypes.includes(fileType) || selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls')) {
         setFile(selectedFile);
         setFileName(selectedFile.name);
         setError(null);
       } else {
-        setError("Format de fichier invalide. Veuillez sélectionner un fichier .csv.");
+        setError("Format de fichier invalide. Veuillez sélectionner un fichier .xlsx ou .xls.");
         setFile(null);
         setFileName(null);
-        toast({ variant: "destructive", title: "Erreur de fichier", description: "Format de fichier invalide. Veuillez sélectionner un fichier .csv." });
+        toast({ variant: "destructive", title: "Erreur de fichier", description: "Format de fichier invalide. Veuillez sélectionner un fichier .xlsx ou .xls." });
       }
     }
   };
@@ -54,7 +57,6 @@ export default function ImportPage() {
     dataToImport.forEach(student => {
       if (student.numeroCandidatINE && student.numeroCandidatINE.trim() !== "") {
         const studentRef = doc(collectionRef, student.numeroCandidatINE);
-        // Exclure rawRowData et s'assurer qu'il n'y a pas de valeurs undefined
         const { rawRowData, ...studentDataForFirestore } = student;
         const cleanedStudentData = JSON.parse(JSON.stringify(studentDataForFirestore));
         batch.set(studentRef, cleanedStudentData);
@@ -105,56 +107,24 @@ export default function ImportPage() {
       const reader = new FileReader();
       reader.onload = async (event) => {
         try {
-          const csvText = event.target?.result as string;
-          if (!csvText) {
-            throw new Error("Le fichier CSV est vide ou n'a pas pu être lu.");
+          const arrayBuffer = event.target?.result;
+          if (!arrayBuffer) {
+            throw new Error("Le fichier Excel est vide ou n'a pas pu être lu.");
           }
-
-          const lines = csvText.split(/\r\n|\n/).filter(line => line.trim() !== '');
-          if (lines.length < 1) {
-            throw new Error("Le fichier CSV est vide ou ne contient pas de ligne d'en-tête.");
+          const data = new Uint8Array(arrayBuffer as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+          
+          if (!workbook.SheetNames.length) {
+            throw new Error("Le classeur Excel ne contient aucune feuille.");
           }
+          
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const dataObjects = XLSX.utils.sheet_to_json<any>(worksheet);
 
-          let headerRowIndex = -1;
-          let csvHeaders: string[] = [];
-
-          for (let i = 0; i < lines.length; i++) {
-              const potentialHeaders = lines[i].split(';').map(h => h.trim());
-              if (potentialHeaders.includes('INE') && potentialHeaders.includes('Nom candidat') && potentialHeaders.includes('Prénom candidat')) {
-                  csvHeaders = potentialHeaders;
-                  headerRowIndex = i;
-                  break;
-              }
+          if (dataObjects.length === 0) {
+            throw new Error("Aucune donnée trouvée dans la première feuille du fichier Excel. Assurez-vous que la première ligne contient les en-têtes.");
           }
-
-          if (headerRowIndex === -1) {
-              throw new Error("Impossible de trouver la ligne d'en-tête dans le fichier CSV. Assurez-vous qu'elle contient les colonnes 'INE', 'Nom candidat' et 'Prénom candidat'.");
-          }
-
-          const dataObjects: any[] = [];
-          if (lines.length > headerRowIndex + 1) {
-            for (let i = headerRowIndex + 1; i < lines.length; i++) {
-                const values = lines[i].split(';');
-                if (values.length === csvHeaders.length) {
-                    const rowObject: any = {};
-                    csvHeaders.forEach((header, index) => {
-                        rowObject[header] = values[index] !== undefined && values[index] !== null ? String(values[index]).trim() : null;
-                    });
-                    dataObjects.push(rowObject);
-                } else {
-                    console.warn(`Ligne ${i + 1} ignorée : nombre de colonnes incohérent. Attendu ${csvHeaders.length}, obtenu ${values.length}. Ligne: "${lines[i]}"`);
-                }
-            }
-          }
-
-
-          if (dataObjects.length === 0 && lines.length > headerRowIndex + 1 ) {
-             throw new Error("Aucune ligne de données n'a pu être analysée à partir du CSV. Vérifiez la cohérence du nombre de colonnes et les délimiteurs (point-virgule).");
-          }
-          if (dataObjects.length === 0 && !(lines.length > headerRowIndex + 1)) {
-            throw new Error("Aucune ligne de données trouvée après la ligne d'en-tête dans le fichier CSV.");
-          }
-
 
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
@@ -171,58 +141,62 @@ export default function ImportPage() {
             '005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année',
             '007AB - 1 - Langues étrangères ou régionales - Contrôle continu',
             '007AD - 1 - Langages des arts et du corps - Contrôle continu',
-            'Edu Mus01A /50', // Conservé au cas où, même si non dans l'exemple CSV récent
-            'EPS CCF01A /100', // Conservé
-            'Phy Chi01A /50',  // Conservé
-            'Sci Vie01A /50'   // Conservé
+            'Edu Mus01A /50',
+            'EPS CCF01A /100',
+            'Phy Chi01A /50',
+            'Sci Vie01A /50'
           ]);
 
           dataObjects.forEach((rawRow, index) => {
-            const getCsvVal = (headerName: string) => rawRow[headerName];
+            const getExcelVal = (headerName: string) => rawRow[headerName];
 
-            const ine = String(getCsvVal('INE') || getCsvVal('Numéro Candidat') || '').trim();
-            const nom = String(getCsvVal('Nom candidat') || '').trim();
-            const prenoms = String(getCsvVal('Prénom candidat') || '').trim();
+            const ine = String(getExcelVal('INE') || getExcelVal('Numéro Candidat') || '').trim();
+            const nom = String(getExcelVal('Nom candidat') || '').trim();
+            const prenoms = String(getExcelVal('Prénom candidat') || '').trim();
 
             if (!ine || !nom || !prenoms) {
-              return;
+              // Skip row if essential identifiers are missing
+              console.warn(`Ligne ${index + 2} ignorée : INE, Nom ou Prénom manquant.`);
+              return; 
             }
 
             const studentInput: any = {
-              serie: getCsvVal('Série'),
-              codeEtablissement: getCsvVal('Code Etablissement'),
-              libelleEtablissement: getCsvVal('Libellé Etablissement'),
-              communeEtablissement: getCsvVal('Commune Etablissement'),
-              divisionEleve: getCsvVal('Division de classe'),
-              categorieSocioPro: getCsvVal('Catégorie candidat'),
+              serie: getExcelVal('Série'),
+              codeEtablissement: getExcelVal('Code Etablissement'),
+              libelleEtablissement: getExcelVal('Libellé Etablissement'),
+              communeEtablissement: getExcelVal('Commune Etablissement'),
+              divisionEleve: getExcelVal('Division de classe'),
+              categorieSocioPro: getExcelVal('Catégorie candidat'),
               numeroCandidatINE: ine,
               nomCandidat: nom,
               prenomsCandidat: prenoms,
-              dateNaissance: getCsvVal('Date de naissance'),
-              resultat: getCsvVal('Résultat'),
-              totalGeneral: getCsvVal('TOTAL GENERAL'),
-              totalPourcentage: getCsvVal('Moyenne sur 20'),
-              scoreFrancais: getCsvVal('001 - 1 - Français - Ponctuel'),
-              scoreMaths: getCsvVal('002 - 1 - Mathématiques - Ponctuel'),
-              scoreHistoireGeo: getCsvVal('003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel'),
-              scoreSciences: getCsvVal('004 - 1 - Sciences - Ponctuel'),
-              scoreOralDNB: getCsvVal('005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année'),
-              scoreLVE: getCsvVal('007AB - 1 - Langues étrangères ou régionales - Contrôle continu'),
-              scoreArtsPlastiques: getCsvVal('007AD - 1 - Langages des arts et du corps - Contrôle continu'),
-              scoreEducationMusicale: getCsvVal('Edu Mus01A /50'),
-              scoreEPS: getCsvVal('EPS CCF01A /100'),
-              scorePhysiqueChimie: getCsvVal('Phy Chi01A /50'),
-              scoreSciencesVie: getCsvVal('Sci Vie01A /50'),
+              dateNaissance: getExcelVal('Date de naissance') instanceof Date 
+                             ? (getExcelVal('Date de naissance') as Date).toLocaleDateString('fr-FR') 
+                             : getExcelVal('Date de naissance'),
+              resultat: getExcelVal('Résultat'),
+              totalGeneral: getExcelVal('TOTAL GENERAL'),
+              totalPourcentage: getExcelVal('Moyenne sur 20'),
+              scoreFrancais: getExcelVal('001 - 1 - Français - Ponctuel'),
+              scoreMaths: getExcelVal('002 - 1 - Mathématiques - Ponctuel'),
+              scoreHistoireGeo: getExcelVal('003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel'),
+              scoreSciences: getExcelVal('004 - 1 - Sciences - Ponctuel'),
+              scoreOralDNB: getExcelVal('005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année'),
+              scoreLVE: getExcelVal('007AB - 1 - Langues étrangères ou régionales - Contrôle continu'),
+              scoreArtsPlastiques: getExcelVal('007AD - 1 - Langages des arts et du corps - Contrôle continu'),
+              scoreEducationMusicale: getExcelVal('Edu Mus01A /50'),
+              scoreEPS: getExcelVal('EPS CCF01A /100'),
+              scorePhysiqueChimie: getExcelVal('Phy Chi01A /50'),
+              scoreSciencesVie: getExcelVal('Sci Vie01A /50'),
               options: {},
               rawRowData: rawRow,
             };
 
             const currentOptions: Record<string, string> = {};
-            Object.keys(rawRow).forEach(csvHeader => {
-                if (!mainHeadersForOptionsLogic.has(csvHeader)) {
-                    const value = rawRow[csvHeader];
+            Object.keys(rawRow).forEach(excelHeader => {
+                if (!mainHeadersForOptionsLogic.has(excelHeader)) {
+                    const value = rawRow[excelHeader];
                     if (value !== undefined && value !== null && String(value).trim() !== '') {
-                        currentOptions[csvHeader] = String(value);
+                        currentOptions[excelHeader] = String(value);
                     }
                 }
             });
@@ -235,7 +209,7 @@ export default function ImportPage() {
             if (validationResult.success) {
               transformedData.push(validationResult.data);
             } else {
-              validationErrors.push({ row: index + headerRowIndex + 2, errors: validationResult.error.flatten() });
+              validationErrors.push({ row: index + 2, errors: validationResult.error.flatten() }); // +2 for 1-based indexing and header row
             }
           });
 
@@ -256,30 +230,30 @@ export default function ImportPage() {
           if (transformedData.length > 0) {
             await handleImportToFirestore(transformedData);
           } else if (error) {
-            // Erreur critique déjà définie
+            // Critical error already set
           } else if (dataObjects.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
-            throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'INE', 'Nom candidat', et 'Prénom candidat' sont présentes, correctement nommées et remplies dans le fichier CSV.");
+             throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'INE', 'Nom candidat', et 'Prénom candidat' sont présentes, correctement nommées et remplies dans le fichier Excel.");
           } else {
-            throw new Error("Aucune donnée valide trouvée dans le fichier CSV après parsing.");
+            throw new Error("Aucune donnée valide trouvée dans le fichier Excel après parsing.");
           }
 
         } catch (parseOrImportError: any) {
-          console.error("Erreur lors du parsing CSV ou de l'importation:", parseOrImportError);
+          console.error("Erreur lors du parsing Excel ou de l'importation:", parseOrImportError);
           setError(`Erreur: ${parseOrImportError.message}`);
-          toast({ variant: "destructive", title: "Erreur de Fichier CSV", description: parseOrImportError.message, duration: 7000 });
+          toast({ variant: "destructive", title: "Erreur de Fichier Excel", description: parseOrImportError.message, duration: 7000 });
         } finally {
           setIsLoading(false);
         }
       };
       reader.onerror = () => {
         console.error("Erreur FileReader:", reader.error);
-        setError("Impossible de lire le fichier CSV.");
-        toast({ variant: "destructive", title: "Erreur", description: "Impossible de lire le fichier CSV." });
+        setError("Impossible de lire le fichier Excel.");
+        toast({ variant: "destructive", title: "Erreur", description: "Impossible de lire le fichier Excel." });
         setIsLoading(false);
       };
-      reader.readAsText(file, 'UTF-8');
+      reader.readAsArrayBuffer(file);
     } catch (e: any) {
-      console.error("Erreur générale d'import CSV:", e);
+      console.error("Erreur générale d'import Excel:", e);
       setError(e.message);
       toast({ variant: "destructive", title: "Erreur Inconnue", description: e.message });
       setIsLoading(false);
@@ -288,11 +262,11 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-6 p-1 md:p-4">
-      <h1 className="text-2xl font-semibold text-foreground">Importer les Données du Brevet (CSV)</h1>
+      <h1 className="text-2xl font-semibold text-foreground">Importer les Données du Brevet (Excel)</h1>
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Téléverser et Importer un fichier CSV</CardTitle>
-          <CardDescription>Sélectionnez un fichier .csv (délimité par des points-virgules) contenant les résultats des élèves. Les données seront importées directement.</CardDescription>
+          <CardTitle>Téléverser et Importer un fichier Excel</CardTitle>
+          <CardDescription>Sélectionnez un fichier .xlsx ou .xls contenant les résultats des élèves. Les données seront importées directement.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-4 items-start">
@@ -300,7 +274,7 @@ export default function ImportPage() {
               <Input
                 id="file-upload"
                 type="file"
-                accept=".csv"
+                accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
                 onChange={handleFileChange}
                 className="hidden"
                 disabled={isLoading || isImporting}
@@ -308,13 +282,13 @@ export default function ImportPage() {
               <Button asChild variant="outline" className="w-full sm:w-auto cursor-pointer" disabled={isLoading || isImporting}>
                 <div>
                   <UploadCloud className="mr-2 h-4 w-4" />
-                  {fileName || "Choisir un fichier CSV..."}
+                  {fileName || "Choisir un fichier Excel..."}
                 </div>
               </Button>
             </label>
             <Button onClick={parseAndImportData} disabled={!file || isLoading || isImporting} className="w-full sm:w-auto">
               {(isLoading || isImporting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />}
-              {isLoading ? "Lecture du fichier CSV..." : (isImporting ? "Importation en cours..." : "Importer le Fichier CSV")}
+              {isLoading ? "Lecture du fichier Excel..." : (isImporting ? "Importation en cours..." : "Importer le Fichier Excel")}
             </Button>
           </div>
           {error && (
