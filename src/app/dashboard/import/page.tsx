@@ -54,6 +54,7 @@ export default function ImportPage() {
     dataToImport.forEach(student => {
       if (student.numeroCandidatINE && student.numeroCandidatINE.trim() !== "") {
         const studentRef = doc(collectionRef, student.numeroCandidatINE);
+        // Exclure rawRowData et s'assurer qu'il n'y a pas de valeurs undefined
         const { rawRowData, ...studentDataForFirestore } = student;
         const cleanedStudentData = JSON.parse(JSON.stringify(studentDataForFirestore));
         batch.set(studentRef, cleanedStudentData);
@@ -79,7 +80,7 @@ export default function ImportPage() {
       console.error("Erreur d'importation Firestore:", importError);
       let userMessage = `Échec de l'importation: ${importError.message}.`;
       if (importError.message && (importError.message.includes('transport errored') || importError.message.includes('RPC'))) {
-          userMessage += " Vérifiez votre connexion internet, la configuration de votre projet Firebase (Firestore activé, région sélectionnée) et vos règles de sécurité Firestore.";
+          userMessage += " Vérifiez votre connexion internet, la configuration de votre projet Firebase (Firestore activé, région sélectionnée), vos règles de sécurité Firestore, et consultez la console du navigateur pour d'éventuelles erreurs d'initialisation Firebase.";
       } else if (importError.code === 'permission-denied') {
         userMessage = "Échec de l'importation: Permission refusée. Vérifiez vos règles de sécurité Firestore.";
       }
@@ -117,8 +118,10 @@ export default function ImportPage() {
           let headerRowIndex = -1;
           let csvHeaders: string[] = [];
 
+          // Recherche de la ligne d'en-tête
           for (let i = 0; i < lines.length; i++) {
               const potentialHeaders = lines[i].split(';').map(h => h.trim());
+              // Critères pour identifier la ligne d'en-tête (ajustez si nécessaire)
               if (potentialHeaders.includes('INE') && potentialHeaders.includes('Nom candidat') && potentialHeaders.includes('Prénom candidat')) {
                   csvHeaders = potentialHeaders;
                   headerRowIndex = i;
@@ -131,12 +134,15 @@ export default function ImportPage() {
           }
           
           const dataObjects: any[] = [];
+          // Commencer à lire les données après la ligne d'en-tête
           if (lines.length > headerRowIndex + 1) {
             for (let i = headerRowIndex + 1; i < lines.length; i++) {
                 const values = lines[i].split(';');
+                // Vérifier si le nombre de valeurs correspond au nombre d'en-têtes
                 if (values.length === csvHeaders.length) {
                     const rowObject: any = {};
                     csvHeaders.forEach((header, index) => {
+                        // S'assurer que la valeur est une chaîne, même si elle est vide ou null
                         rowObject[header] = values[index] !== undefined && values[index] !== null ? String(values[index]).trim() : null;
                     });
                     dataObjects.push(rowObject);
@@ -158,18 +164,26 @@ export default function ImportPage() {
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
           
+          // Ensemble des en-têtes principaux pour différencier des options
            const mainHeadersForOptionsLogic = new Set([
             'Série', 'Code Etablissement', 'Libellé Etablissement', 'Commune Etablissement',
             'Division de classe', 'Catégorie candidat', 'Numéro Candidat', 'INE', 
             'Nom candidat', 'Prénom candidat', 'Date de naissance', 'Résultat', 
-            'TOTAL GENERAL', 'Moyenne sur 20', 
+            'TOTAL GENERAL', 'TOTAL POUR MENTION', 'Moyenne sur 20', 
             '001 - 1 - Français - Ponctuel', 
+            // '001A - 1 - Grammaire, compréhension - Dictée - Ponctuel', // Sous-scores, peuvent être optionnels
+            // '001AA - 1 - Grammaire et compréhension - Ponctuel',
+            // '001AB - 1 - Dictée - Ponctuel',
+            // '001B - 1 - Rédaction - Ponctuel',
             '002 - 1 - Mathématiques - Ponctuel',
             '003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel',
-            '004 - 1 - Sciences - Ponctuel', 
+            '004 - 1 - Sciences - Ponctuel', // Ajouté
             '005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année',
+            // '007 - 1 - Socle commun de connaissances, compétences, culture - Contrôle continu', // Et ses sous-scores
+            // Les colonnes '007...' spécifiques comme '007AA', '007AB', etc. seront capturées comme options si non explicitement mappées ci-dessous
             '007AB - 1 - Langues étrangères ou régionales - Contrôle continu',
             '007AD - 1 - Langages des arts et du corps - Contrôle continu',
+            // Si d'autres colonnes comme 'Edu Mus01A /50' sont toujours présentes, ajoutez-les ici
             'Edu Mus01A /50',
             'EPS CCF01A /100',
             'Phy Chi01A /50',
@@ -177,17 +191,20 @@ export default function ImportPage() {
           ]);
 
           dataObjects.forEach((rawRow, index) => {
+            // Fonction utilitaire pour obtenir la valeur d'une colonne par son nom d'en-tête
             const getCsvVal = (headerName: string) => rawRow[headerName]; 
 
-            const ine = String(getCsvVal('INE') || getCsvVal('Numéro Candidat') || '').trim();
+            // Pré-filtrage plus robuste des lignes non pertinentes
+            const ine = String(getCsvVal('INE') || getCsvVal('Numéro Candidat') || '').trim(); // INE est prioritaire
             const nom = String(getCsvVal('Nom candidat') || '').trim();
-            const prenoms = String(getCsvVal('Prénom candidat') || '').trim();
+            const prenoms = String(getCsvVal('Prénom candidat') || '').trim(); // Nom de colonne Excel
 
+            // Ignorer la ligne si les identifiants essentiels sont manquants
             if (!ine || !nom || !prenoms) {
-              return; 
+              return; // Passer à la ligne suivante
             }
             
-            const studentInput: any = { 
+            const studentInput: any = { // Utiliser 'any' temporairement pour flexibilité
               serie: getCsvVal('Série'),
               codeEtablissement: getCsvVal('Code Etablissement'),
               libelleEtablissement: getCsvVal('Libellé Etablissement'),
@@ -197,14 +214,15 @@ export default function ImportPage() {
               numeroCandidatINE: ine,
               nomCandidat: nom,
               prenomsCandidat: prenoms,
-              dateNaissance: getCsvVal('Date de naissance'), 
+              dateNaissance: getCsvVal('Date de naissance'), // Conserver comme chaîne pour l'instant
               resultat: getCsvVal('Résultat'),
               totalGeneral: getCsvVal('TOTAL GENERAL'),
+              // totalPourMention: getCsvVal('TOTAL POUR MENTION'), // Décommentez si nécessaire
               totalPourcentage: getCsvVal('Moyenne sur 20'),
               scoreFrancais: getCsvVal('001 - 1 - Français - Ponctuel'),
               scoreMaths: getCsvVal('002 - 1 - Mathématiques - Ponctuel'),
               scoreHistoireGeo: getCsvVal('003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel'),
-              scoreSciences: getCsvVal('004 - 1 - Sciences - Ponctuel'),
+              scoreSciences: getCsvVal('004 - 1 - Sciences - Ponctuel'), 
               scoreOralDNB: getCsvVal('005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année'),
               scoreLVE: getCsvVal('007AB - 1 - Langues étrangères ou régionales - Contrôle continu'),
               scoreArtsPlastiques: getCsvVal('007AD - 1 - Langages des arts et du corps - Contrôle continu'),
@@ -213,19 +231,23 @@ export default function ImportPage() {
               scorePhysiqueChimie: getCsvVal('Phy Chi01A /50'),
               scoreSciencesVie: getCsvVal('Sci Vie01A /50'),
               options: {},
-              rawRowData: rawRow,
+              rawRowData: rawRow, // Conserver les données brutes de la ligne si nécessaire
             };
             
+            // Collecter les options
             const currentOptions: Record<string, string> = {};
             Object.keys(rawRow).forEach(csvHeader => {
+                // Si l'en-tête n'est pas dans notre liste d'en-têtes principaux, c'est une option
                 if (!mainHeadersForOptionsLogic.has(csvHeader)) {
                     const value = rawRow[csvHeader];
+                    // S'assurer que la valeur n'est pas undefined, null ou une chaîne vide avant de l'ajouter
                     if (value !== undefined && value !== null && String(value).trim() !== '') {
                         currentOptions[csvHeader] = String(value);
                     }
                 }
             });
 
+             // Ajouter les options uniquement si elles ne sont pas vides
              if (Object.keys(currentOptions).length > 0) {
                 studentInput.options = currentOptions;
             }
@@ -240,10 +262,11 @@ export default function ImportPage() {
 
           if (validationErrors.length > 0) {
             const firstError = validationErrors[0];
+            // Afficher le premier message d'erreur pour chaque champ en erreur
             const errorMessages = Object.entries(firstError.errors.fieldErrors)
               .map(([field, messages]) => {
                 if (messages && messages.length > 0) {
-                  return `${field}: ${messages[0]}`; 
+                  return `${field}: ${messages[0]}`; // Prendre le premier message d'erreur pour ce champ
                 }
                 return `${field}: Erreur de validation inconnue`;
               })
@@ -255,10 +278,12 @@ export default function ImportPage() {
           if (transformedData.length > 0) {
             await handleImportToFirestore(transformedData);
           } else if (error) { 
-            // Error already set (e.g. header not found)
+            // Une erreur critique (ex: en-tête non trouvé) a déjà été définie
           } else if (dataObjects.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
+            // Toutes les lignes ont été filtrées par la logique de pré-filtrage (INE/Nom/Prénom manquants)
             throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'INE', 'Nom candidat', et 'Prénom candidat' sont présentes, correctement nommées et remplies dans le fichier CSV.");
           } else {
+            // Aucun objet de données n'a été créé ou aucune donnée transformée, sans erreurs de validation spécifiques
             throw new Error("Aucune donnée valide trouvée dans le fichier CSV après parsing.");
           }
 
@@ -276,7 +301,7 @@ export default function ImportPage() {
         toast({ variant: "destructive", title: "Erreur", description: "Impossible de lire le fichier CSV." });
         setIsLoading(false);
       };
-      reader.readAsText(file, 'UTF-8'); 
+      reader.readAsText(file, 'UTF-8'); // Utiliser UTF-8, ajuster si l'encodage est différent
     } catch (e: any) {
       console.error("Erreur générale d'import CSV:", e);
       setError(e.message);
