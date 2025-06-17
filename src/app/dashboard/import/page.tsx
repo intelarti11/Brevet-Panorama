@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import type { StudentData } from '@/lib/excel-types'; // Keep name for now, structure is relevant
-import { studentDataSchema } from '@/lib/excel-types'; // Keep name for now
+import type { StudentData } from '@/lib/excel-types'; 
+import { studentDataSchema } from '@/lib/excel-types'; 
 import { Loader2, UploadCloud, Import, AlertTriangle } from 'lucide-react';
 
 import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
@@ -77,8 +77,14 @@ export default function ImportPage() {
       setFileName(null);
     } catch (importError: any) {
       console.error("Erreur d'importation Firestore:", importError);
-      setError(`Échec de l'importation: ${importError.message}`);
-      toast({ variant: "destructive", title: "Erreur d'Importation", description: `Échec de l'importation: ${importError.message}`, duration: 7000 });
+      let userMessage = `Échec de l'importation: ${importError.message}.`;
+      if (importError.message && (importError.message.includes('transport errored') || importError.message.includes('RPC'))) {
+          userMessage += " Vérifiez votre connexion internet, la configuration de votre projet Firebase (Firestore activé, région sélectionnée) et vos règles de sécurité Firestore.";
+      } else if (importError.code === 'permission-denied') {
+        userMessage = "Échec de l'importation: Permission refusée. Vérifiez vos règles de sécurité Firestore.";
+      }
+      setError(userMessage);
+      toast({ variant: "destructive", title: "Erreur d'Importation Firestore", description: userMessage, duration: 10000 });
     } finally {
       setIsImporting(false);
     }
@@ -104,7 +110,7 @@ export default function ImportPage() {
           }
 
           const lines = csvText.split(/\r\n|\n/).filter(line => line.trim() !== '');
-          if (lines.length < 1) { // Must have at least a header row
+          if (lines.length < 1) { 
             throw new Error("Le fichier CSV est vide ou ne contient pas de ligne d'en-tête.");
           }
           
@@ -113,7 +119,6 @@ export default function ImportPage() {
 
           for (let i = 0; i < lines.length; i++) {
               const potentialHeaders = lines[i].split(';').map(h => h.trim());
-              // A simple check: if it contains common expected headers, assume it's the header
               if (potentialHeaders.includes('INE') && potentialHeaders.includes('Nom candidat') && potentialHeaders.includes('Prénom candidat')) {
                   csvHeaders = potentialHeaders;
                   headerRowIndex = i;
@@ -153,12 +158,11 @@ export default function ImportPage() {
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
           
-          // These are the headers that are directly mapped to the StudentData schema's main fields
            const mainHeadersForOptionsLogic = new Set([
             'Série', 'Code Etablissement', 'Libellé Etablissement', 'Commune Etablissement',
             'Division de classe', 'Catégorie candidat', 'Numéro Candidat', 'INE', 
             'Nom candidat', 'Prénom candidat', 'Date de naissance', 'Résultat', 
-            'TOTAL GENERAL', 'Moyenne sur 20', // TOTAL POUR MENTION is handled by options
+            'TOTAL GENERAL', 'Moyenne sur 20', 
             '001 - 1 - Français - Ponctuel', 
             '002 - 1 - Mathématiques - Ponctuel',
             '003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel',
@@ -166,7 +170,6 @@ export default function ImportPage() {
             '005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année',
             '007AB - 1 - Langues étrangères ou régionales - Contrôle continu',
             '007AD - 1 - Langages des arts et du corps - Contrôle continu',
-            // Headers from old excel not in new CSV example are fine, they'll be undefined and handled by Zod's .optional()
             'Edu Mus01A /50',
             'EPS CCF01A /100',
             'Phy Chi01A /50',
@@ -174,18 +177,17 @@ export default function ImportPage() {
           ]);
 
           dataObjects.forEach((rawRow, index) => {
-            const getCsvVal = (headerName: string) => rawRow[headerName]; // rawRow keys are already trimmed
+            const getCsvVal = (headerName: string) => rawRow[headerName]; 
 
             const ine = String(getCsvVal('INE') || getCsvVal('Numéro Candidat') || '').trim();
             const nom = String(getCsvVal('Nom candidat') || '').trim();
             const prenoms = String(getCsvVal('Prénom candidat') || '').trim();
 
             if (!ine || !nom || !prenoms) {
-              // console.log(`Skipping CSV row ${index + headerRowIndex + 2} due to missing INE, nom, or prenoms.`);
               return; 
             }
             
-            const studentInput: any = { // Use 'any' temporarily for flexible assignment
+            const studentInput: any = { 
               serie: getCsvVal('Série'),
               codeEtablissement: getCsvVal('Code Etablissement'),
               libelleEtablissement: getCsvVal('Libellé Etablissement'),
@@ -195,7 +197,7 @@ export default function ImportPage() {
               numeroCandidatINE: ine,
               nomCandidat: nom,
               prenomsCandidat: prenoms,
-              dateNaissance: getCsvVal('Date de naissance'), // Zod expects string here based on schema
+              dateNaissance: getCsvVal('Date de naissance'), 
               resultat: getCsvVal('Résultat'),
               totalGeneral: getCsvVal('TOTAL GENERAL'),
               totalPourcentage: getCsvVal('Moyenne sur 20'),
@@ -206,7 +208,6 @@ export default function ImportPage() {
               scoreOralDNB: getCsvVal('005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année'),
               scoreLVE: getCsvVal('007AB - 1 - Langues étrangères ou régionales - Contrôle continu'),
               scoreArtsPlastiques: getCsvVal('007AD - 1 - Langages des arts et du corps - Contrôle continu'),
-              // Fields not in CSV will be undefined, handled by Zod preprocess + optional
               scoreEducationMusicale: getCsvVal('Edu Mus01A /50'), 
               scoreEPS: getCsvVal('EPS CCF01A /100'),
               scorePhysiqueChimie: getCsvVal('Phy Chi01A /50'),
@@ -275,7 +276,7 @@ export default function ImportPage() {
         toast({ variant: "destructive", title: "Erreur", description: "Impossible de lire le fichier CSV." });
         setIsLoading(false);
       };
-      reader.readAsText(file, 'UTF-8'); // Specify encoding for CSV, UTF-8 is common
+      reader.readAsText(file, 'UTF-8'); 
     } catch (e: any) {
       console.error("Erreur générale d'import CSV:", e);
       setError(e.message);
