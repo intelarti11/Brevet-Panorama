@@ -51,7 +51,7 @@ function SidebarFilters() {
           <Filter className="h-4 w-4" />
           Filtres (Chargement...)
         </SidebarGroupLabel>
-        <div className="space-y-3 p-2">
+        <div className="space-y-3 p-3">
           <Skeleton className="h-8 w-full" />
           <Skeleton className="h-8 w-full" />
           <Skeleton className="h-8 w-full" />
@@ -67,7 +67,7 @@ function SidebarFilters() {
           <AlertTriangle className="h-4 w-4" />
           Erreur Chargement Filtres
         </SidebarGroupLabel>
-        <div className="p-2 text-xs text-destructive-foreground bg-destructive/20 rounded-md border border-destructive/50">
+        <div className="p-3 text-xs text-destructive-foreground bg-destructive/20 rounded-md border border-destructive/50">
           {filterContextError}
         </div>
       </SidebarGroup>
@@ -80,7 +80,7 @@ function SidebarFilters() {
         <Filter className="h-4 w-4" />
         Filtres Globaux
       </SidebarGroupLabel>
-      <div className="space-y-3 p-2">
+      <div className="space-y-3 p-3">
         <div>
           <label htmlFor="academicYear-filter-sidebar" className="block text-xs font-medium text-sidebar-foreground/80 mb-1">Année Scolaire</label>
           <Select value={selectedAcademicYear} onValueChange={setSelectedAcademicYear} disabled={availableAcademicYears.length === 0}>

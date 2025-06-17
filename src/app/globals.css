@@ -40,8 +40,8 @@
     --destructive: var(--color-error-hsl);
     --destructive-foreground: var(--color-surface-hsl); /* White text on error */
 
-    --border: 210 14% 89%; /* #D1D5DB - Tailwind gray-300 for neutral borders */
-    --input: 210 14% 89%;
+    --border: 210 14% 93%; /* #E5E7EB - Tailwind gray-200 for lighter borders */
+    --input: 210 14% 93%; /* Matching input border to the new border color */
     --ring: var(--color-primary-hsl); /* Focus rings with primary color */
 
     --radius: 8px; /* Updated border radius */
