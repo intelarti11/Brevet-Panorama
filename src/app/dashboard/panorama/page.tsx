@@ -68,12 +68,20 @@ const initialStats: Stats = {
 };
 
 const CHART_COLORS = {
-  admis: "hsl(var(--chart-2))", // Greenish
-  refuse: "hsl(var(--destructive))", // Reddish
-  tresBien: "hsl(var(--chart-1))", // Blue
-  bien: "hsl(var(--chart-3))", // Teal
-  assezBien: "hsl(var(--chart-4))", // Orange
-  sansMention: "hsl(var(--chart-5))", // Purple
+  admis: "hsl(var(--chart-2))", 
+  refuse: "hsl(var(--destructive))", 
+  tresBien: "hsl(var(--chart-1))", 
+  bien: "hsl(var(--chart-3))", 
+  assezBien: "hsl(var(--chart-4))", 
+  sansMention: "hsl(var(--chart-5))", 
+};
+
+const normalizeForComparison = (text: string): string => {
+  if (text === null || text === undefined) return "";
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 };
 
 export default function PanoramaPage() {
@@ -148,35 +156,70 @@ export default function PanoramaPage() {
   }, [selectedYear, selectedEstablishment, allStudentsData]);
 
   useEffect(() => {
+    if (isLoading || (filteredStudentsData.length === 0 && allStudentsData.length > 0 && selectedYear === ALL_YEARS_VALUE && selectedEstablishment === ALL_ESTABLISHMENTS_VALUE && !error)) {
+       // If still loading, or if all data is loaded but filtered set is empty (initial state before any filtering might show this)
+       // but ensure we don't reset if it's genuinely no data for filters.
+       // The condition `filteredStudentsData.length === 0 && !isLoading` is handled later.
+       if (isLoading) {
+           setStats(initialStats); // Reset stats if loading
+           return;
+       }
+    }
+    
     if (filteredStudentsData.length === 0 && !isLoading) {
       setStats(initialStats);
       return;
     }
 
-    const newStats: Stats = { ...initialStats, mentions: { ...initialStats.mentions }, mentionPercentages: { ...initialStats.mentionPercentages } };
+    const newStats: Stats = { 
+      totalStudents: 0,
+      admis: 0,
+      refuse: 0,
+      successRate: 0,
+      mentions: { tresBien: 0, bien: 0, assezBien: 0, sansMention: 0 },
+      mentionPercentages: { tresBien: 0, bien: 0, assezBien: 0, sansMention: 0 },
+    };
     newStats.totalStudents = filteredStudentsData.length;
 
+    const normalizedAdmisStr = normalizeForComparison('admis');
+    const normalizedRefuseStr = normalizeForComparison('refusé');
+    const normalizedTresBienStr = normalizeForComparison('très bien');
+    const normalizedBienStr = normalizeForComparison('bien');
+    const normalizedAssezBienStr = normalizeForComparison('assez bien');
+
     filteredStudentsData.forEach(student => {
-      const resultatLower = student.resultat.toLowerCase();
-      if (resultatLower.includes('admis')) {
+      const normalizedResultat = normalizeForComparison(student.resultat);
+      
+      if (normalizedResultat.includes(normalizedAdmisStr)) {
         newStats.admis++;
-        if (resultatLower.includes('très bien')) {
+        if (normalizedResultat.includes(normalizedTresBienStr)) {
           newStats.mentions.tresBien++;
-        } else if (resultatLower.includes('bien')) {
+        } else if (normalizedResultat.includes(normalizedBienStr)) {
           newStats.mentions.bien++;
-        } else if (resultatLower.includes('assez bien')) {
+        } else if (normalizedResultat.includes(normalizedAssezBienStr)) {
           newStats.mentions.assezBien++;
         } else {
           newStats.mentions.sansMention++;
         }
-      } else if (resultatLower.includes('refusé')) {
+      } else if (normalizedResultat.includes(normalizedRefuseStr)) {
         newStats.refuse++;
       }
     });
 
-    if (newStats.totalStudents > 0) {
-      newStats.successRate = parseFloat(((newStats.admis / newStats.totalStudents) * 100).toFixed(1));
+    if (newStats.totalStudents > 0 && (newStats.admis + newStats.refuse) > 0) {
+      // Base success rate on students who are either admis or refusé, if totalStudents includes other statuses.
+      // Or, if totalStudents is meant to be only admis+refusé, then newStats.admis / newStats.totalStudents is fine.
+      // Let's assume totalStudents might include "en attente" etc. so (admis / (admis+refuse)) if (admis+refuse)>0
+      const consideredForRate = newStats.admis + newStats.refuse;
+      if (consideredForRate > 0) {
+        newStats.successRate = parseFloat(((newStats.admis / consideredForRate) * 100).toFixed(1));
+      } else {
+        newStats.successRate = 0;
+      }
+    } else {
+         newStats.successRate = 0;
     }
+
 
     if (newStats.admis > 0) {
       newStats.mentionPercentages.tresBien = parseFloat(((newStats.mentions.tresBien / newStats.admis) * 100).toFixed(1));
@@ -185,12 +228,12 @@ export default function PanoramaPage() {
       newStats.mentionPercentages.sansMention = parseFloat(((newStats.mentions.sansMention / newStats.admis) * 100).toFixed(1));
     }
     setStats(newStats);
-  }, [filteredStudentsData, isLoading]);
+  }, [filteredStudentsData, isLoading, allStudentsData.length, error, selectedYear, selectedEstablishment]);
 
   const resultsChartData = useMemo(() => [
     { name: 'Admis', value: stats.admis, fill: CHART_COLORS.admis },
     { name: 'Refusé', value: stats.refuse, fill: CHART_COLORS.refuse },
-  ], [stats.admis, stats.refuse]);
+  ].filter(item => item.value > 0), [stats.admis, stats.refuse]);
 
   const mentionsChartData = useMemo(() => [
     { name: 'TB', value: stats.mentions.tresBien, fill: CHART_COLORS.tresBien, percentage: stats.mentionPercentages.tresBien },
@@ -309,7 +352,7 @@ export default function PanoramaPage() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stats.successRate}%</div>
-              <p className="text-xs text-muted-foreground">{stats.admis} admis sur {stats.totalStudents} élèves</p>
+              <p className="text-xs text-muted-foreground">{stats.admis} admis sur {stats.admis + stats.refuse > 0 ? stats.admis + stats.refuse : stats.totalStudents} élèves considérés</p>
             </CardContent>
           </Card>
           <Card className="shadow-md rounded-lg">
@@ -319,13 +362,16 @@ export default function PanoramaPage() {
             </CardHeader>
             <CardContent>
               <div className="text-lg font-semibold">
-                TB: {stats.mentions.tresBien} <span className="text-xs text-muted-foreground">({stats.mentionPercentages.tresBien}%)</span>
+                TB: {stats.mentions.tresBien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.tresBien : 0}%)</span>
               </div>
               <div className="text-md">
-                B: {stats.mentions.bien} <span className="text-xs text-muted-foreground">({stats.mentionPercentages.bien}%)</span>
+                B: {stats.mentions.bien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.bien : 0}%)</span>
               </div>
               <div className="text-md">
-                AB: {stats.mentions.assezBien} <span className="text-xs text-muted-foreground">({stats.mentionPercentages.assezBien}%)</span>
+                AB: {stats.mentions.assezBien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.assezBien : 0}%)</span>
+              </div>
+               <div className="text-md">
+                SM: {stats.mentions.sansMention} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.sansMention : 0}%)</span>
               </div>
             </CardContent>
           </Card>
@@ -341,19 +387,32 @@ export default function PanoramaPage() {
               <CardDescription>Distribution des élèves admis et refusés.</CardDescription>
             </CardHeader>
             <CardContent>
-              {stats.totalStudents > 0 ? (
+              {stats.admis + stats.refuse > 0 ? (
                 <ChartContainer config={{}} className="mx-auto aspect-square max-h-[300px]">
                   <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                    <ChartTooltip 
+                        content={<ChartTooltipContent 
+                            hideLabel 
+                            formatter={(value, name, props) => (
+                                <div className="flex flex-col">
+                                    <span className="font-semibold capitalize">{props.payload?.name}</span>
+                                    <span>Nombre: {value}</span>
+                                </div>
+                            )}
+                        />} 
+                    />
                     <Pie data={resultsChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} 
                          label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }) => {
                             const RADIAN = Math.PI / 180;
-                            const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                            // Ensure radius is positive for calculations
+                            const effectiveOuterRadius = Math.max(0, outerRadius);
+                            const effectiveInnerRadius = Math.max(0, innerRadius);
+                            const radius = effectiveInnerRadius + (effectiveOuterRadius - effectiveInnerRadius) * 0.5;
                             const x = cx + radius * Math.cos(-midAngle * RADIAN);
                             const y = cy + radius * Math.sin(-midAngle * RADIAN);
                             return (
-                                <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="12px">
-                                {`${name} (${value}) - ${(percent * 100).toFixed(0)}%`}
+                                <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="12px" fontWeight="medium">
+                                {`${name} (${value})`}
                                 </text>
                             );
                         }}
@@ -365,7 +424,7 @@ export default function PanoramaPage() {
                   </PieChart>
                 </ChartContainer>
               ) : (
-                <p className="text-center text-muted-foreground py-10">Pas de données à afficher pour ce graphique.</p>
+                <p className="text-center text-muted-foreground py-10">Pas de données (admis/refusés) à afficher pour ce graphique.</p>
               )}
             </CardContent>
           </Card>
@@ -379,36 +438,38 @@ export default function PanoramaPage() {
               <CardDescription>Distribution des mentions pour les élèves admis.</CardDescription>
             </CardHeader>
             <CardContent>
-              {stats.admis > 0 ? (
+              {stats.admis > 0 && mentionsChartData.length > 0 ? (
                 <ChartContainer config={{}} className="w-full h-[300px]">
-                  <BarChart data={mentionsChartData} layout="vertical" margin={{left:10, right:30}}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" dataKey="value" />
-                    <YAxis type="category" dataKey="name" width={40} tickLine={false} axisLine={false} />
-                    <ChartTooltip 
-                        cursor={false}
-                        content={
-                            <ChartTooltipContent 
-                                formatter={(value, name, props) => (
-                                    <div className="flex flex-col">
-                                        <span className="font-semibold">{props.payload.name === "SM" ? "Sans Mention" : `Mention ${props.payload.name}`}</span>
-                                        <span>Nombre: {value}</span>
-                                        <span>Pourcentage: {props.payload.percentage}%</span>
-                                    </div>
-                                )}
-                            />
-                        } 
-                    />
-                    <Bar dataKey="value" radius={4}>
-                       {mentionsChartData.map((entry, index) => (
-                        <Cell key={`cell-mention-${index}`} fill={entry.fill} />
-                      ))}
-                       <LabelList dataKey="value" position="right" offset={8} className="fill-foreground" fontSize={12} />
-                    </Bar>
-                  </BarChart>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={mentionsChartData} layout="vertical" margin={{left:10, right:30, top: 5, bottom: 5}}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis type="number" dataKey="value" allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" width={50} tickLine={false} axisLine={false} />
+                      <ChartTooltip 
+                          cursor={false}
+                          content={
+                              <ChartTooltipContent 
+                                  formatter={(value, name, props) => (
+                                      <div className="flex flex-col p-1">
+                                          <span className="font-semibold">{props.payload.name === "SM" ? "Sans Mention" : (props.payload.name === "TB" ? "Très Bien" : (props.payload.name === "B" ? "Bien" : "Assez Bien"))}</span>
+                                          <span>Effectif: {value}</span>
+                                          <span>{props.payload.percentage}% des admis</span>
+                                      </div>
+                                  )}
+                              />
+                          } 
+                      />
+                      <Bar dataKey="value" radius={4}>
+                         {mentionsChartData.map((entry, index) => (
+                          <Cell key={`cell-mention-${index}`} fill={entry.fill} />
+                        ))}
+                         <LabelList dataKey="value" position="right" offset={8} className="fill-foreground" fontSize={12} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </ChartContainer>
               ) : (
-                <p className="text-center text-muted-foreground py-10">Pas d'élèves admis pour afficher les mentions.</p>
+                <p className="text-center text-muted-foreground py-10">Pas d'élèves admis avec mention à afficher.</p>
               )}
             </CardContent>
           </Card>
