@@ -33,8 +33,8 @@ if (!getApps().length) {
     app = initializeApp(firebaseConfig);
   } catch (e) {
     console.error("Erreur d'initialisation Firebase:", e);
-    // Il serait peut-être judicieux de lever une erreur ici ou de gérer cet état
-    // si l'application ne peut pas être initialisée et que db en dépend.
+    // It might be wise to throw an error here or handle this state
+    // if the app cannot be initialized and db depends on it.
   }
 } else {
   app = getApp();
@@ -46,7 +46,7 @@ if (app) {
     db = getFirestore(app);
   } catch (e) {
     console.error("Erreur d'initialisation Firestore:", e);
-     // Il serait peut-être judicieux de lever une erreur ici ou de gérer cet état
+     // It might be wise to throw an error here or handle this state
   }
 } else {
   console.error("L'application Firebase n'est pas initialisée. Firestore est inaccessible.");
