@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'BrevetSynthèse',
+  title: 'Brevet Panorama',
   description: 'Manage student exam results efficiently.',
 };
 
