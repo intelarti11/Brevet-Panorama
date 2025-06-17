@@ -7,7 +7,7 @@ import { getFirestore, collection, getDocs, QuerySnapshot, DocumentData } from '
 import { app, db } from '@/lib/firebase'; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, AlertTriangle, Users, Percent, Award, PieChart as PieChartIcon, BarChart2 } from 'lucide-react';
+import { Loader2, AlertTriangle, Users, Percent, Award, PieChart as PieChartIcon, BarChart2, GraduationCap, BookText, Calculator, Landmark, FlaskConical } from 'lucide-react';
 import { 
   ChartContainer, 
   ChartTooltip, 
@@ -33,7 +33,11 @@ interface DisplayStudentData {
   etablissement: string;
   annee: string; 
   resultat: string;
-  moyenne?: number;
+  moyenne?: number; // totalPourcentage
+  scoreFrancais?: number;
+  scoreMaths?: number;
+  scoreHistoireGeo?: number;
+  scoreSciences?: number;
 }
 
 const ALL_YEARS_VALUE = "__ALL_YEARS__";
@@ -56,6 +60,15 @@ interface Stats {
     assezBien: number;
     sansMention: number;
   };
+  averageOverallScoreAdmitted?: number;
+  averageFrancais?: number;
+  countFrancais?: number;
+  averageMaths?: number;
+  countMaths?: number;
+  averageHistoireGeo?: number;
+  countHistoireGeo?: number;
+  averageSciences?: number;
+  countSciences?: number;
 }
 
 const initialStats: Stats = {
@@ -65,6 +78,15 @@ const initialStats: Stats = {
   successRate: 0,
   mentions: { tresBien: 0, bien: 0, assezBien: 0, sansMention: 0 },
   mentionPercentages: { tresBien: 0, bien: 0, assezBien: 0, sansMention: 0 },
+  averageOverallScoreAdmitted: undefined,
+  averageFrancais: undefined,
+  countFrancais: 0,
+  averageMaths: undefined,
+  countMaths: 0,
+  averageHistoireGeo: undefined,
+  countHistoireGeo: 0,
+  averageSciences: undefined,
+  countSciences: 0,
 };
 
 const CHART_COLORS = {
@@ -125,6 +147,10 @@ export default function PanoramaPage() {
             annee: data.serie || 'N/A', 
             resultat: data.resultat || 'N/A',
             moyenne: data.totalPourcentage !== undefined && data.totalPourcentage !== null ? Number(data.totalPourcentage) : undefined,
+            scoreFrancais: data.scoreFrancais !== undefined && data.scoreFrancais !== null ? Number(data.scoreFrancais) : undefined,
+            scoreMaths: data.scoreMaths !== undefined && data.scoreMaths !== null ? Number(data.scoreMaths) : undefined,
+            scoreHistoireGeo: data.scoreHistoireGeo !== undefined && data.scoreHistoireGeo !== null ? Number(data.scoreHistoireGeo) : undefined,
+            scoreSciences: data.scoreSciences !== undefined && data.scoreSciences !== null ? Number(data.scoreSciences) : undefined,
           });
           if (data.serie) years.add(data.serie);
           if (data.libelleEtablissement) establishments.add(data.libelleEtablissement);
@@ -168,14 +194,7 @@ export default function PanoramaPage() {
       return;
     }
 
-    const newStats: Stats = { 
-      totalStudents: 0,
-      admis: 0,
-      refuse: 0,
-      successRate: 0,
-      mentions: { tresBien: 0, bien: 0, assezBien: 0, sansMention: 0 },
-      mentionPercentages: { tresBien: 0, bien: 0, assezBien: 0, sansMention: 0 },
-    };
+    const newStats: Stats = { ...initialStats }; // Start with initialStats to ensure all fields are present
     newStats.totalStudents = filteredStudentsData.length;
 
     const normalizedAdmisStr = normalizeForComparison('admis');
@@ -184,14 +203,25 @@ export default function PanoramaPage() {
     const normalizedBienStr = normalizeForComparison('bien');
     const normalizedAssezBienStr = normalizeForComparison('assez bien');
 
+    let sumOverallScoresAdmitted = 0;
+    let countOverallScoresAdmitted = 0;
+    let sumFrancais = 0, countFrancais = 0;
+    let sumMaths = 0, countMaths = 0;
+    let sumHistoireGeo = 0, countHistoireGeo = 0;
+    let sumSciences = 0, countSciences = 0;
+
     filteredStudentsData.forEach(student => {
       const normalizedResultat = normalizeForComparison(student.resultat);
       
       if (normalizedResultat.includes(normalizedAdmisStr)) {
         newStats.admis++;
+        if (student.moyenne !== undefined && student.moyenne !== null) {
+          sumOverallScoresAdmitted += student.moyenne;
+          countOverallScoresAdmitted++;
+        }
         if (normalizedResultat.includes(normalizedTresBienStr)) {
           newStats.mentions.tresBien++;
-        } else if (normalizedResultat.includes(normalizedAssezBienStr)) { // Check for "Assez Bien" before "Bien"
+        } else if (normalizedResultat.includes(normalizedAssezBienStr)) {
           newStats.mentions.assezBien++;
         } else if (normalizedResultat.includes(normalizedBienStr)) {
           newStats.mentions.bien++;
@@ -200,6 +230,23 @@ export default function PanoramaPage() {
         }
       } else if (normalizedResultat.includes(normalizedRefuseStr)) {
         newStats.refuse++;
+      }
+
+      if (student.scoreFrancais !== undefined && student.scoreFrancais !== null) {
+        sumFrancais += student.scoreFrancais;
+        countFrancais++;
+      }
+      if (student.scoreMaths !== undefined && student.scoreMaths !== null) {
+        sumMaths += student.scoreMaths;
+        countMaths++;
+      }
+      if (student.scoreHistoireGeo !== undefined && student.scoreHistoireGeo !== null) {
+        sumHistoireGeo += student.scoreHistoireGeo;
+        countHistoireGeo++;
+      }
+      if (student.scoreSciences !== undefined && student.scoreSciences !== null) {
+        sumSciences += student.scoreSciences;
+        countSciences++;
       }
     });
 
@@ -220,6 +267,18 @@ export default function PanoramaPage() {
       newStats.mentionPercentages.assezBien = parseFloat(((newStats.mentions.assezBien / newStats.admis) * 100).toFixed(1));
       newStats.mentionPercentages.sansMention = parseFloat(((newStats.mentions.sansMention / newStats.admis) * 100).toFixed(1));
     }
+
+    newStats.averageOverallScoreAdmitted = countOverallScoresAdmitted > 0 ? parseFloat((sumOverallScoresAdmitted / countOverallScoresAdmitted).toFixed(1)) : undefined;
+    
+    newStats.averageFrancais = countFrancais > 0 ? parseFloat((sumFrancais / countFrancais).toFixed(1)) : undefined;
+    newStats.countFrancais = countFrancais;
+    newStats.averageMaths = countMaths > 0 ? parseFloat((sumMaths / countMaths).toFixed(1)) : undefined;
+    newStats.countMaths = countMaths;
+    newStats.averageHistoireGeo = countHistoireGeo > 0 ? parseFloat((sumHistoireGeo / countHistoireGeo).toFixed(1)) : undefined;
+    newStats.countHistoireGeo = countHistoireGeo;
+    newStats.averageSciences = countSciences > 0 ? parseFloat((sumSciences / countSciences).toFixed(1)) : undefined;
+    newStats.countSciences = countSciences;
+
     setStats(newStats);
   }, [filteredStudentsData, isLoading, allStudentsData.length, error, selectedYear, selectedEstablishment]);
 
@@ -350,25 +409,88 @@ export default function PanoramaPage() {
           </Card>
           <Card className="shadow-md rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Mentions (parmi admis)</CardTitle>
-              <Award className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Moyenne Générale (Admis)</CardTitle>
+              <GraduationCap className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-lg font-semibold">
-                TB: {stats.mentions.tresBien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.tresBien : 0}%)</span>
+              <div className="text-3xl font-bold">
+                {stats.averageOverallScoreAdmitted !== undefined ? `${stats.averageOverallScoreAdmitted.toFixed(1)}/20` : 'N/A'}
               </div>
-               <div className="text-md">
-                AB: {stats.mentions.assezBien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.assezBien : 0}%)</span>
-              </div>
-              <div className="text-md">
-                B: {stats.mentions.bien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.bien : 0}%)</span>
-              </div>
-               <div className="text-md">
-                SM: {stats.mentions.sansMention} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.sansMention : 0}%)</span>
-              </div>
+              <p className="text-xs text-muted-foreground">moyenne des élèves admis</p>
             </CardContent>
           </Card>
         </div>
+        
+        <Card className="shadow-lg rounded-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xl font-medium">Mentions (parmi admis)</CardTitle>
+            <Award className="h-6 w-6 text-muted-foreground" />
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 pt-4 sm:grid-cols-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Très Bien</p>
+              <p className="text-2xl font-bold">{stats.mentions.tresBien}</p>
+              <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.tresBien : 0}% des admis</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Bien</p>
+              <p className="text-2xl font-bold">{stats.mentions.bien}</p>
+              <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.bien : 0}% des admis</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Assez Bien</p>
+              <p className="text-2xl font-bold">{stats.mentions.assezBien}</p>
+              <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.assezBien : 0}% des admis</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Sans Mention</p>
+              <p className="text-2xl font-bold">{stats.mentions.sansMention}</p>
+              <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.sansMention : 0}% des admis</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg rounded-lg">
+            <CardHeader>
+                <CardTitle className="text-xl">Moyennes par Matières Principales</CardTitle>
+                <CardDescription>Moyenne des notes (/20) pour les élèves de la sélection ayant une note enregistrée.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-6 pt-4 md:grid-cols-4">
+                <div className="flex flex-col items-center text-center p-3 rounded-md bg-muted/30">
+                    <BookText className="h-7 w-7 text-primary mb-2" />
+                    <p className="text-sm font-medium text-foreground">Français</p>
+                    <p className="text-2xl font-bold mt-1">
+                        {stats.averageFrancais !== undefined ? stats.averageFrancais.toFixed(1) : 'N/A'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">({stats.countFrancais ?? 0} élèves)</p>
+                </div>
+                <div className="flex flex-col items-center text-center p-3 rounded-md bg-muted/30">
+                    <Calculator className="h-7 w-7 text-primary mb-2" />
+                    <p className="text-sm font-medium text-foreground">Mathématiques</p>
+                    <p className="text-2xl font-bold mt-1">
+                        {stats.averageMaths !== undefined ? stats.averageMaths.toFixed(1) : 'N/A'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">({stats.countMaths ?? 0} élèves)</p>
+                </div>
+                <div className="flex flex-col items-center text-center p-3 rounded-md bg-muted/30">
+                    <Landmark className="h-7 w-7 text-primary mb-2" />
+                    <p className="text-sm font-medium text-foreground">Histoire-Géo.</p>
+                    <p className="text-2xl font-bold mt-1">
+                        {stats.averageHistoireGeo !== undefined ? stats.averageHistoireGeo.toFixed(1) : 'N/A'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">({stats.countHistoireGeo ?? 0} élèves)</p>
+                </div>
+                <div className="flex flex-col items-center text-center p-3 rounded-md bg-muted/30">
+                    <FlaskConical className="h-7 w-7 text-primary mb-2" />
+                    <p className="text-sm font-medium text-foreground">Sciences</p>
+                    <p className="text-2xl font-bold mt-1">
+                        {stats.averageSciences !== undefined ? stats.averageSciences.toFixed(1) : 'N/A'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">({stats.countSciences ?? 0} élèves)</p>
+                </div>
+            </CardContent>
+        </Card>
+
 
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
           <Card className="shadow-lg rounded-lg">
