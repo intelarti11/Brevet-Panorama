@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Database, LayoutGrid, PanelLeft } from 'lucide-react';
+import { Database, LayoutGrid, PanelLeft, FileUp } from 'lucide-react';
 
 import Logo from '@/components/logo';
 import {
@@ -42,11 +42,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <SidebarMenuButton
                 asChild
                 isActive={pathname === '/dashboard/donnee' || pathname === '/dashboard'}
-                tooltip={{ children: "Données", side: "right", align: "center" }}
+                tooltip={{ children: " Données", side: "right", align: "center" }}
               >
                 <Link href="/dashboard/donnee">
                   <Database />
-                  <span>Données</span>
+                  <span> Données</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -54,11 +54,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <SidebarMenuButton
                 asChild
                 isActive={pathname === '/dashboard/panorama'}
-                tooltip={{ children: "Panorama", side: "right", align: "center" }}
+                tooltip={{ children: " Panorama", side: "right", align: "center" }}
               >
                 <Link href="/dashboard/panorama">
                   <LayoutGrid />
-                  <span>Panorama</span>
+                  <span> Panorama</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === '/dashboard/import'}
+                tooltip={{ children: "Import", side: "right", align: "center" }}
+              >
+                <Link href="/dashboard/import">
+                  <FileUp />
+                  <span>Import</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
