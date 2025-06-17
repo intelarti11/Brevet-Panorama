@@ -2,14 +2,15 @@
 "use client";
 
 import type { ChangeEvent } from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import type { StudentData } from '@/lib/excel-types';
 import { studentDataSchema } from '@/lib/excel-types';
-import { Loader2, UploadCloud, Import, AlertTriangle } from 'lucide-react';
+import { Loader2, UploadCloud, Import, AlertTriangle, CalendarDays } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
@@ -21,7 +22,21 @@ export default function ImportPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [importYear, setImportYear] = useState<string>('');
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Set default import year to current calendar year
+    const currentYear = new Date().getFullYear().toString();
+    // Attempt to set a more relevant academic year format like "YYYY-YYYY"
+    const currentMonth = new Date().getMonth(); // 0-11 for Jan-Dec
+    let academicYearStart = new Date().getFullYear();
+    if (currentMonth < 7) { // Before August, academic year started last year
+        academicYearStart--;
+    }
+    setImportYear(`${academicYearStart}-${academicYearStart + 1}`);
+
+  }, []);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -41,7 +56,7 @@ export default function ImportPage() {
     }
   };
 
-  const handleImportToFirestore = async (dataToImport: StudentData[]) => {
+  const handleImportToFirestore = async (dataToImport: StudentData[], yearToImport: string) => {
     if (dataToImport.length === 0) {
       toast({ variant: "destructive", title: "Aucune Donnée", description: "Aucune donnée valide à importer." });
       return;
@@ -58,8 +73,12 @@ export default function ImportPage() {
       if (student.numeroCandidatINE && student.numeroCandidatINE.trim() !== "") {
         const studentRef = doc(collectionRef, student.numeroCandidatINE);
         const { rawRowData, ...studentDataForFirestore } = student;
-        const cleanedStudentData = JSON.parse(JSON.stringify(studentDataForFirestore));
-        batch.set(studentRef, cleanedStudentData);
+        // Add the importYear to the data being saved
+        const finalStudentData = { 
+            ...JSON.parse(JSON.stringify(studentDataForFirestore)), 
+            anneeScolaireImportee: yearToImport 
+        };
+        batch.set(studentRef, finalStudentData);
         documentsAddedToBatch++;
       } else {
         console.warn("Skipping student due to missing or invalid INE:", student);
@@ -75,9 +94,10 @@ export default function ImportPage() {
 
     try {
       await batch.commit();
-      toast({ title: "Importation Réussie", description: `${documentsAddedToBatch} enregistrements importés dans Firestore.` });
+      toast({ title: "Importation Réussie", description: `${documentsAddedToBatch} enregistrements importés pour l'année ${yearToImport} dans Firestore.` });
       setFile(null);
       setFileName(null);
+      // Optionally reset importYear or keep it for next import
     } catch (importError: any) {
       console.error("Erreur d'importation Firestore:", importError);
       let userMessage = `Échec de l'importation: ${importError.message}.`;
@@ -97,6 +117,11 @@ export default function ImportPage() {
     if (!file) {
       setError("Aucun fichier sélectionné.");
       toast({ variant: "destructive", title: "Erreur", description: "Aucun fichier sélectionné." });
+      return;
+    }
+    if (!importYear || importYear.trim() === "") {
+      setError("L'année d'importation est requise.");
+      toast({ variant: "destructive", title: "Erreur", description: "Veuillez spécifier l'année d'importation.", duration: 5000 });
       return;
     }
 
@@ -155,13 +180,13 @@ export default function ImportPage() {
             const prenoms = String(getExcelVal('Prénom candidat') || '').trim();
 
             if (!ine || !nom || !prenoms) {
-              // Skip row if essential identifiers are missing
               console.warn(`Ligne ${index + 2} ignorée : INE, Nom ou Prénom manquant.`);
               return; 
             }
 
             const studentInput: any = {
-              serie: getExcelVal('Série'),
+              serie: getExcelVal('Série'), // This is the original "Série" field from Excel
+              anneeScolaireImportee: importYear, // Will be overwritten by handleImportToFirestore, but good to have for schema
               codeEtablissement: getExcelVal('Code Etablissement'),
               libelleEtablissement: getExcelVal('Libellé Etablissement'),
               communeEtablissement: getExcelVal('Commune Etablissement'),
@@ -209,7 +234,7 @@ export default function ImportPage() {
             if (validationResult.success) {
               transformedData.push(validationResult.data);
             } else {
-              validationErrors.push({ row: index + 2, errors: validationResult.error.flatten() }); // +2 for 1-based indexing and header row
+              validationErrors.push({ row: index + 2, errors: validationResult.error.flatten() }); 
             }
           });
 
@@ -228,7 +253,7 @@ export default function ImportPage() {
           }
 
           if (transformedData.length > 0) {
-            await handleImportToFirestore(transformedData);
+            await handleImportToFirestore(transformedData, importYear);
           } else if (error) {
             // Critical error already set
           } else if (dataObjects.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
@@ -266,9 +291,28 @@ export default function ImportPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Téléverser et Importer un fichier Excel</CardTitle>
-          <CardDescription>Sélectionnez un fichier .xlsx ou .xls contenant les résultats des élèves. Les données seront importées directement.</CardDescription>
+          <CardDescription>Sélectionnez un fichier .xlsx ou .xls contenant les résultats des élèves, et spécifiez l'année scolaire pour ces données.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="importYear" className="text-sm font-medium">Année Scolaire d'Importation</Label>
+            <div className="relative">
+                <CalendarDays className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                    id="importYear"
+                    type="text"
+                    placeholder="Ex: 2023-2024 ou 2024"
+                    value={importYear}
+                    onChange={(e) => setImportYear(e.target.value)}
+                    className="pl-10"
+                    disabled={isLoading || isImporting}
+                />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Indiquez l'année scolaire (ex: "2023-2024" ou "2024") pour les données de ce fichier.
+            </p>
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-4 items-start">
             <label htmlFor="file-upload" className="flex-grow w-full sm:w-auto">
               <Input
@@ -286,9 +330,9 @@ export default function ImportPage() {
                 </div>
               </Button>
             </label>
-            <Button onClick={parseAndImportData} disabled={!file || isLoading || isImporting} className="w-full sm:w-auto">
+            <Button onClick={parseAndImportData} disabled={!file || isLoading || isImporting || !importYear.trim()} className="w-full sm:w-auto">
               {(isLoading || isImporting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />}
-              {isLoading ? "Lecture du fichier Excel..." : (isImporting ? "Importation en cours..." : "Importer le Fichier Excel")}
+              {isLoading ? "Lecture du fichier..." : (isImporting ? "Importation en cours..." : "Importer le Fichier")}
             </Button>
           </div>
           {error && (

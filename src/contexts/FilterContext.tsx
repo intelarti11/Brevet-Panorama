@@ -6,18 +6,16 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { getFirestore, collection, getDocs, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-// This interface will be used by DonneePage and PanoramaPage
 export interface ProcessedStudentData {
   id: string; // INE
   nom: string;
   prenom: string;
   etablissement: string;
-  anneeOriginale: string; // The raw data.serie from Firestore
-  academicYear?: string; // Parsed e.g., "2023-2024"
+  anneeOriginale: string; // The raw data.serie or other original year/serie field from Firestore
+  academicYear?: string; // Parsed or directly imported e.g., "2023-2024"
   serieType?: string; // Parsed e.g., "GÉNÉRALE"
   resultat: string;
   moyenne?: number;
-  // Panorama specific fields
   scoreFrancais?: number;
   scoreMaths?: number;
   scoreHistoireGeo?: number;
@@ -41,7 +39,6 @@ interface FilterContextType {
   selectedEstablishment: string;
   setSelectedEstablishment: (establishment: string) => void;
 
-  // Constants for "all" options
   ALL_ACADEMIC_YEARS_VALUE: string;
   ALL_SERIE_TYPES_VALUE: string;
   ALL_ESTABLISHMENTS_VALUE: string;
@@ -53,7 +50,7 @@ export const ALL_ACADEMIC_YEARS_VALUE = "__ALL_ACADEMIC_YEARS__";
 export const ALL_SERIE_TYPES_VALUE = "__ALL_SERIE_TYPES__";
 export const ALL_ESTABLISHMENTS_VALUE = "__ALL_ESTABLISHMENTS__";
 
-const normalizeTextForComparison = (text: string): string => {
+const normalizeTextForComparison = (text: string | undefined): string => {
   if (text === null || text === undefined) return "";
   return text
     .toLowerCase()
@@ -61,49 +58,42 @@ const normalizeTextForComparison = (text: string): string => {
     .replace(/[\u0300-\u036f]/g, "");
 };
 
-// Basic parsing function for 'serie' field
-// Example: "2023-2024 GÉNÉRALE" -> { academicYear: "2023-2024", serieType: "GÉNÉRALE" }
-// Example: "2023" -> { academicYear: "2023", serieType: "N/A" }
-// Example: "PROFESSIONNELLE" -> { academicYear: "N/A", serieType: "PROFESSIONNELLE" }
-const parseSerieField = (rawSerie: string): { academicYear: string; serieType: string } => {
-  if (!rawSerie) return { academicYear: "N/A", serieType: "N/A" };
+// Adjusted parsing function: primarily extracts serieType from the original 'serie' field.
+// Academic year extraction is a fallback if `anneeScolaireImportee` is missing.
+const parseOriginalSerieField = (rawSerieOriginale: string | undefined): { academicYearFallback: string; serieType: string } => {
+  if (!rawSerieOriginale) return { academicYearFallback: "N/A", serieType: "N/A" };
 
-  // Regex to find YYYY-YYYY or YYYY/YYYY or standalone YYYY
   const yearRegex = /(\d{4}[-\/]\d{4}|\b\d{4}\b)/;
-  const yearMatch = rawSerie.match(yearRegex);
-  let academicYear = "N/A";
-  let serieTypePart = rawSerie;
+  const yearMatch = rawSerieOriginale.match(yearRegex);
+  let academicYearFallback = "N/A";
+  let serieTypePart = rawSerieOriginale;
 
   if (yearMatch) {
-    academicYear = yearMatch[0];
-    serieTypePart = rawSerie.replace(yearMatch[0], '').trim();
+    academicYearFallback = yearMatch[0];
+    serieTypePart = rawSerieOriginale.replace(yearMatch[0], '').trim();
   }
 
-  // Keywords for series, case-insensitive
-  const serieKeywords = ["GÉNÉRALE", "GENERALE", "PROFESSIONNELLE", "PRO", "BEPC", "TECHNIQUE", "TECHNOLOGIQUE"];
+  const serieKeywords = ["GÉNÉRALE", "GENERALE", "PROFESSIONNELLE", "PRO", "BEPC", "TECHNIQUE", "TECHNOLOGIQUE", "MODERNE LONG", "MODERNE COURT"];
   let foundSerieKeyword = "N/A";
 
   for (const keyword of serieKeywords) {
     if (normalizeTextForComparison(serieTypePart).includes(normalizeTextForComparison(keyword))) {
-      // Find the original casing of the keyword in serieTypePart
-      const originalKeywordRegex = new RegExp(keyword.split('').map(char => `[${char.toUpperCase()}${char.toLowerCase()}]`).join(''), 'i');
+      const originalKeywordRegex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       const originalKeywordMatch = serieTypePart.match(originalKeywordRegex);
-      foundSerieKeyword = originalKeywordMatch ? originalKeywordMatch[0] : keyword; // Use original casing if possible
-      serieTypePart = serieTypePart.replace(originalKeywordRegex, '').trim();
+      foundSerieKeyword = originalKeywordMatch ? originalKeywordMatch[0] : keyword;
+      // Do not remove the keyword from serieTypePart if it's the only content left, or if it's a multi-word keyword.
+      // This part might need refinement based on actual data variations.
+      // For now, if a keyword is found, we assume it's the serie type.
       break;
     }
   }
   
-  if (foundSerieKeyword === "N/A" && serieTypePart && !yearMatch) { // If no year and no keyword, assume the whole string is type
-      foundSerieKeyword = serieTypePart;
-  } else if (foundSerieKeyword === "N/A" && serieTypePart && yearMatch) { // Year found, rest is type
-      foundSerieKeyword = serieTypePart || "N/A";
-  } else if (foundSerieKeyword === "N/A" && !serieTypePart && yearMatch) { // Only year found
-      foundSerieKeyword = "N/A";
+  // If no keyword was found but there's text left in serieTypePart, use that text as serieType.
+  if (foundSerieKeyword === "N/A" && serieTypePart && serieTypePart.trim() !== "") {
+      foundSerieKeyword = serieTypePart.trim();
   }
-
-
-  return { academicYear, serieType: foundSerieKeyword === "" ? "N/A" : foundSerieKeyword };
+  
+  return { academicYearFallback, serieType: foundSerieKeyword === "" ? "N/A" : foundSerieKeyword };
 };
 
 
@@ -141,16 +131,20 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          const rawSerie = data.serie || "N/A";
-          const { academicYear, serieType } = parseSerieField(rawSerie);
+          const anneeOriginaleField = data.serie || ""; // The original 'serie' field from Excel/Firestore
+          const importedYear = data.anneeScolaireImportee; // The new dedicated year field
+
+          const { academicYearFallback, serieType } = parseOriginalSerieField(anneeOriginaleField);
+          
+          const finalAcademicYear = importedYear || academicYearFallback;
 
           students.push({
             id: doc.id, 
             nom: data.nomCandidat || 'N/A',
             prenom: data.prenomsCandidat || 'N/A',
             etablissement: data.libelleEtablissement || 'N/A',
-            anneeOriginale: rawSerie,
-            academicYear: academicYear,
+            anneeOriginale: anneeOriginaleField,
+            academicYear: finalAcademicYear,
             serieType: serieType,
             resultat: data.resultat || 'N/A',
             moyenne: data.totalPourcentage !== undefined && data.totalPourcentage !== null ? Number(data.totalPourcentage) : undefined,
@@ -160,24 +154,30 @@ export function FilterProvider({ children }: { children: ReactNode }) {
             scoreSciences: data.scoreSciences !== undefined && data.scoreSciences !== null ? Number(data.scoreSciences) : undefined,
           });
 
-          if (academicYear !== "N/A") academicYearsSet.add(academicYear);
-          if (serieType !== "N/A") serieTypesSet.add(serieType);
+          if (finalAcademicYear && finalAcademicYear !== "N/A") academicYearsSet.add(finalAcademicYear);
+          if (serieType && serieType !== "N/A") serieTypesSet.add(serieType);
           if (data.libelleEtablissement) establishmentsSet.add(data.libelleEtablissement);
         });
 
         setAllProcessedStudents(students);
         
-        const sortedAcademicYears = Array.from(academicYearsSet).sort((a, b) => b.localeCompare(a)); // Sort descending for "most recent"
+        const sortedAcademicYears = Array.from(academicYearsSet).sort((a, b) => {
+            // Custom sort for "YYYY-YYYY" and "YYYY"
+            const yearA = parseInt(a.substring(0,4));
+            const yearB = parseInt(b.substring(0,4));
+            if (yearB !== yearA) return yearB - yearA; // Sort by start year descending
+            return b.localeCompare(a); // Fallback for same start year or other formats
+        });
+
         setAvailableAcademicYears(sortedAcademicYears);
         if (sortedAcademicYears.length > 0) {
-          setSelectedAcademicYear(sortedAcademicYears[0]); // Default to most recent
+          setSelectedAcademicYear(sortedAcademicYears[0]); 
         } else {
           setSelectedAcademicYear(ALL_ACADEMIC_YEARS_VALUE);
         }
 
         const sortedSerieTypes = Array.from(serieTypesSet).sort();
         setAvailableSerieTypes(sortedSerieTypes);
-        // Default to "GÉNÉRALE" if available, case-insensitive check
         const generaleEquivalent = sortedSerieTypes.find(s => normalizeTextForComparison(s) === normalizeTextForComparison("GÉNÉRALE"));
         if (generaleEquivalent) {
           setSelectedSerieType(generaleEquivalent);
@@ -189,11 +189,13 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         
         const sortedEstablishments = Array.from(establishmentsSet).sort();
         setAvailableEstablishments(sortedEstablishments);
+        // Default to first establishment if available, otherwise "All"
         if (sortedEstablishments.length > 0) {
-          setSelectedEstablishment(sortedEstablishments[0]); // Default to first found
+           setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE); // Default to all establishments now for broader initial view
         } else {
-          setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE);
+           setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE);
         }
+
 
       } catch (err: any) {
         console.error("Erreur de récupération des données Firestore:", err);
@@ -233,4 +235,3 @@ export function useFilters(): FilterContextType {
   }
   return context;
 }
-

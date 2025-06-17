@@ -17,7 +17,8 @@ const preprocessOptionalStringToNumber = (val: unknown) => {
 
 
 export const studentDataSchema = z.object({
-  serie: z.string().optional(),
+  serie: z.string().optional(), // This will now primarily be for "Type de Série" like "GÉNÉRALE"
+  anneeScolaireImportee: z.string(), // Nouveau champ pour l'année d'import, ex: "2023-2024" ou "2024"
   codeEtablissement: z.string().optional(),
   libelleEtablissement: z.string().optional(),
   communeEtablissement: z.string().optional(),
