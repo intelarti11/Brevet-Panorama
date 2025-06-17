@@ -27,10 +27,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/logo';
-import { Mail, LockKeyhole, Loader2 } from 'lucide-react';
+import { User, LockKeyhole, Loader2, Eye, EyeOff } from 'lucide-react';
 
 const formSchema = z.object({
-  email: z.string().email({ message: "Adresse email invalide." }), // Kept email validation, but label is "Identifiant"
+  email: z.string().min(1, { message: "L'identifiant est requis." }), 
   password: z.string().min(6, { message: "Le mot de passe doit contenir au moins 6 caractères." }),
 });
 
@@ -38,6 +38,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -86,8 +87,8 @@ export default function LoginPage() {
                     <FormLabel>Identifiant</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="email" placeholder="e.g., jean.dupont@example.com" {...field} className="pl-10" />
+                        <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                        <Input type="text" placeholder="Entrez votre identifiant" {...field} className="pl-10" />
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -103,7 +104,22 @@ export default function LoginPage() {
                     <FormControl>
                        <div className="relative">
                         <LockKeyhole className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="password" placeholder="Entrez votre mot de passe" {...field} className="pl-10" />
+                        <Input 
+                          type={showPassword ? "text" : "password"} 
+                          placeholder="Entrez votre mot de passe" 
+                          {...field} 
+                          className="pl-10 pr-10" 
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          <span className="sr-only">{showPassword ? "Cacher le mot de passe" : "Afficher le mot de passe"}</span>
+                        </Button>
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -126,3 +142,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
