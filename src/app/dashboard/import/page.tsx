@@ -108,7 +108,7 @@ export default function ImportPage() {
             const prenoms = String(getVal(['Prénom(s) candidat', 'Prenom(s) candidat']) || '').trim();
 
             if (!ine || !nom || !prenoms) {
-              // console.log(`Skipping row ${index + headerRowIndex + 2} due to missing essential identifier(s).`);
+              // console.log(`Skipping row ${index + headerRowIndex + 2} due to missing essential identifier(s). INE: '${ine}', Nom: '${nom}', Prenoms: '${prenoms}'`);
               return; 
             }
             
@@ -148,18 +148,17 @@ export default function ImportPage() {
 
             const currentOptions: Record<string, string> = {};
             optionHeadersFromExcel.forEach(optHeader => {
-              const val = getVal([optHeader, `${optHeader} /20`, `${optHeader} /50`]); // Attempt to match with common score patterns
+              const val = getVal([optHeader, `${optHeader} /20`, `${optHeader} /50`]);
               if (val !== undefined && val !== null) {
-                currentOptions[optHeader.split(' ')[0]] = String(val); // Use base header name as key
+                currentOptions[optHeader.split(' ')[0]] = String(val);
               }
             });
-            // Also check for any other columns not in knownMainHeaders as potential options
             Object.keys(rawRow).forEach(excelHeader => {
                 if (!knownMainHeaders.some(mainHeader => 
-                    (studentInput as any)[mainHeader] === rawRow[excelHeader] || // Check if value is already used
-                    excelHeader.toLowerCase().includes(mainHeader.toLowerCase()) // Heuristic for related columns
+                    (studentInput as any)[mainHeader] === rawRow[excelHeader] || 
+                    excelHeader.toLowerCase().includes(mainHeader.toLowerCase()) 
                   ) && 
-                    !optionHeadersFromExcel.includes(excelHeader.split(' ')[0]) // Not already processed
+                    !optionHeadersFromExcel.includes(excelHeader.split(' ')[0]) 
                    ) {
                     const value = rawRow[excelHeader];
                     if (value !== undefined && value !== null && String(value).trim() !== '') {
@@ -184,8 +183,16 @@ export default function ImportPage() {
 
           if (validationErrors.length > 0) {
             const firstError = validationErrors[0];
-            const errorMessages = Object.entries(firstError.errors.fieldErrors).map(([field, msg]) => `${field}: ${msg[0] || msg}`).join('; '); // Access first error message if array
-            console.error("Erreurs de validation:", validationErrors);
+            const errorMessages = Object.entries(firstError.errors.fieldErrors)
+              .map(([field, messages]) => {
+                // messages is string[] | undefined
+                if (messages && messages.length > 0) {
+                  return `${field}: ${messages[0]}`; // Display the first error message for the field
+                }
+                return `${field}: Erreur de validation inconnue`; // Fallback
+              })
+              .join('; ');
+            console.error("Erreurs de validation:", validationErrors); // Keep detailed log for dev
             throw new Error(`Validation échouée pour certaines lignes. Ex: Ligne ${firstError.row}: ${errorMessages}`);
           }
           
@@ -195,7 +202,6 @@ export default function ImportPage() {
           } else if (error) {
             // Don't override existing critical error like "header not found"
           } else if (dataRows.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
-            // This case means all rows were skipped by the pre-filter
             throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'Numéro Cand. INE', 'Nom candidat', et 'Prénom(s) candidat' sont présentes et remplies.");
           }
           else {
@@ -231,7 +237,6 @@ export default function ImportPage() {
       return;
     }
     setIsImporting(true);
-    // Placeholder for Firestore import logic
     console.log("Données à importer:", parsedData);
     // Example:
     // const db = getFirestore(app);
@@ -346,5 +351,4 @@ export default function ImportPage() {
     </div>
   );
 }
-
     
