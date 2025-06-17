@@ -68,7 +68,8 @@ const normalizeTextForComparison = (text: string): string => {
 const parseSerieField = (rawSerie: string): { academicYear: string; serieType: string } => {
   if (!rawSerie) return { academicYear: "N/A", serieType: "N/A" };
 
-  const yearRegex = /(\d{4}-\d{4}|\b\d{4}\b)/;
+  // Regex to find YYYY-YYYY or YYYY/YYYY or standalone YYYY
+  const yearRegex = /(\d{4}[-\/]\d{4}|\b\d{4}\b)/;
   const yearMatch = rawSerie.match(yearRegex);
   let academicYear = "N/A";
   let serieTypePart = rawSerie;
@@ -232,3 +233,4 @@ export function useFilters(): FilterContextType {
   }
   return context;
 }
+
