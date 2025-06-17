@@ -64,13 +64,12 @@ export default function ImportPage() {
           const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); // Get array of arrays to find header row
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); 
 
           if (jsonData.length === 0) {
             throw new Error("Le fichier Excel est vide ou ne contient pas de données lisibles.");
           }
           
-          // Find the actual header row (first row with non-empty cells)
           let headerRowIndex = -1;
           for(let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i] as any[];
@@ -87,8 +86,8 @@ export default function ImportPage() {
           const headers = jsonData[headerRowIndex] as string[];
           const dataRows = XLSX.utils.sheet_to_json(worksheet, {
             header: headers,
-            range: headerRowIndex + 1, // Data starts from the row after headers
-            defval: null, // Use null for empty cells
+            range: headerRowIndex + 1, 
+            defval: null, 
             cellDates: true
           }) as any[];
 
@@ -97,13 +96,21 @@ export default function ImportPage() {
           const validationErrors: { row: number; errors: any }[] = [];
 
           dataRows.forEach((rawRow, index) => {
-            // Helper to safely access potentially missing or differently cased headers
             const getVal = (keys: string[]) => {
               for (const key of keys) {
                 if (rawRow[key] !== undefined) return rawRow[key];
               }
               return undefined;
             };
+            
+            const ine = String(getVal(['Numéro Cand. INE', 'Numero Cand. INE']) || '').trim();
+            const nom = String(getVal(['Nom candidat']) || '').trim();
+            const prenoms = String(getVal(['Prénom(s) candidat', 'Prenom(s) candidat']) || '').trim();
+
+            if (!ine || !nom || !prenoms) {
+              // console.log(`Skipping row ${index + headerRowIndex + 2} due to missing essential identifier(s).`);
+              return; 
+            }
             
             const studentInput = {
               serie: getVal(['Série', 'Serie']),
@@ -112,9 +119,9 @@ export default function ImportPage() {
               communeEtablissement: getVal(['Commune Établis.', 'Commune Etablis.']),
               divisionEleve: getVal(['Division Élève', 'Division Eleve']),
               categorieSocioPro: getVal(['Catégorie socio-prof.', 'Categorie socio-prof.']),
-              numeroCandidatINE: String(getVal(['Numéro Cand. INE', 'Numero Cand. INE']) || ''),
-              nomCandidat: getVal(['Nom candidat']),
-              prenomsCandidat: getVal(['Prénom(s) candidat', 'Prenom(s) candidat']),
+              numeroCandidatINE: ine,
+              nomCandidat: nom,
+              prenomsCandidat: prenoms,
               dateNaissance: getVal(['Dt nais. Cand.']) instanceof Date ? (getVal(['Dt nais. Cand.']) as Date).toLocaleDateString('fr-FR') : String(getVal(['Dt nais. Cand.']) || ''),
               resultat: getVal(['Résultat', 'Resultat']),
               totalGeneral: getVal(['TOTAL GÉNÉRAL /800,0', 'TOTAL GENERAL /800,0']),
@@ -129,25 +136,39 @@ export default function ImportPage() {
               scoreEducationMusicale: getVal(['Edu Mus01A /50']),
               scoreEPS: getVal(['EPS CCF01A /100']),
               scoreOralDNB: getVal(['OralDNB01A /100']),
-              options: {}, // Populate this dynamically
-              rawRowData: rawRow, // Keep original row data if needed
+              options: {}, 
+              rawRowData: rawRow, 
             };
             
-            // Dynamically populate options
             const knownMainHeaders = Object.keys(studentInput).filter(k => k !== 'options' && k !== 'rawRowData');
             const optionHeadersFromExcel = [
               'LCA001AR', 'LCA001AC', 'LCA001AL', 'LCA001AG', 'LCA001FT', 'LCA001BI', 'LCA001CH',
               'LCE001AN', 'LCE001AL', 'LCE001ES', 'LCE001IT', 'les comprofessionnels' 
-              // Add any other specific option headers from your Excel
             ];
 
             const currentOptions: Record<string, string> = {};
             optionHeadersFromExcel.forEach(optHeader => {
-              const val = getVal([optHeader]);
+              const val = getVal([optHeader, `${optHeader} /20`, `${optHeader} /50`]); // Attempt to match with common score patterns
               if (val !== undefined && val !== null) {
-                currentOptions[optHeader] = String(val);
+                currentOptions[optHeader.split(' ')[0]] = String(val); // Use base header name as key
               }
             });
+            // Also check for any other columns not in knownMainHeaders as potential options
+            Object.keys(rawRow).forEach(excelHeader => {
+                if (!knownMainHeaders.some(mainHeader => 
+                    (studentInput as any)[mainHeader] === rawRow[excelHeader] || // Check if value is already used
+                    excelHeader.toLowerCase().includes(mainHeader.toLowerCase()) // Heuristic for related columns
+                  ) && 
+                    !optionHeadersFromExcel.includes(excelHeader.split(' ')[0]) // Not already processed
+                   ) {
+                    const value = rawRow[excelHeader];
+                    if (value !== undefined && value !== null && String(value).trim() !== '') {
+                        currentOptions[excelHeader] = String(value);
+                    }
+                }
+            });
+
+
              if (Object.keys(currentOptions).length > 0) {
                 studentInput.options = currentOptions;
             }
@@ -163,7 +184,7 @@ export default function ImportPage() {
 
           if (validationErrors.length > 0) {
             const firstError = validationErrors[0];
-            const errorMessages = Object.entries(firstError.errors.fieldErrors).map(([field, msg]) => `${field}: ${msg}`).join('; ');
+            const errorMessages = Object.entries(firstError.errors.fieldErrors).map(([field, msg]) => `${field}: ${msg[0] || msg}`).join('; '); // Access first error message if array
             console.error("Erreurs de validation:", validationErrors);
             throw new Error(`Validation échouée pour certaines lignes. Ex: Ligne ${firstError.row}: ${errorMessages}`);
           }
@@ -171,14 +192,20 @@ export default function ImportPage() {
           setParsedData(transformedData);
           if (transformedData.length > 0) {
              toast({ title: "Succès", description: `${transformedData.length} lignes lues et validées depuis ${file.name}.` });
-          } else {
+          } else if (error) {
+            // Don't override existing critical error like "header not found"
+          } else if (dataRows.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
+            // This case means all rows were skipped by the pre-filter
+            throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'Numéro Cand. INE', 'Nom candidat', et 'Prénom(s) candidat' sont présentes et remplies.");
+          }
+          else {
             throw new Error("Aucune donnée valide trouvée dans le fichier après parsing.");
           }
 
         } catch (parseError: any) {
           console.error("Erreur de parsing Excel:", parseError);
           setError(`Erreur lors de la lecture du fichier: ${parseError.message}`);
-          toast({ variant: "destructive", title: "Erreur de Lecture", description: parseError.message });
+          toast({ variant: "destructive", title: "Erreur de Lecture", description: parseError.message, duration: 7000 });
         } finally {
           setIsLoading(false);
         }
@@ -319,3 +346,5 @@ export default function ImportPage() {
     </div>
   );
 }
+
+    
