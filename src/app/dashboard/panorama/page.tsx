@@ -157,11 +157,8 @@ export default function PanoramaPage() {
 
   useEffect(() => {
     if (isLoading || (filteredStudentsData.length === 0 && allStudentsData.length > 0 && selectedYear === ALL_YEARS_VALUE && selectedEstablishment === ALL_ESTABLISHMENTS_VALUE && !error)) {
-       // If still loading, or if all data is loaded but filtered set is empty (initial state before any filtering might show this)
-       // but ensure we don't reset if it's genuinely no data for filters.
-       // The condition `filteredStudentsData.length === 0 && !isLoading` is handled later.
        if (isLoading) {
-           setStats(initialStats); // Reset stats if loading
+           setStats(initialStats); 
            return;
        }
     }
@@ -194,10 +191,10 @@ export default function PanoramaPage() {
         newStats.admis++;
         if (normalizedResultat.includes(normalizedTresBienStr)) {
           newStats.mentions.tresBien++;
+        } else if (normalizedResultat.includes(normalizedAssezBienStr)) { // Check for "Assez Bien" before "Bien"
+          newStats.mentions.assezBien++;
         } else if (normalizedResultat.includes(normalizedBienStr)) {
           newStats.mentions.bien++;
-        } else if (normalizedResultat.includes(normalizedAssezBienStr)) {
-          newStats.mentions.assezBien++;
         } else {
           newStats.mentions.sansMention++;
         }
@@ -207,9 +204,6 @@ export default function PanoramaPage() {
     });
 
     if (newStats.totalStudents > 0 && (newStats.admis + newStats.refuse) > 0) {
-      // Base success rate on students who are either admis or refusé, if totalStudents includes other statuses.
-      // Or, if totalStudents is meant to be only admis+refusé, then newStats.admis / newStats.totalStudents is fine.
-      // Let's assume totalStudents might include "en attente" etc. so (admis / (admis+refuse)) if (admis+refuse)>0
       const consideredForRate = newStats.admis + newStats.refuse;
       if (consideredForRate > 0) {
         newStats.successRate = parseFloat(((newStats.admis / consideredForRate) * 100).toFixed(1));
@@ -219,7 +213,6 @@ export default function PanoramaPage() {
     } else {
          newStats.successRate = 0;
     }
-
 
     if (newStats.admis > 0) {
       newStats.mentionPercentages.tresBien = parseFloat(((newStats.mentions.tresBien / newStats.admis) * 100).toFixed(1));
@@ -364,11 +357,11 @@ export default function PanoramaPage() {
               <div className="text-lg font-semibold">
                 TB: {stats.mentions.tresBien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.tresBien : 0}%)</span>
               </div>
-              <div className="text-md">
-                B: {stats.mentions.bien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.bien : 0}%)</span>
+               <div className="text-md">
+                AB: {stats.mentions.assezBien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.assezBien : 0}%)</span>
               </div>
               <div className="text-md">
-                AB: {stats.mentions.assezBien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.assezBien : 0}%)</span>
+                B: {stats.mentions.bien} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.bien : 0}%)</span>
               </div>
                <div className="text-md">
                 SM: {stats.mentions.sansMention} <span className="text-xs text-muted-foreground">({stats.admis > 0 ? stats.mentionPercentages.sansMention : 0}%)</span>
@@ -404,7 +397,6 @@ export default function PanoramaPage() {
                     <Pie data={resultsChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} 
                          label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }) => {
                             const RADIAN = Math.PI / 180;
-                            // Ensure radius is positive for calculations
                             const effectiveOuterRadius = Math.max(0, outerRadius);
                             const effectiveInnerRadius = Math.max(0, innerRadius);
                             const radius = effectiveInnerRadius + (effectiveOuterRadius - effectiveInnerRadius) * 0.5;
@@ -451,7 +443,7 @@ export default function PanoramaPage() {
                               <ChartTooltipContent 
                                   formatter={(value, name, props) => (
                                       <div className="flex flex-col p-1">
-                                          <span className="font-semibold">{props.payload.name === "SM" ? "Sans Mention" : (props.payload.name === "TB" ? "Très Bien" : (props.payload.name === "B" ? "Bien" : "Assez Bien"))}</span>
+                                          <span className="font-semibold">{props.payload.name === "SM" ? "Sans Mention" : (props.payload.name === "TB" ? "Très Bien" : (props.payload.name === "AB" ? "Assez Bien" : "Bien" ))}</span>
                                           <span>Effectif: {value}</span>
                                           <span>{props.payload.percentage}% des admis</span>
                                       </div>
