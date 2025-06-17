@@ -12,7 +12,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -133,13 +132,8 @@ export default function LoginPage() {
             </form>
           </Form>
         </CardContent>
-        <CardFooter className="flex flex-col items-center space-y-2">
-           <Link href="/forgot-password" className="text-sm text-primary hover:underline hover:text-accent">
-            Mot de passe oublié ?
-          </Link>
-        </CardFooter>
+        {/* CardFooter with the link has been removed */}
       </Card>
     </div>
   );
 }
-
