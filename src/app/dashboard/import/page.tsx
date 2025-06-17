@@ -50,6 +50,7 @@ export default function ImportPage() {
     const db = getFirestore(app);
     const batch = writeBatch(db);
     const collectionRef = collection(db, 'brevetResults');
+    let documentsAddedToBatch = 0;
 
     dataToImport.forEach(student => {
       if (student.numeroCandidatINE && student.numeroCandidatINE.trim() !== "") {
@@ -58,21 +59,29 @@ export default function ImportPage() {
         const { rawRowData, ...studentDataForFirestore } = student;
         const cleanedStudentData = JSON.parse(JSON.stringify(studentDataForFirestore));
         batch.set(studentRef, cleanedStudentData);
+        documentsAddedToBatch++;
       } else {
         console.warn("Skipping student due to missing or invalid INE:", student);
       }
     });
 
+    if (documentsAddedToBatch === 0) {
+      setError("Aucun élève avec un INE valide n'a été trouvé dans les données pour l'importation.");
+      toast({ variant: "destructive", title: "Importation Annulée", description: "Aucun élève avec un INE valide à importer.", duration: 7000 });
+      setIsImporting(false);
+      return;
+    }
+
     try {
       await batch.commit();
-      toast({ title: "Importation Réussie", description: `${dataToImport.length} enregistrements importés dans Firestore.` });
+      toast({ title: "Importation Réussie", description: `${documentsAddedToBatch} enregistrements importés dans Firestore.` });
       setFile(null);
       setFileName(null);
     } catch (importError: any) {
       console.error("Erreur d'importation Firestore:", importError);
       setError(`Échec de l'importation: ${importError.message}`);
       toast({ variant: "destructive", title: "Erreur d'Importation", description: `Échec de l'importation: ${importError.message}`, duration: 7000 });
-      throw importError;
+      // Ne pas jeter l'erreur ici pour permettre à l'interface utilisateur de rester active, l'erreur est déjà affichée
     } finally {
       setIsImporting(false);
     }
@@ -106,12 +115,13 @@ export default function ImportPage() {
           let headerRowIndex = -1;
           for (let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i] as any[];
+            // Check if the row is not entirely empty/null before considering it for headers
             if (row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')) {
               headerRowIndex = i;
               break;
             }
           }
-
+          
           if (headerRowIndex === -1) {
             throw new Error("Impossible de trouver la ligne d'en-tête dans le fichier Excel.");
           }
@@ -119,61 +129,62 @@ export default function ImportPage() {
           const rawHeadersFromExcel = jsonData[headerRowIndex] as any[];
           const headers = rawHeadersFromExcel.map(h => {
             if (typeof h === 'string') {
-              return h.trim();
+              return h.trim(); // Trim whitespace from headers
             }
-            return String(h || '').trim();
+            return String(h || '').trim(); // Ensure it's a string and trim
           });
 
 
           const dataRows = XLSX.utils.sheet_to_json(worksheet, {
-            header: headers,
-            range: headerRowIndex + 1,
-            defval: null,
-            cellDates: true
+            header: headers, // Use the trimmed headers
+            range: headerRowIndex + 1, // Start reading data from the row after the header
+            defval: null, // Explicitly set undefined/empty cells to null
+            cellDates: true // Attempt to parse dates
           }) as any[];
 
 
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
           
-          // Define the set of Excel headers that are explicitly mapped to studentInput fields
           const mappedExcelHeaders = new Set([
             'Série', 'Code Etablissement', 'Libellé Etablissement', 'Commune Etablissement',
-            'Division de classe', 'Catégorie candidat', 
-            // 'Numéro Candidat' and 'INE' are used for ine
-            'Numéro Candidat', 'INE', 
-            'Nom candidat', // used for nom
-            'Prénom candidat', // used for prenoms
-            'Date de naissance', 'Résultat', 'TOTAL GENERAL', 'Moyenne sur 20',
+            'Division de classe', 'Catégorie candidat', 'Numéro Candidat', 'INE', 
+            'Nom candidat', 'Prénom candidat', 'Date de naissance', 'Résultat', 
+            'TOTAL GENERAL', 'Moyenne sur 20',
             '001 - 1 - Français - Ponctuel', 
             '002 - 1 - Mathématiques - Ponctuel',
             '003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel',
             '004 - 1 - Sciences - Ponctuel', 
             '005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année',
-            '007AB - 1 - Langues étrangères ou régionales - Contrôle continu', // For scoreLVE
-            '007AD - 1 - Langages des arts et du corps - Contrôle continu', // For scoreArtsPlastiques
-            'Edu Mus01A /50', // For scoreEducationMusicale
-            'EPS CCF01A /100', // For scoreEPS
-            'Phy Chi01A /50', // For scorePhysiqueChimie
-            'Sci Vie01A /50', // For scoreSciencesVie
-            // Add any other headers that are directly used by getVal for studentInput fields
+            '007AB - 1 - Langues étrangères ou régionales - Contrôle continu',
+            '007AD - 1 - Langages des arts et du corps - Contrôle continu',
+            'Edu Mus01A /50',
+            'EPS CCF01A /100',
+            'Phy Chi01A /50',
+            'Sci Vie01A /50',
+            // Explicitly list other "main" fields that are mapped
+            'TOTAL POUR MENTION' // Example, if you map this field directly later
           ]);
 
 
           dataRows.forEach((rawRow, index) => {
             const getVal = (keys: string[]) => {
               for (const key of keys) {
+                // Check against the actual keys present in rawRow (which are now trimmed)
                 if (rawRow[key] !== undefined && rawRow[key] !== null) return rawRow[key];
               }
               return undefined;
             };
 
+            // Ensure INE, nom, prenoms are extracted correctly and are strings
             const ine = String(getVal(['INE', 'Numéro Candidat']) || '').trim();
             const nom = String(getVal(['Nom candidat']) || '').trim();
             const prenoms = String(getVal(['Prénom candidat']) || '').trim();
 
+            // Pre-filter rows: skip if essential identifiers are missing
             if (!ine || !nom || !prenoms) {
-              return;
+              // console.log(`Skipping row ${index + headerRowIndex + 2} due to missing INE, nom, or prenoms.`);
+              return; 
             }
 
             const studentInput = {
@@ -202,12 +213,14 @@ export default function ImportPage() {
               scorePhysiqueChimie: getVal(['Phy Chi01A /50']),
               scoreSciencesVie: getVal(['Sci Vie01A /50']),
               options: {},
-              rawRowData: rawRow,
+              rawRowData: rawRow, // Keep rawRowData for potential debugging or advanced features
             };
             
+            // Collect options from columns not in mappedExcelHeaders
             const currentOptions: Record<string, string> = {};
             Object.keys(rawRow).forEach(excelHeader => {
-                if (!mappedExcelHeaders.has(excelHeader)) { // Optimized check
+                // excelHeader is already trimmed because 'headers' array used in sheet_to_json was trimmed
+                if (!mappedExcelHeaders.has(excelHeader)) {
                     const value = rawRow[excelHeader];
                     if (value !== undefined && value !== null && String(value).trim() !== '') {
                         currentOptions[excelHeader] = String(value);
@@ -232,13 +245,14 @@ export default function ImportPage() {
             const firstError = validationErrors[0];
             const errorMessages = Object.entries(firstError.errors.fieldErrors)
               .map(([field, messages]) => {
+                // messages should be an array of strings
                 if (messages && messages.length > 0) {
-                  return `${field}: ${messages[0]}`;
+                  return `${field}: ${messages[0]}`; // Take the first error message for that field
                 }
-                return `${field}: Erreur de validation inconnue`;
+                return `${field}: Erreur de validation inconnue`; // Fallback if messages is not as expected
               })
               .join('; ');
-            console.error("Erreurs de validation:", validationErrors);
+            console.error("Erreurs de validation:", validationErrors); // Log all validation errors for debugging
             throw new Error(`Validation échouée pour certaines lignes. Ex: Ligne ${firstError.row}: ${errorMessages}`);
           }
 
@@ -247,8 +261,10 @@ export default function ImportPage() {
           } else if (error) { 
             // If 'error' state is already set (e.g. header not found), don't override it.
           } else if (dataRows.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
+            // This case means all rows were filtered out by the INE/nom/prenoms check
             throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'INE', 'Nom candidat', et 'Prénom candidat' (ou leurs équivalents) sont présentes, correctement nommées et remplies dans le fichier Excel.");
           } else {
+             // This means no data rows were found after header, or jsonData was empty
             throw new Error("Aucune donnée valide trouvée dans le fichier après parsing.");
           }
 
