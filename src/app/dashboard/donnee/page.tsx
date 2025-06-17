@@ -10,9 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Search, SlidersHorizontal } from 'lucide-react';
 
-// Type pour les données affichées (simplifié pour l'exemple)
 interface DisplayStudentData {
-  id: string; // INE
+  id: string; 
   nom: string;
   prenom: string;
   etablissement: string;
@@ -24,7 +23,6 @@ interface DisplayStudentData {
 const FAKE_YEARS = ["2024-2025", "2023-2024", "2022-2023", "2021-2022"];
 const FAKE_ESTABLISHMENTS = ["Collège A. Camus", "Collège V. Hugo", "Lycée J. Moulin", "Collège P. Valéry"];
 
-// Données fictives pour la démonstration
 const FAKE_STUDENT_DATA: DisplayStudentData[] = [
   { id: '123456789AB', nom: 'Dupont', prenom: 'Jean', etablissement: 'Collège A. Camus', annee: '2023-2024', resultat: 'Admis Mention Bien', moyenne: 15.5 },
   { id: '987654321CD', nom: 'Martin', prenom: 'Alice', etablissement: 'Collège V. Hugo', annee: '2023-2024', resultat: 'Admis', moyenne: 12.0 },
@@ -34,19 +32,21 @@ const FAKE_STUDENT_DATA: DisplayStudentData[] = [
   { id: 'CD1234567ZA', nom: 'Moreau', prenom: 'Manon', etablissement: 'Collège V. Hugo', annee: '2024-2025', resultat: 'Admis', moyenne: 11.8 },
 ];
 
+const ALL_YEARS_VALUE = "__ALL_YEARS__";
+const ALL_ESTABLISHMENTS_VALUE = "__ALL_ESTABLISHMENTS__";
 
 export default function DonneePage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedYear, setSelectedYear] = useState<string>('');
-  const [selectedEstablishment, setSelectedEstablishment] = useState<string>('');
+  const [selectedYear, setSelectedYear] = useState<string>(''); // Empty string for placeholder
+  const [selectedEstablishment, setSelectedEstablishment] = useState<string>(''); // Empty string for placeholder
   const [filteredData, setFilteredData] = useState<DisplayStudentData[]>(FAKE_STUDENT_DATA);
 
   useEffect(() => {
     let data = FAKE_STUDENT_DATA;
-    if (selectedYear) {
+    if (selectedYear && selectedYear !== ALL_YEARS_VALUE) {
       data = data.filter(student => student.annee === selectedYear);
     }
-    if (selectedEstablishment) {
+    if (selectedEstablishment && selectedEstablishment !== ALL_ESTABLISHMENTS_VALUE) {
       data = data.filter(student => student.etablissement === selectedEstablishment);
     }
     if (searchTerm) {
@@ -114,7 +114,7 @@ export default function DonneePage() {
                   <SelectValue placeholder="Sélectionner une année" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Toutes les années</SelectItem>
+                  <SelectItem value={ALL_YEARS_VALUE}>Toutes les années</SelectItem>
                   {FAKE_YEARS.map(year => (
                     <SelectItem key={year} value={year}>{year}</SelectItem>
                   ))}
@@ -129,7 +129,7 @@ export default function DonneePage() {
                   <SelectValue placeholder="Sélectionner un établissement" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tous les établissements</SelectItem>
+                  <SelectItem value={ALL_ESTABLISHMENTS_VALUE}>Tous les établissements</SelectItem>
                   {FAKE_ESTABLISHMENTS.map(est => (
                     <SelectItem key={est} value={est}>{est}</SelectItem>
                   ))}
@@ -197,4 +197,3 @@ export default function DonneePage() {
     </div>
   );
 }
-
