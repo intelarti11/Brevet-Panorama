@@ -7,7 +7,7 @@ interface LogoProps {
 const Logo: FC<LogoProps> = ({ className }) => {
   return (
     <div className={`font-headline text-3xl font-bold text-primary ${className}`}>
-      BrevetConnect
+      BrevetSynthèse
     </div>
   );
 };
