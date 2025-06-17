@@ -14,27 +14,31 @@ const preprocessOptionalStringToNumber = (val: unknown) => {
   return parseScoreValue(String(val));
 };
 
+const preprocessToStringOptional = (val: unknown) => {
+  if (val === undefined || val === null) return undefined;
+  return String(val).trim() === '' ? undefined : String(val).trim();
+};
+
 
 export const studentDataSchema = z.object({
-  'Série': z.string().optional(),
-  anneeScolaireImportee: z.string(),
-  'Code Etablissement': z.string().optional(),
-  'Libellé Etablissement': z.string().optional(),
-  'Commune Etablissement': z.string().optional(),
-  'Division de classe': z.string().optional(),
-  'Catégorie candidat': z.string().optional(),
-  'Numéro Candidat': z.string().optional(),
-  'INE': z.string().min(1, "INE requis"),
-  'Nom candidat': z.string().min(1, "Nom candidat requis"),
-  'Prénom candidat': z.string().min(1, "Prénom candidat requis"),
-  'Date de naissance': z.string().optional(),
-  'Résultat': z.string().optional(),
+  'Série': z.preprocess(preprocessToStringOptional, z.string().optional()),
+  anneeScolaireImportee: z.string(), // This is added by the app, should always be a string
+  'Code Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
+  'Libellé Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
+  'Commune Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
+  'Division de classe': z.preprocess(preprocessToStringOptional, z.string().optional()),
+  'Catégorie candidat': z.preprocess(preprocessToStringOptional, z.string().optional()),
+  'Numéro Candidat': z.preprocess(preprocessToStringOptional, z.string().optional()),
+  'INE': z.preprocess(preprocessToStringOptional, z.string().min(1, "INE requis")),
+  'Nom candidat': z.preprocess(preprocessToStringOptional, z.string().min(1, "Nom candidat requis")),
+  'Prénom candidat': z.preprocess(preprocessToStringOptional, z.string().min(1, "Prénom candidat requis")),
+  'Date de naissance': z.preprocess(preprocessToStringOptional, z.string().optional()), // Dates are often read as strings or numbers, convert to string.
+  'Résultat': z.preprocess(preprocessToStringOptional, z.string().optional()),
 
   'TOTAL GENERAL': z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
   'TOTAL POUR MENTION': z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
   'Moyenne sur 20': z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
 
-  // Score fields remain camelCase as they map from complex Excel headers not explicitly listed for this harmonization
   scoreFrancais: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
   scoreMaths: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
   scoreHistoireGeo: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
