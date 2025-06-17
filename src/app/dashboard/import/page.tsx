@@ -26,12 +26,9 @@ export default function ImportPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set default import year to current calendar year
-    const currentYear = new Date().getFullYear().toString();
-    // Attempt to set a more relevant academic year format like "YYYY-YYYY"
-    const currentMonth = new Date().getMonth(); // 0-11 for Jan-Dec
+    const currentMonth = new Date().getMonth(); 
     let academicYearStart = new Date().getFullYear();
-    if (currentMonth < 7) { // Before August, academic year started last year
+    if (currentMonth < 7) { 
         academicYearStart--;
     }
     setImportYear(`${academicYearStart}-${academicYearStart + 1}`);
@@ -73,7 +70,7 @@ export default function ImportPage() {
       if (student.numeroCandidatINE && student.numeroCandidatINE.trim() !== "") {
         const studentRef = doc(collectionRef, student.numeroCandidatINE);
         const { rawRowData, ...studentDataForFirestore } = student;
-        // Add the importYear to the data being saved
+        
         const finalStudentData = { 
             ...JSON.parse(JSON.stringify(studentDataForFirestore)), 
             anneeScolaireImportee: yearToImport 
@@ -97,7 +94,6 @@ export default function ImportPage() {
       toast({ title: "Importation Réussie", description: `${documentsAddedToBatch} enregistrements importés pour l'année ${yearToImport} dans Firestore.` });
       setFile(null);
       setFileName(null);
-      // Optionally reset importYear or keep it for next import
     } catch (importError: any) {
       console.error("Erreur d'importation Firestore:", importError);
       let userMessage = `Échec de l'importation: ${importError.message}.`;
@@ -185,13 +181,13 @@ export default function ImportPage() {
             }
 
             const studentInput: any = {
-              serie: getExcelVal('Série'), // This is the original "Série" field from Excel
-              anneeScolaireImportee: importYear, // Will be overwritten by handleImportToFirestore, but good to have for schema
+              serie: getExcelVal('Série'), 
+              anneeScolaireImportee: importYear, 
               codeEtablissement: getExcelVal('Code Etablissement'),
               libelleEtablissement: getExcelVal('Libellé Etablissement'),
               communeEtablissement: getExcelVal('Commune Etablissement'),
               divisionEleve: getExcelVal('Division de classe'),
-              categorieSocioPro: getExcelVal('Catégorie candidat'),
+              categorieCandidat: getExcelVal('Catégorie candidat'), // Changed from categorieSocioPro
               numeroCandidatINE: ine,
               nomCandidat: nom,
               prenomsCandidat: prenoms,
@@ -345,3 +341,4 @@ export default function ImportPage() {
     </div>
   );
 }
+
