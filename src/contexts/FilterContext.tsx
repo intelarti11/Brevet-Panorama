@@ -20,7 +20,6 @@ export interface ProcessedStudentData {
   scoreMaths?: number;
   scoreHistoireGeo?: number;
   scoreSciences?: number;
-  // Potentially add other fields like 'TOTAL POUR MENTION' if needed for display
 }
 
 interface FilterContextType {
@@ -59,19 +58,18 @@ const normalizeTextForComparison = (text: string | undefined): string => {
     .replace(/[\u0300-\u036f]/g, "");
 };
 
-// Parses the original 'Série' field which might contain both year and serie type.
-// Returns a fallback year and the identified serie type.
 const parseOriginalSerieField = (rawSerieOriginale: string | undefined): { academicYearFallback?: string; serieType?: string } => {
   if (!rawSerieOriginale || String(rawSerieOriginale).trim() === "") return { academicYearFallback: undefined, serieType: undefined };
 
-  const yearRegex = /(\d{4}[-\/]\d{4}|\b\d{4}\b)/; // Matches "2023-2024", "2023/2024", or "2024"
-  const yearMatch = String(rawSerieOriginale).match(yearRegex);
+  const serieStr = String(rawSerieOriginale);
+  const yearRegex = /(\d{4}[-\/]\d{4}|\b\d{4}\b)/;
+  const yearMatch = serieStr.match(yearRegex);
   let academicYearFallback: string | undefined = undefined;
-  let serieTypePart = String(rawSerieOriginale);
+  let serieTypePart = serieStr;
 
   if (yearMatch && yearMatch[0]) {
     academicYearFallback = yearMatch[0];
-    serieTypePart = String(rawSerieOriginale).replace(yearMatch[0], '').trim();
+    serieTypePart = serieStr.replace(yearMatch[0], '').trim();
   }
 
   const serieKeywords = ["GÉNÉRALE", "GENERALE", "PROFESSIONNELLE", "PRO", "BEPC", "TECHNIQUE", "TECHNOLOGIQUE", "MODERNE LONG", "MODERNE COURT"];
@@ -80,15 +78,13 @@ const parseOriginalSerieField = (rawSerieOriginale: string | undefined): { acade
   if (serieTypePart) {
     for (const keyword of serieKeywords) {
       if (normalizeTextForComparison(serieTypePart).includes(normalizeTextForComparison(keyword))) {
-        // Try to find the original casing of the keyword in serieTypePart
         const originalKeywordRegex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
         const originalKeywordMatch = serieTypePart.match(originalKeywordRegex);
         foundSerieKeyword = originalKeywordMatch ? originalKeywordMatch[0] : keyword;
         break;
       }
     }
-    // If no keyword matched but there's remaining text, use that as serie type.
-    if (!foundSerieKeyword && serieTypePart.trim() !== "") {
+    if (!foundSerieKeyword && serieTypePart.trim() !== "" && serieTypePart.trim().toUpperCase() !== academicYearFallback?.toUpperCase()) {
         foundSerieKeyword = serieTypePart.trim();
     }
   }
@@ -131,11 +127,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         const studentCollectionRef = collection(db, 'brevetResults');
         const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(studentCollectionRef);
 
-        if (querySnapshot.empty) {
-          // No data, filters will remain empty. This is not an error state for the context itself.
-          // Panorama/Donnee pages should handle empty allProcessedStudents.
-        }
-
         const students: ProcessedStudentData[] = [];
         const academicYearsSet = new Set<string>();
         const serieTypesSet = new Set<string>();
@@ -144,26 +135,24 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           
-          const anneeOriginaleField = data['Série']; // From Excel 'Série' field, harmonized name
-          const importedYear = data.anneeScolaireImportee; // Field added by the app during import
+          const anneeOriginaleField = data['Série'];
+          const importedYear = data['anneeScolaireImportee'] || data.anneeScolaireImportee; // Handle both key styles just in case
 
-          // Use importedYear if available, otherwise parse from anneeOriginaleField
           const { academicYearFallback, serieType: parsedSerieType } = parseOriginalSerieField(anneeOriginaleField);
           const finalAcademicYear = importedYear || academicYearFallback;
           const finalSerieType = parsedSerieType;
 
           const studentToAdd: ProcessedStudentData = {
-            id: doc.id, // INE from document ID
+            id: doc.id, 
             nom: data['Nom candidat'] || 'N/A',
             prenom: data['Prénom candidat'] || 'N/A',
             etablissement: data['Libellé Etablissement'] || 'N/A',
-            anneeOriginale: anneeOriginaleField, // Keep original 'Série' value
+            anneeOriginale: anneeOriginaleField, 
             academicYear: finalAcademicYear,
             serieType: finalSerieType,
             resultat: data['Résultat'],
             moyenne: data['Moyenne sur 20'] !== undefined && data['Moyenne sur 20'] !== null ? Number(data['Moyenne sur 20']) : undefined,
             
-            // Score fields are from Zod schema, using camelCase names
             scoreFrancais: data.scoreFrancais !== undefined && data.scoreFrancais !== null ? Number(data.scoreFrancais) : undefined,
             scoreMaths: data.scoreMaths !== undefined && data.scoreMaths !== null ? Number(data.scoreMaths) : undefined,
             scoreHistoireGeo: data.scoreHistoireGeo !== undefined && data.scoreHistoireGeo !== null ? Number(data.scoreHistoireGeo) : undefined,
@@ -188,16 +177,24 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         const sortedAcademicYears = Array.from(academicYearsSet)
           .filter(year => year !== undefined && year !== null && String(year).trim() !== "")
           .sort((a, b) => {
-            const yearAVal = parseInt(String(a).substring(0,4), 10);
-            const yearBVal = parseInt(String(b).substring(0,4), 10);
-            if (isNaN(yearAVal) || isNaN(yearBVal)) return String(b).localeCompare(String(a)); // Fallback for non-standard
-            if (yearBVal !== yearAVal) return yearBVal - yearAVal; // Sort descending by start year
-            return String(b).localeCompare(String(a)); // Secondary sort for formats like "2023-2024" vs "2023"
+            const sA = String(a);
+            const sB = String(b);
+            const startYearA = parseInt(sA.substring(0, 4), 10);
+            const startYearB = parseInt(sB.substring(0, 4), 10);
+
+            if (isNaN(startYearA) && isNaN(startYearB)) return sB.localeCompare(sA);
+            if (isNaN(startYearA)) return 1; 
+            if (isNaN(startYearB)) return -1;
+
+            if (startYearB !== startYearA) {
+                return startYearB - startYearA; 
+            }
+            return sB.length - sA.length; 
         });
 
         setAvailableAcademicYears(sortedAcademicYears);
         if (sortedAcademicYears.length > 0) {
-          setSelectedAcademicYear(sortedAcademicYears[0]); // Default to most recent
+          setSelectedAcademicYear(sortedAcademicYears[0]); 
         } else {
           setSelectedAcademicYear(ALL_ACADEMIC_YEARS_VALUE);
         }
@@ -210,7 +207,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         if (generaleEquivalent) {
           setSelectedSerieType(generaleEquivalent);
         } else if (sortedSerieTypes.length > 0) {
-          setSelectedSerieType(sortedSerieTypes[0]); // Default to first available if "GÉNÉRALE" not found
+          setSelectedSerieType(sortedSerieTypes[0]); 
         } else {
           setSelectedSerieType(ALL_SERIE_TYPES_VALUE);
         }
@@ -219,7 +216,11 @@ export function FilterProvider({ children }: { children: ReactNode }) {
          .filter(est => est !== undefined && est !== null && String(est).trim() !== "")
          .sort();
         setAvailableEstablishments(sortedEstablishments);
-        setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE); // Default to "All Establishments"
+        if (sortedEstablishments.length > 0) {
+          setSelectedEstablishment(sortedEstablishments[0]); // Default to first establishment found
+        } else {
+          setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE);
+        }
 
       } catch (err: any) {
         console.error("Erreur de récupération des données Firestore pour les filtres:", err);
@@ -232,8 +233,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       }
     };
     fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Assuming db should not change, so not in deps. If db could change, add it.
+  }, []); 
 
   const contextValue: FilterContextType = {
     allProcessedStudents,
