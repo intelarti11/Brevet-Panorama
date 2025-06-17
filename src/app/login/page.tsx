@@ -30,8 +30,8 @@ import Logo from '@/components/logo';
 import { Mail, LockKeyhole, Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-  email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  email: z.string().email({ message: "Adresse email invalide." }), // Kept email validation, but label is "Identifiant"
+  password: z.string().min(6, { message: "Le mot de passe doit contenir au moins 6 caractères." }),
 });
 
 export default function LoginPage() {
@@ -49,22 +49,20 @@ export default function LoginPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsLoading(false);
 
-    // Replace with actual authentication logic
-    if (values.email === "admin@brevetconnect.fr" && values.password === "password123") {
+    if (values.email === "Adminbrevet" && values.password === "SVeil2025") {
       toast({
-        title: "Login Successful",
-        description: "Welcome back!",
+        title: "Connexion réussie",
+        description: "Bienvenue !",
       });
-      // router.push('/dashboard'); // Navigate to dashboard or desired page
+      router.push('/dashboard');
     } else {
       toast({
         variant: "destructive",
-        title: "Login Failed",
-        description: "Invalid email or password. Please try again.",
+        title: "Échec de la connexion",
+        description: "Identifiant ou mot de passe incorrect. Veuillez réessayer.",
       });
     }
   }
@@ -74,7 +72,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="items-center text-center">
           <Logo className="mb-4" />
-          <CardTitle className="font-headline text-2xl">Connectez-vous à BrevetConnect</CardTitle>
+          <CardTitle className="font-headline text-2xl">Connectez-vous à Brevet Panorama</CardTitle>
           <CardDescription>Entrez vos identifiants pour accéder à votre compte.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -120,7 +118,7 @@ export default function LoginPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
-          <Link href="/forgot-password" className="text-sm text-primary hover:underline hover:text-accent">
+           <Link href="/forgot-password" className="text-sm text-primary hover:underline hover:text-accent">
             Mot de passe oublié ?
           </Link>
         </CardFooter>
