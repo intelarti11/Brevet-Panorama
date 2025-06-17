@@ -64,7 +64,9 @@ export default function ImportPage() {
           const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); 
+          
+          // Get raw data as array of arrays to find header row
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null }); 
 
           if (jsonData.length === 0) {
             throw new Error("Le fichier Excel est vide ou ne contient pas de données lisibles.");
@@ -83,9 +85,16 @@ export default function ImportPage() {
              throw new Error("Impossible de trouver la ligne d'en-tête dans le fichier Excel.");
           }
           
-          const headers = jsonData[headerRowIndex] as string[];
+          const rawHeadersFromExcel = jsonData[headerRowIndex] as any[];
+          const headers = rawHeadersFromExcel.map(h => {
+            if (typeof h === 'string') {
+              return h.trim();
+            }
+            return String(h || '').trim();
+          });
+          
           const dataRows = XLSX.utils.sheet_to_json(worksheet, {
-            header: headers,
+            header: headers, // Use trimmed headers
             range: headerRowIndex + 1, 
             defval: null, 
             cellDates: true
@@ -98,7 +107,8 @@ export default function ImportPage() {
           dataRows.forEach((rawRow, index) => {
             const getVal = (keys: string[]) => {
               for (const key of keys) {
-                if (rawRow[key] !== undefined) return rawRow[key];
+                // rawRow keys are now trimmed because `headers` was trimmed
+                if (rawRow[key] !== undefined && rawRow[key] !== null) return rawRow[key];
               }
               return undefined;
             };
@@ -154,11 +164,13 @@ export default function ImportPage() {
               }
             });
             Object.keys(rawRow).forEach(excelHeader => {
-                if (!knownMainHeaders.some(mainHeader => 
-                    (studentInput as any)[mainHeader] === rawRow[excelHeader] || 
-                    excelHeader.toLowerCase().includes(mainHeader.toLowerCase()) 
-                  ) && 
-                    !optionHeadersFromExcel.includes(excelHeader.split(' ')[0]) 
+                // excelHeader is now a trimmed key from the `headers` array
+                if (!knownMainHeaders.some(mainHeaderKey => {
+                    const mainHeaderInExcelCouldBe = [mainHeaderKey, mainHeaderKey.replace(/\./g, '')]; // e.g. 'Code Établis.' vs 'Code Etablis'
+                    return mainHeaderInExcelCouldBe.some(mh => excelHeader.toLowerCase().includes(mh.toLowerCase())) ||
+                           (studentInput as any)[mainHeaderKey] === rawRow[excelHeader];
+                  }) && 
+                    !optionHeadersFromExcel.some(optKey => excelHeader.toLowerCase().startsWith(optKey.toLowerCase().split(' ')[0]))
                    ) {
                     const value = rawRow[excelHeader];
                     if (value !== undefined && value !== null && String(value).trim() !== '') {
@@ -185,14 +197,13 @@ export default function ImportPage() {
             const firstError = validationErrors[0];
             const errorMessages = Object.entries(firstError.errors.fieldErrors)
               .map(([field, messages]) => {
-                // messages is string[] | undefined
                 if (messages && messages.length > 0) {
-                  return `${field}: ${messages[0]}`; // Display the first error message for the field
+                  return `${field}: ${messages[0]}`; 
                 }
-                return `${field}: Erreur de validation inconnue`; // Fallback
+                return `${field}: Erreur de validation inconnue`;
               })
               .join('; ');
-            console.error("Erreurs de validation:", validationErrors); // Keep detailed log for dev
+            console.error("Erreurs de validation:", validationErrors); 
             throw new Error(`Validation échouée pour certaines lignes. Ex: Ligne ${firstError.row}: ${errorMessages}`);
           }
           
