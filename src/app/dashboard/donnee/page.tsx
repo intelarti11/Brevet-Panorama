@@ -25,6 +25,14 @@ interface DisplayStudentData {
 const ALL_YEARS_VALUE = "__ALL_YEARS__";
 const ALL_ESTABLISHMENTS_VALUE = "__ALL_ESTABLISHMENTS__";
 
+// Helper function to normalize text (lowercase and remove accents)
+const normalizeText = (text: string): string => {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+};
+
 export default function DonneePage() {
   const [allStudentsData, setAllStudentsData] = useState<DisplayStudentData[]>([]);
   const [filteredData, setFilteredData] = useState<DisplayStudentData[]>([]);
@@ -88,7 +96,7 @@ export default function DonneePage() {
   }, []);
 
   useEffect(() => {
-    let data = [...allStudentsData]; // Start with a fresh copy of all data
+    let data = [...allStudentsData]; 
 
     if (selectedYear && selectedYear !== ALL_YEARS_VALUE) {
       data = data.filter(student => student.annee === selectedYear);
@@ -97,11 +105,11 @@ export default function DonneePage() {
       data = data.filter(student => student.etablissement === selectedEstablishment);
     }
     if (searchTerm) {
-      const lowerSearchTerm = searchTerm.toLowerCase();
+      const normalizedSearchTerm = normalizeText(searchTerm);
       data = data.filter(student =>
-        student.nom.toLowerCase().includes(lowerSearchTerm) ||
-        student.prenom.toLowerCase().includes(lowerSearchTerm) ||
-        student.id.toLowerCase().includes(lowerSearchTerm)
+        normalizeText(student.nom).includes(normalizedSearchTerm) ||
+        normalizeText(student.prenom).includes(normalizedSearchTerm) ||
+        normalizeText(student.id).includes(normalizedSearchTerm)
       );
     }
     setFilteredData(data);
