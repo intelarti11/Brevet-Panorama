@@ -2,7 +2,7 @@
 "use client";
 
 import type { ChangeEvent } from 'react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,11 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { StudentData } from '@/lib/excel-types';
 import { studentDataSchema } from '@/lib/excel-types';
-import { Loader2, UploadCloud, FileCheck2, AlertTriangle } from 'lucide-react';
+import { Loader2, UploadCloud, FileCheck2, AlertTriangle, DatabaseZap } from 'lucide-react';
 
-// Firebase imports (will be used later)
-// import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
-// import { app } from '@/lib/firebase'; // Assuming you have a firebase init file
+import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
+import { app } from '@/lib/firebase'; 
 
 const MAX_PREVIEW_ROWS = 5;
 
@@ -35,7 +34,7 @@ export default function ImportPage() {
         setFile(selectedFile);
         setFileName(selectedFile.name);
         setError(null);
-        setParsedData([]); // Clear previous data
+        setParsedData([]); 
       } else {
         setError("Format de fichier invalide. Veuillez sélectionner un fichier .xlsx ou .xls.");
         setFile(null);
@@ -111,7 +110,6 @@ export default function ImportPage() {
             '003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel',
             '004 - 1 - Sciences - Ponctuel', 
             '005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année'
-            // Add other specific score/data columns if they become primary later
           ];
 
 
@@ -123,52 +121,48 @@ export default function ImportPage() {
               return undefined;
             };
             
-            const ine = String(getVal(['INE', 'Numéro Cand. INE']) || '').trim();
+            const ine = String(getVal(['INE', 'Numéro Candidat']) || '').trim();
             const nom = String(getVal(['Nom candidat']) || '').trim();
-            const prenoms = String(getVal(['Prénom candidat', 'Prénom(s) candidat']) || '').trim();
+            const prenoms = String(getVal(['Prénom candidat']) || '').trim();
 
             if (!ine || !nom || !prenoms) {
-              // console.log(`Skipping row ${index + headerRowIndex + 2} due to missing essential identifier(s). INE: '${ine}', Nom: '${nom}', Prenoms: '${prenoms}'`);
               return; 
             }
             
             const studentInput = {
               serie: getVal(['Série']),
-              codeEtablissement: getVal(['Code Etablissement', 'Code Établis.']),
-              libelleEtablissement: getVal(['Libellé Etablissement', 'Libellé Établis.']),
-              communeEtablissement: getVal(['Commune Etablissement', 'Commune Établis.']),
-              divisionEleve: getVal(['Division de classe', 'Division Élève']),
-              categorieSocioPro: getVal(['Catégorie candidat', 'Catégorie socio-prof.']),
+              codeEtablissement: getVal(['Code Etablissement']),
+              libelleEtablissement: getVal(['Libellé Etablissement']),
+              communeEtablissement: getVal(['Commune Etablissement']),
+              divisionEleve: getVal(['Division de classe']),
+              categorieSocioPro: getVal(['Catégorie candidat']),
               numeroCandidatINE: ine,
               nomCandidat: nom,
               prenomsCandidat: prenoms,
-              dateNaissance: getVal(['Date de naissance', 'Dt nais. Cand.']) instanceof Date ? (getVal(['Date de naissance', 'Dt nais. Cand.']) as Date).toLocaleDateString('fr-FR') : String(getVal(['Date de naissance', 'Dt nais. Cand.']) || ''),
+              dateNaissance: getVal(['Date de naissance']) instanceof Date ? (getVal(['Date de naissance']) as Date).toLocaleDateString('fr-FR') : String(getVal(['Date de naissance']) || ''),
               resultat: getVal(['Résultat']),
-              totalGeneral: getVal(['TOTAL GENERAL', 'TOTAL GÉNÉRAL /800,0']),
-              totalPourcentage: getVal(['Moyenne sur 20', 'TOTAL POURCENTAGE /20']),
-              scoreFrancais: getVal(['001 - 1 - Français - Ponctuel', 'Fra LV001 /50']),
-              scoreMaths: getVal(['002 - 1 - Mathématiques - Ponctuel', 'Mat LV001 /50']),
-              scoreHistoireGeo: getVal(['003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel', 'His Geo01A /50']),
-              scoreSciences: getVal(['004 - 1 - Sciences - Ponctuel']), // New mapping
-              scoreOralDNB: getVal(['005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année', 'OralDNB01A /100']),
+              totalGeneral: getVal(['TOTAL GENERAL']),
+              totalPourcentage: getVal(['Moyenne sur 20']),
+              scoreFrancais: getVal(['001 - 1 - Français - Ponctuel']),
+              scoreMaths: getVal(['002 - 1 - Mathématiques - Ponctuel']),
+              scoreHistoireGeo: getVal(['003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel']),
+              scoreSciences: getVal(['004 - 1 - Sciences - Ponctuel']), 
+              scoreOralDNB: getVal(['005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année']),
               
-              // These will likely be undefined or non-numeric with the new headers
-              scoreLVE: getVal(['LVE Ang01A /50', '007AB - 1 - Langues étrangères ou régionales - Contrôle continu']), 
-              scoreArtsPlastiques: getVal(['ArtsPla01A /50', '007AD - 1 - Langages des arts et du corps - Contrôle continu']), // This might be a broader category
-              scoreEducationMusicale: getVal(['Edu Mus01A /50']),
-              scoreEPS: getVal(['EPS CCF01A /100']),
-              scorePhysiqueChimie: getVal(['Phy Chi01A /50']),
-              scoreSciencesVie: getVal(['Sci Vie01A /50']),
+              scoreLVE: getVal(['007AB - 1 - Langues étrangères ou régionales - Contrôle continu']), 
+              scoreArtsPlastiques: getVal(['007AD - 1 - Langages des arts et du corps - Contrôle continu']), 
+              scoreEducationMusicale: getVal(['Edu Mus01A /50']), // Might need more specific mapping if available
+              scoreEPS: getVal(['EPS CCF01A /100']), // Might need more specific mapping
+              scorePhysiqueChimie: getVal(['Phy Chi01A /50']), // Might need more specific mapping
+              scoreSciencesVie: getVal(['Sci Vie01A /50']), // Might need more specific mapping
               options: {}, 
               rawRowData: rawRow, 
             };
             
             const currentOptions: Record<string, string> = {};
             Object.keys(rawRow).forEach(excelHeader => {
-                // excelHeader is a trimmed key from the `headers` array
-                // Check if this header was NOT one of the main data keys we explicitly mapped above
                 if (!mainDataKeysFromCsv.includes(excelHeader) && 
-                    !Object.values(studentInput).includes(rawRow[excelHeader]) // rough check if value was already used
+                    !Object.values(studentInput).some(val => val === rawRow[excelHeader]) 
                    ) {
                     const value = rawRow[excelHeader];
                     if (value !== undefined && value !== null && String(value).trim() !== '') {
@@ -207,7 +201,7 @@ export default function ImportPage() {
           if (transformedData.length > 0) {
              toast({ title: "Succès", description: `${transformedData.length} lignes lues et validées depuis ${file.name}.` });
           } else if (error) {
-            // Don't override existing critical error like "header not found"
+            // Don't override existing critical error
           } else if (dataRows.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
             throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'INE', 'Nom candidat', et 'Prénom candidat' (ou leurs équivalents) sont présentes, correctement nommées et remplies dans le fichier Excel.");
           }
@@ -244,29 +238,36 @@ export default function ImportPage() {
       return;
     }
     setIsImporting(true);
-    console.log("Données à importer:", parsedData);
-    // Example:
-    // const db = getFirestore(app);
-    // const batch = writeBatch(db);
-    // parsedData.forEach(student => {
-    //   const studentRef = doc(collection(db, 'brevetResults'), student.numeroCandidatINE);
-    //   batch.set(studentRef, student);
-    // });
-    // try {
-    //   await batch.commit();
-    //   toast({ title: "Importation Réussie", description: `${parsedData.length} enregistrements importés dans Firestore.` });
-    //   setParsedData([]); // Clear data after import
-    //   setFile(null);
-    //   setFileName(null);
-    // } catch (error: any) {
-    //   console.error("Erreur d'importation Firestore:", error);
-    //   toast({ variant: "destructive", title: "Erreur d'Importation", description: error.message });
-    // } finally {
-    //   setIsImporting(false);
-    // }
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate import
-    toast({ title: "Simulation d'Importation", description: `Prêt à importer ${parsedData.length} enregistrements. (Logique Firestore à implémenter)` });
-    setIsImporting(false);
+    
+    const db = getFirestore(app);
+    const batch = writeBatch(db);
+    const collectionRef = collection(db, 'brevetResults');
+
+    parsedData.forEach(student => {
+      // Ensure numeroCandidatINE is valid for Firestore document ID
+      if (student.numeroCandidatINE && student.numeroCandidatINE.trim() !== "") {
+        const studentRef = doc(collectionRef, student.numeroCandidatINE);
+        // Remove rawRowData before saving to Firestore if it's not needed there
+        const { rawRowData, ...studentToSave } = student;
+        batch.set(studentRef, studentToSave);
+      } else {
+        console.warn("Skipping student due to missing or invalid INE:", student);
+        // Optionally, notify about skipped students
+      }
+    });
+    
+    try {
+      await batch.commit();
+      toast({ title: "Importation Réussie", description: `${parsedData.length} enregistrements importés dans Firestore.` });
+      setParsedData([]); 
+      setFile(null);
+      setFileName(null);
+    } catch (importError: any) {
+      console.error("Erreur d'importation Firestore:", importError);
+      toast({ variant: "destructive", title: "Erreur d'Importation", description: `Échec de l'importation: ${importError.message}`, duration: 7000 });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
 
@@ -349,7 +350,7 @@ export default function ImportPage() {
           </CardContent>
           <CardFooter>
             <Button onClick={handleImportToFirestore} disabled={isImporting || isLoading || parsedData.length === 0} className="w-full sm:w-auto">
-              {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseZap className="mr-2 h-4 w-4" />}
               Importer {parsedData.length} élèves vers Firebase
             </Button>
           </CardFooter>
