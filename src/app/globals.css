@@ -4,96 +4,119 @@
 
 @layer base {
   :root {
-    --background: 189 67% 93%; /* #E0F7FA */
-    --foreground: 222.2 47.4% 11.2%; /* Default dark for good contrast on light bg */
+    /* New color palette definition (HSL) */
+    --color-primary-hsl: 222 69% 40%; /* #1E40AF */
+    --color-secondary-hsl: 201 92% 60%; /* #38BDF8 */
+    --color-success-hsl: 160 82% 40%; /* #10B981 */
+    --color-warning-hsl: 38 92% 51%; /* #F59E0B */
+    --color-error-hsl: 0 84% 60%; /* #EF4444 */
+    --color-bg-hsl: 210 17% 98%; /* #F9FAFB */
+    --color-surface-hsl: 0 0% 100%; /* #FFFFFF */
+    --color-text-primary-hsl: 215 39% 11%; /* #111827 */
+    --color-text-secondary-hsl: 212 10% 46%; /* #6B7280 */
 
-    --card: 0 0% 100%; /* White cards */
-    --card-foreground: 222.2 47.4% 11.2%;
+    /* ShadCN Theme Variables Mapping */
+    --background: var(--color-bg-hsl);
+    --foreground: var(--color-text-primary-hsl);
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
+    --card: var(--color-surface-hsl);
+    --card-foreground: var(--color-text-primary-hsl);
 
-    --primary: 157 45% 48%; /* #3EB489 Deep sky blue */
-    --primary-foreground: 0 0% 98%; /* White/very light for contrast on primary */
+    --popover: var(--color-surface-hsl);
+    --popover-foreground: var(--color-text-primary-hsl);
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 210 40% 9.8%;
+    --primary: var(--color-primary-hsl);
+    --primary-foreground: var(--color-surface-hsl); /* White text on primary */
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 210 38% 45.1%; /* Adjusted for better readability */
+    --secondary: var(--color-secondary-hsl);
+    --secondary-foreground: var(--color-text-primary-hsl); /* Dark text on light blue secondary */
 
-    --accent: 180 100% 25%; /* #008080 Dark cyan */
-    --accent-foreground: 0 0% 98%; /* White/very light for contrast on accent */
+    --muted: 210 14% 93%; /* #E5E7EB - Tailwind gray-200 */
+    --muted-foreground: var(--color-text-secondary-hsl);
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --accent: var(--color-secondary-hsl); /* Using secondary as accent for hovers */
+    --accent-foreground: var(--color-text-primary-hsl); /* Dark text on accent */
 
-    --border: 189 30% 85%; /* Lighter border, derived from background */
-    --input: 189 30% 80%; /* Slightly darker input border for visibility */
-    --ring: 157 45% 48%; /* Primary color for rings */
+    --destructive: var(--color-error-hsl);
+    --destructive-foreground: var(--color-surface-hsl); /* White text on error */
 
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+    --border: 210 14% 89%; /* #D1D5DB - Tailwind gray-300 for neutral borders */
+    --input: 210 14% 89%;
+    --ring: var(--color-primary-hsl); /* Focus rings with primary color */
 
-    /* Sidebar specific colors - retain or adjust if sidebar is used with this theme */
-    --sidebar-background: 210 40% 98%; /* Lighter shade for sidebar */
-    --sidebar-foreground: 222.2 47.4% 11.2%;
-    --sidebar-primary: 157 45% 48%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 180 100% 25%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 189 30% 85%;
-    --sidebar-ring: 157 45% 48%;
+    --radius: 8px; /* Updated border radius */
+
+    /* Chart specific colors */
+    --chart-admis: var(--color-success-hsl);
+    --chart-assez-bien: var(--color-warning-hsl);
+    --chart-tres-bien: 49 96% 77%; /* #FDE68A */
+    --chart-bien: 223 78% 48%; /* #1D4ED8 */
+    --chart-sans-mention: 215 9% 68%; /* #9CA3AF */
+    /* For "Refusés", use --destructive */
+
+    /* Sidebar specific colors */
+    --sidebar-background: var(--color-primary-hsl);
+    --sidebar-foreground: var(--color-surface-hsl); /* White text */
+    --sidebar-accent: var(--color-secondary-hsl); /* Active/hover background */
+    --sidebar-accent-foreground: var(--color-surface-hsl); /* White text on active/hover */
+    --sidebar-border: 222 69% 50%; /* Lighter primary for internal borders */
+    --sidebar-ring: var(--color-secondary-hsl);
   }
 
   .dark {
-    /* Ensure dark theme variables provide good contrast if used. For now, focus on light theme. */
-    --background: 222.2 47.4% 11.2%;
-    --foreground: 210 40% 98%;
+    /* Dark theme (basic adaptation, can be further refined) */
+    --color-primary-hsl: 222 69% 55%;
+    --color-secondary-hsl: 201 92% 50%;
+    --color-success-hsl: 160 82% 35%;
+    --color-warning-hsl: 38 92% 45%;
+    --color-error-hsl: 0 84% 50%;
+    --color-bg-hsl: 220 13% 10%; /* Dark background */
+    --color-surface-hsl: 220 13% 18%; /* Dark surface for cards */
+    --color-text-primary-hsl: 210 17% 95%; /* Light text */
+    --color-text-secondary-hsl: 212 10% 65%;
 
-    --card: 222.2 47.4% 11.2%;
-    --card-foreground: 210 40% 98%;
+    --background: var(--color-bg-hsl);
+    --foreground: var(--color-text-primary-hsl);
 
-    --popover: 222.2 47.4% 11.2%;
-    --popover-foreground: 210 40% 98%;
+    --card: var(--color-surface-hsl);
+    --card-foreground: var(--color-text-primary-hsl);
 
-    --primary: 157 45% 55%; /* Adjusted primary for dark */
-    --primary-foreground: 0 0% 9%;
+    --popover: var(--color-surface-hsl);
+    --popover-foreground: var(--color-text-primary-hsl);
 
-    --secondary: 210 40% 14.9%;
-    --secondary-foreground: 210 40% 98%;
+    --primary: var(--color-primary-hsl);
+    --primary-foreground: var(--color-text-primary-hsl);
 
-    --muted: 210 40% 14.9%;
-    --muted-foreground: 210 38% 63.9%;
+    --secondary: var(--color-secondary-hsl);
+    --secondary-foreground: var(--color-text-primary-hsl);
 
-    --accent: 180 100% 30%; /* Adjusted accent for dark */
-    --accent-foreground: 0 0% 98%;
+    --muted: 220 13% 25%;
+    --muted-foreground: var(--color-text-secondary-hsl);
 
-    --destructive: 0 72.2% 50.6%;
-    --destructive-foreground: 0 0% 98%;
+    --accent: var(--color-secondary-hsl);
+    --accent-foreground: var(--color-text-primary-hsl);
 
-    --border: 210 40% 14.9%;
-    --input: 210 40% 14.9%;
-    --ring: 157 45% 55%;
+    --destructive: var(--color-error-hsl);
+    --destructive-foreground: var(--color-text-primary-hsl);
 
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --border: 220 13% 30%;
+    --input: 220 13% 30%;
+    --ring: var(--color-primary-hsl);
 
-    --sidebar-background: 222.2 47.4% 11.2%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 157 45% 55%;
-    --sidebar-primary-foreground: 0 0% 9%;
-    --sidebar-accent: 180 100% 30%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 210 40% 14.9%;
-    --sidebar-ring: 157 45% 55%;
+    /* Chart specific colors for dark theme */
+    --chart-admis: var(--color-success-hsl);
+    --chart-assez-bien: var(--color-warning-hsl);
+    --chart-tres-bien: 49 80% 70%;
+    --chart-bien: 223 70% 55%;
+    --chart-sans-mention: 215 10% 55%;
+    
+    /* Sidebar specific colors for dark theme */
+    --sidebar-background: 220 13% 14%; /* Darker primary for sidebar */
+    --sidebar-foreground: var(--color-text-primary-hsl);
+    --sidebar-accent: var(--color-secondary-hsl);
+    --sidebar-accent-foreground: var(--color-text-primary-hsl);
+    --sidebar-border: 220 13% 25%;
+    --sidebar-ring: var(--color-secondary-hsl);
   }
 }
 
@@ -103,5 +126,6 @@
   }
   body {
     @apply bg-background text-foreground;
+    line-height: 1.6; /* Aéré interlignes */
   }
 }

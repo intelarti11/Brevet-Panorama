@@ -69,13 +69,14 @@ const initialStats: Stats = {
   countSciences: 0,
 };
 
+// Updated CHART_COLORS to use new CSS variables
 const CHART_COLORS = {
-  admis: "hsl(var(--chart-2))", 
-  refuse: "hsl(var(--destructive))", 
-  tresBien: "hsl(var(--chart-1))", 
-  bien: "hsl(var(--chart-3))", 
-  assezBien: "hsl(var(--chart-4))", 
-  sansMention: "hsl(var(--chart-5))", 
+  admis: "hsl(var(--chart-admis))", 
+  refuse: "hsl(var(--destructive))", // Maps to --color-error
+  tresBien: "hsl(var(--chart-tres-bien))", 
+  bien: "hsl(var(--chart-bien))", 
+  assezBien: "hsl(var(--chart-assez-bien))", 
+  sansMention: "hsl(var(--chart-sans-mention))", 
 };
 
 const normalizeForComparison = (text: string | undefined): string => {
@@ -156,7 +157,7 @@ export default function PanoramaPage() {
         }
         if (normalizedResultat.includes(normalizedTresBienStr)) {
           newStats.mentions.tresBien++;
-        } else if (normalizedResultat.includes(normalizedAssezBienStr)) { // Check Assez Bien before Bien
+        } else if (normalizedResultat.includes(normalizedAssezBienStr)) { 
           newStats.mentions.assezBien++;
         } else if (normalizedResultat.includes(normalizedBienStr)) {
           newStats.mentions.bien++;
@@ -226,7 +227,7 @@ export default function PanoramaPage() {
 
   const mentionsChartData = useMemo(() => [
     { name: 'Très Bien', value: stats.mentions.tresBien, fill: CHART_COLORS.tresBien, percentage: stats.mentionPercentages.tresBien },
-    { name: 'Assez Bien', value: stats.mentions.assezBien, fill: CHART_COLORS.assezBien, percentage: stats.mentionPercentages.assezBien }, // Order matters for display
+    { name: 'Assez Bien', value: stats.mentions.assezBien, fill: CHART_COLORS.assezBien, percentage: stats.mentionPercentages.assezBien },
     { name: 'Bien', value: stats.mentions.bien, fill: CHART_COLORS.bien, percentage: stats.mentionPercentages.bien },
     { name: 'Sans Mention', value: stats.mentions.sansMention, fill: CHART_COLORS.sansMention, percentage: stats.mentionPercentages.sansMention },
   ].filter(item => item.value > 0), [stats.mentions, stats.mentionPercentages]);
@@ -254,18 +255,16 @@ export default function PanoramaPage() {
   const noDataForFilters = filteredStudentsData.length === 0 && allProcessedStudents.length > 0 && !isLoadingContext;
 
   return (
-    <div className="space-y-6 p-1 md:p-4">
-      <header className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground tracking-tight">Panorama des Résultats</h1>
-        <p className="text-muted-foreground mt-1">
+    <div className="space-y-6 p-4 md:p-6"> {/* Increased padding */}
+      <header className="mb-8"> {/* Increased margin */}
+        <h1 className="text-3xl font-bold text-primary tracking-tight">Panorama des Résultats</h1> {/* text-primary */}
+        <p className="text-muted-foreground mt-2"> {/* Increased margin-top */}
           Visualisez les statistiques clés et les répartitions des résultats au brevet. Utilisez les filtres dans la barre latérale.
         </p>
       </header>
 
-      {/* Filters are now in the sidebar via DashboardLayout */}
-
       {noDataForFilters ? (
-         <Card className="shadow-lg rounded-lg">
+         <Card className="shadow-md rounded-lg"> {/* shadow-md */}
             <CardContent className="pt-6">
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                     <Users className="w-12 h-12 text-muted-foreground/50 mb-4" />
@@ -275,7 +274,7 @@ export default function PanoramaPage() {
             </CardContent>
          </Card>
       ) : allProcessedStudents.length === 0 && !isLoadingContext ? (
-        <Card className="shadow-lg rounded-lg">
+        <Card className="shadow-md rounded-lg"> {/* shadow-md */}
             <CardContent className="pt-6">
                  <div className="flex flex-col items-center justify-center py-10 text-center">
                     <Users className="w-12 h-12 text-muted-foreground/50 mb-4" />
@@ -286,51 +285,51 @@ export default function PanoramaPage() {
         </Card>
       ) : (
       <>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Card className="shadow-md rounded-lg">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"> {/* Increased gap */}
+          <Card className="shadow-md rounded-lg"> {/* shadow-md */}
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Nombre d'Élèves</CardTitle>
+              <CardTitle className="text-sm font-medium text-foreground">Nombre d'Élèves</CardTitle> {/* text-foreground (will be --color-text-primary) */}
               <Users className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats.totalStudents}</div>
-              <p className="text-xs text-muted-foreground">total des élèves pour la sélection</p>
+            <CardContent className="p-6"> {/* Ensure generous padding */}
+              <div className="text-3xl font-bold text-primary">{stats.totalStudents}</div> {/* text-primary */}
+              <p className="text-xs text-muted-foreground mt-1">total des élèves pour la sélection</p>
             </CardContent>
           </Card>
-          <Card className="shadow-md rounded-lg">
+          <Card className="shadow-md rounded-lg"> {/* shadow-md */}
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Taux de Réussite</CardTitle>
+              <CardTitle className="text-sm font-medium text-foreground">Taux de Réussite</CardTitle>
               <Percent className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats.successRate}%</div>
-              <p className="text-xs text-muted-foreground">{stats.admis} admis sur {stats.admis + stats.refuse > 0 ? stats.admis + stats.refuse : stats.totalStudents} élèves considérés</p>
+            <CardContent className="p-6">
+              <div className="text-3xl font-bold text-primary">{stats.successRate}%</div> {/* text-primary */}
+              <p className="text-xs text-muted-foreground mt-1">{stats.admis} admis sur {stats.admis + stats.refuse > 0 ? stats.admis + stats.refuse : stats.totalStudents} élèves considérés</p>
             </CardContent>
           </Card>
-          <Card className="shadow-md rounded-lg">
+          <Card className="shadow-md rounded-lg"> {/* shadow-md */}
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Moyenne Générale (Admis)</CardTitle>
+              <CardTitle className="text-sm font-medium text-foreground">Moyenne Générale (Admis)</CardTitle>
               <GraduationCap className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
+            <CardContent className="p-6">
+              <div className="text-3xl font-bold text-primary"> {/* text-primary */}
                 {stats.averageOverallScoreAdmitted !== undefined ? `${stats.averageOverallScoreAdmitted.toFixed(1)}/20` : 'N/A'}
               </div>
-              <p className="text-xs text-muted-foreground">moyenne des élèves admis</p>
+              <p className="text-xs text-muted-foreground mt-1">moyenne des élèves admis</p>
             </CardContent>
           </Card>
         </div>
         
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
-          <Card className="shadow-lg rounded-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <PieChartIcon className="mr-2 h-5 w-5 text-primary" />
+          <Card className="shadow-md rounded-lg"> {/* shadow-md */}
+            <CardHeader className="p-6"> {/* Ensure generous padding */}
+              <CardTitle className="flex items-center text-xl text-primary"> {/* text-primary */}
+                <PieChartIcon className="mr-2 h-5 w-5 text-primary" /> {/* Icon color also primary */}
                 Répartition des Résultats
               </CardTitle>
-              <CardDescription>Distribution des élèves admis et refusés.</CardDescription>
+              <CardDescription className="mt-1">Distribution des élèves admis et refusés.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {stats.admis + stats.refuse > 0 ? (
                 <ChartContainer config={{}} className="mx-auto aspect-square max-h-[300px]">
                   <PieChart>
@@ -372,15 +371,15 @@ export default function PanoramaPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-lg rounded-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BarChart2 className="mr-2 h-5 w-5 text-primary" />
+          <Card className="shadow-md rounded-lg"> {/* shadow-md */}
+            <CardHeader className="p-6">
+              <CardTitle className="flex items-center text-xl text-primary"> {/* text-primary */}
+                <BarChart2 className="mr-2 h-5 w-5 text-primary" /> {/* Icon color also primary */}
                 Répartition des Mentions (Admis)
               </CardTitle>
-              <CardDescription>Distribution des mentions pour les élèves admis.</CardDescription>
+              <CardDescription className="mt-1">Distribution des mentions pour les élèves admis.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {stats.admis > 0 && mentionsChartData.length > 0 ? (
                 <ChartContainer config={{}} className="w-full h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -392,7 +391,7 @@ export default function PanoramaPage() {
                           cursor={false}
                           content={
                               <ChartTooltipContent 
-                                  formatter={(value, name, props) => ( // name is 'value' here by default, use props.payload.name
+                                  formatter={(value, name, props) => ( 
                                       <div className="flex flex-col p-1">
                                           <span className="font-semibold">{props.payload.name}</span>
                                           <span>Effectif: {value}</span>
@@ -418,40 +417,40 @@ export default function PanoramaPage() {
           </Card>
         </div>
 
-        <Card className="shadow-lg rounded-lg">
-            <CardHeader>
-                <CardTitle className="text-xl">Moyennes par Matières Principales</CardTitle>
-                <CardDescription>Moyenne des notes (/20) pour les élèves de la sélection ayant une note enregistrée.</CardDescription>
+        <Card className="shadow-md rounded-lg"> {/* shadow-md */}
+            <CardHeader className="p-6">
+                <CardTitle className="text-xl text-primary">Moyennes par Matières Principales</CardTitle> {/* text-primary */}
+                <CardDescription className="mt-1">Moyenne des notes (/20) pour les élèves de la sélection ayant une note enregistrée.</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-6 pt-4 md:grid-cols-4">
-                <div className="flex flex-col items-center text-center p-3 rounded-md bg-muted/30">
+            <CardContent className="grid grid-cols-2 gap-6 pt-4 md:grid-cols-4 p-6"> {/* Ensure p-6 for generous padding */}
+                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30"> {/* p-4 within items, rounded-lg */}
                     <BookText className="h-7 w-7 text-primary mb-2" />
                     <p className="text-sm font-medium text-foreground">Français</p>
-                    <p className="text-2xl font-bold mt-1">
+                    <p className="text-2xl font-bold mt-1 text-primary"> {/* text-primary for KPI */}
                         {stats.averageFrancais !== undefined ? stats.averageFrancais.toFixed(1) : 'N/A'}
                     </p>
                     <p className="text-xs text-muted-foreground">({stats.countFrancais ?? 0} élèves)</p>
                 </div>
-                <div className="flex flex-col items-center text-center p-3 rounded-md bg-muted/30">
+                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30">
                     <Calculator className="h-7 w-7 text-primary mb-2" />
                     <p className="text-sm font-medium text-foreground">Mathématiques</p>
-                    <p className="text-2xl font-bold mt-1">
+                    <p className="text-2xl font-bold mt-1 text-primary">
                         {stats.averageMaths !== undefined ? stats.averageMaths.toFixed(1) : 'N/A'}
                     </p>
                     <p className="text-xs text-muted-foreground">({stats.countMaths ?? 0} élèves)</p>
                 </div>
-                <div className="flex flex-col items-center text-center p-3 rounded-md bg-muted/30">
+                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30">
                     <Landmark className="h-7 w-7 text-primary mb-2" />
                     <p className="text-sm font-medium text-foreground">Histoire-Géo.</p>
-                    <p className="text-2xl font-bold mt-1">
+                    <p className="text-2xl font-bold mt-1 text-primary">
                         {stats.averageHistoireGeo !== undefined ? stats.averageHistoireGeo.toFixed(1) : 'N/A'}
                     </p>
                     <p className="text-xs text-muted-foreground">({stats.countHistoireGeo ?? 0} élèves)</p>
                 </div>
-                <div className="flex flex-col items-center text-center p-3 rounded-md bg-muted/30">
+                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30">
                     <FlaskConical className="h-7 w-7 text-primary mb-2" />
                     <p className="text-sm font-medium text-foreground">Sciences</p>
-                    <p className="text-2xl font-bold mt-1">
+                    <p className="text-2xl font-bold mt-1 text-primary">
                         {stats.averageSciences !== undefined ? stats.averageSciences.toFixed(1) : 'N/A'}
                     </p>
                     <p className="text-xs text-muted-foreground">({stats.countSciences ?? 0} élèves)</p>
@@ -459,30 +458,30 @@ export default function PanoramaPage() {
             </CardContent>
         </Card>
 
-        <Card className="shadow-lg rounded-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xl font-medium">Mentions (parmi admis)</CardTitle>
-            <Award className="h-6 w-6 text-muted-foreground" />
+        <Card className="shadow-md rounded-lg"> {/* shadow-md */}
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6"> {/* Ensure p-6 for generous padding */}
+            <CardTitle className="text-xl font-medium text-primary">Mentions (parmi admis)</CardTitle> {/* text-primary */}
+            <Award className="h-6 w-6 text-primary" /> {/* Icon color also primary */}
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 pt-4 sm:grid-cols-4">
+          <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 pt-4 sm:grid-cols-4 p-6 pb-6"> {/* Ensure p-6 for generous padding */}
             <div>
               <p className="text-sm font-semibold text-foreground">Très Bien</p>
-              <p className="text-2xl font-bold">{stats.mentions.tresBien}</p>
+              <p className="text-2xl font-bold text-primary">{stats.mentions.tresBien}</p> {/* text-primary */}
               <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.tresBien : 0}% des admis</p>
             </div>
-            <div> {/* Assez Bien before Bien */}
+            <div> 
               <p className="text-sm font-semibold text-foreground">Assez Bien</p>
-              <p className="text-2xl font-bold">{stats.mentions.assezBien}</p>
+              <p className="text-2xl font-bold text-primary">{stats.mentions.assezBien}</p> {/* text-primary */}
               <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.assezBien : 0}% des admis</p>
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Bien</p>
-              <p className="text-2xl font-bold">{stats.mentions.bien}</p>
+              <p className="text-2xl font-bold text-primary">{stats.mentions.bien}</p> {/* text-primary */}
               <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.bien : 0}% des admis</p>
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Sans Mention</p>
-              <p className="text-2xl font-bold">{stats.mentions.sansMention}</p>
+              <p className="text-2xl font-bold text-primary">{stats.mentions.sansMention}</p> {/* text-primary */}
               <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.sansMention : 0}% des admis</p>
             </div>
           </CardContent>
