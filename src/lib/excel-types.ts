@@ -25,8 +25,10 @@ const preprocessOptionalStringToNumber = (val: unknown) => {
 
 
 export const studentDataSchema = z.object({
-  'Série': z.preprocess(preprocessToStringOptional, z.string().optional()),
   'anneeScolaireImportee': z.string().min(1, "Année scolaire d'importation requise"),
+  
+  // Fields matching Excel headers exactly
+  'Série': z.preprocess(preprocessToStringOptional, z.string().optional()),
   'Code Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
   'Libellé Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
   'Commune Etablissement': z.preprocess(preprocessToStringOptional, z.string().optional()),
@@ -36,14 +38,13 @@ export const studentDataSchema = z.object({
   'INE': z.preprocess(preprocessToStringOptional, z.string().min(1, "INE requis")),
   'Nom candidat': z.preprocess(preprocessToStringOptional, z.string().min(1, "Nom candidat requis")),
   'Prénom candidat': z.preprocess(preprocessToStringOptional, z.string().min(1, "Prénom candidat requis")),
-  'Date de naissance': z.preprocess(preprocessToStringOptional, z.string().optional()), // Dates are often read as strings or numbers, convert to string.
+  'Date de naissance': z.preprocess(preprocessToStringOptional, z.string().optional()),
   'Résultat': z.preprocess(preprocessToStringOptional, z.string().optional()),
-
   'TOTAL GENERAL': z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
-  'TOTAL POUR MENTION': z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
   'Moyenne sur 20': z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
+  // 'TOTAL POUR MENTION' is removed as it's always empty
 
-  // Score fields remain as they were, assuming their Excel headers are complex and mapping is specific
+  // Score fields retain camelCase names from original complex headers
   scoreFrancais: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
   scoreMaths: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
   scoreHistoireGeo: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
@@ -57,8 +58,7 @@ export const studentDataSchema = z.object({
   scoreSciencesVie: z.preprocess(preprocessOptionalStringToNumber, z.number().optional()),
 
   options: z.record(z.string()).optional(),
-  rawRowData: z.any().optional(), // To store the original raw row for any unmapped fields
+  rawRowData: z.any().optional(), 
 });
 
 export type StudentData = z.infer<typeof studentDataSchema>;
-

@@ -73,16 +73,12 @@ export default function ImportPage() {
     let documentsAddedToBatch = 0;
 
     dataToImport.forEach(student => {
-      // student['INE'] is now guaranteed by Zod to be a string if parsing was successful
       const docId = student['INE']; 
-      if (docId) { // No need to check for trim or empty string, Zod handles .min(1)
+      if (docId) { 
         const studentRef = doc(collectionRef, docId);
-        // The student object already matches the Firestore structure due to Zod schema
-        // and is guaranteed to have anneeScolaireImportee
         batch.set(studentRef, student);
         documentsAddedToBatch++;
       } else {
-        // This case should ideally not be reached if Zod validation is strict and INE is required.
         console.warn("Skipping student due to missing or invalid INE (should be caught by Zod):", student);
       }
     });
@@ -146,7 +142,6 @@ export default function ImportPage() {
 
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          // Get raw JSON data, Zod will handle type coercion and validation
           const rawDataObjects = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false, defval: undefined });
 
 
@@ -157,13 +152,11 @@ export default function ImportPage() {
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
 
-          // Define a set of known main headers that are explicitly mapped.
-          // All other headers will be collected into the 'options' field.
           const explicitlyMappedHeaders = new Set([
             'Série', 'Code Etablissement', 'Libellé Etablissement', 'Commune Etablissement',
             'Division de classe', 'Catégorie candidat', 'Numéro Candidat', 'INE',
             'Nom candidat', 'Prénom candidat', 'Date de naissance', 'Résultat',
-            'TOTAL GENERAL', 'TOTAL POUR MENTION', 'Moyenne sur 20',
+            'TOTAL GENERAL', 'Moyenne sur 20', // 'TOTAL POUR MENTION' removed
             // Explicit score headers
             '001 - 1 - Français - Ponctuel',
             '002 - 1 - Mathématiques - Ponctuel',
@@ -181,8 +174,8 @@ export default function ImportPage() {
 
           rawDataObjects.forEach((rawRow, index) => {
             const studentInput: any = {
-              'anneeScolaireImportee': importYear, // Added by the app
-              // Direct mapping based on harmonized field names in Zod schema
+              'anneeScolaireImportee': importYear, 
+              // Exact Excel header mapping
               'Série': rawRow['Série'],
               'Code Etablissement': rawRow['Code Etablissement'],
               'Libellé Etablissement': rawRow['Libellé Etablissement'],
@@ -193,11 +186,11 @@ export default function ImportPage() {
               'INE': rawRow['INE'],
               'Nom candidat': rawRow['Nom candidat'],
               'Prénom candidat': rawRow['Prénom candidat'],
-              'Date de naissance': rawRow['Date de naissance'], // Zod preprocesses this
+              'Date de naissance': rawRow['Date de naissance'],
               'Résultat': rawRow['Résultat'],
-              'TOTAL GENERAL': rawRow['TOTAL GENERAL'], // Zod preprocesses this
-              'TOTAL POUR MENTION': rawRow['TOTAL POUR MENTION'], // Zod preprocesses this
-              'Moyenne sur 20': rawRow['Moyenne sur 20'], // Zod preprocesses this
+              'TOTAL GENERAL': rawRow['TOTAL GENERAL'],
+              'Moyenne sur 20': rawRow['Moyenne sur 20'],
+              // 'TOTAL POUR MENTION': rawRow['TOTAL POUR MENTION'], // Removed
 
               // Explicit score fields
               scoreFrancais: rawRow['001 - 1 - Français - Ponctuel'],
@@ -212,16 +205,14 @@ export default function ImportPage() {
               scorePhysiqueChimie: rawRow['Phy Chi01A /50'],
               scoreSciencesVie: rawRow['Sci Vie01A /50'],
               
-              rawRowData: rawRow, // Keep the full raw row for debugging or future use
-              options: {} // Initialize options
+              rawRowData: rawRow, 
+              options: {} 
             };
             
-            // Collect any other columns into the 'options' field
             const currentOptions: Record<string, string> = {};
             for (const excelHeader in rawRow) {
               if (rawRow.hasOwnProperty(excelHeader) && !explicitlyMappedHeaders.has(excelHeader)) {
                 const value = rawRow[excelHeader];
-                // Ensure value is not undefined/null and convert to string for options
                 if (value !== undefined && value !== null) {
                     currentOptions[excelHeader] = String(value);
                 }
@@ -249,18 +240,17 @@ export default function ImportPage() {
                 return `${field}: Erreur de validation inconnue`;
               })
               .join('; ');
+            // console.error("Erreurs de validation:", validationErrors); // Removed verbose logging
             throw new Error(`Validation échouée pour certaines lignes. Ex: Ligne ${firstError.row}: ${errorMessages}`);
           }
 
           if (transformedData.length > 0) {
             await handleImportToFirestore(transformedData, importYear);
-          } else if (error) { // If a critical error was set before this stage
+          } else if (error) { 
             // Do nothing, error is already set and will be displayed
           } else if (rawDataObjects.length > 0 && transformedData.length === 0 && validationErrors.length === 0) {
-             // This case indicates all rows were skipped, likely due to missing critical fields not caught by Zod structure but by logic (e.g. all INE were blank but Zod only validates if field exists)
-             // However, with current Zod schema, INE, Nom, Prénom are required, so this implies a deeper issue if reached.
              throw new Error("Aucune ligne n'a pu être traitée. Vérifiez que les colonnes 'INE', 'Nom candidat', et 'Prénom candidat' sont présentes, correctement nommées et remplies dans le fichier Excel.");
-          } else { // No data and no specific validation errors thrown, but no transformed data.
+          } else { 
             throw new Error("Aucune donnée valide trouvée dans le fichier Excel après parsing. Vérifiez le format du fichier et la présence de données.");
           }
 
