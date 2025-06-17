@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -73,8 +74,8 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="items-center text-center">
           <Logo className="mb-4" />
-          <CardTitle className="font-headline text-2xl">Sign in to BrevetConnect</CardTitle>
-          <CardDescription>Enter your credentials to access your account.</CardDescription>
+          <CardTitle className="font-headline text-2xl">Connectez-vous à BrevetConnect</CardTitle>
+          <CardDescription>Entrez vos identifiants pour accéder à votre compte.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -84,7 +85,7 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email Address</FormLabel>
+                    <FormLabel>Identifiant</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -100,11 +101,11 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>Mot de passe</FormLabel>
                     <FormControl>
                        <div className="relative">
                         <LockKeyhole className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="password" placeholder="Enter your password" {...field} className="pl-10" />
+                        <Input type="password" placeholder="Entrez votre mot de passe" {...field} className="pl-10" />
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -113,14 +114,14 @@ export default function LoginPage() {
               />
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isLoading ? 'Signing In...' : 'Sign In'}
+                {isLoading ? 'Connexion en cours...' : 'Se connecter'}
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
           <Link href="/forgot-password" className="text-sm text-primary hover:underline hover:text-accent">
-            Forgot your password?
+            Mot de passe oublié ?
           </Link>
         </CardFooter>
       </Card>
