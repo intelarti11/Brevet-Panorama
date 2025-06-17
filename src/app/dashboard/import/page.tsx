@@ -26,9 +26,9 @@ export default function ImportPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const currentMonth = new Date().getMonth(); 
+    const currentMonth = new Date().getMonth();
     let academicYearStart = new Date().getFullYear();
-    if (currentMonth < 7) { 
+    if (currentMonth < 7) {
         academicYearStart--;
     }
     setImportYear(`${academicYearStart}-${academicYearStart + 1}`);
@@ -67,18 +67,21 @@ export default function ImportPage() {
     let documentsAddedToBatch = 0;
 
     dataToImport.forEach(student => {
-      if (student.numeroCandidatINE && student.numeroCandidatINE.trim() !== "") {
-        const studentRef = doc(collectionRef, student.numeroCandidatINE);
+      // The document ID will be based on the 'INE' field from the Excel sheet
+      const docId = student['INE'];
+      if (docId && String(docId).trim() !== "") {
+        const studentRef = doc(collectionRef, String(docId).trim());
+        // Ensure rawRowData is not part of what's sent to Firestore unless explicitly desired for debugging
         const { rawRowData, ...studentDataForFirestore } = student;
-        
-        const finalStudentData = { 
-            ...JSON.parse(JSON.stringify(studentDataForFirestore)), 
-            anneeScolaireImportee: yearToImport 
+
+        const finalStudentData = {
+            ...JSON.parse(JSON.stringify(studentDataForFirestore)), // Deep copy to avoid issues with complex objects
+            anneeScolaireImportee: yearToImport // This field is explicitly managed by the app
         };
         batch.set(studentRef, finalStudentData);
         documentsAddedToBatch++;
       } else {
-        console.warn("Skipping student due to missing or invalid INE:", student);
+        console.warn("Skipping student due to missing or invalid INE for document ID:", student);
       }
     });
 
@@ -134,11 +137,11 @@ export default function ImportPage() {
           }
           const data = new Uint8Array(arrayBuffer as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-          
+
           if (!workbook.SheetNames.length) {
             throw new Error("Le classeur Excel ne contient aucune feuille.");
           }
-          
+
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
           const dataObjects = XLSX.utils.sheet_to_json<any>(worksheet);
@@ -150,11 +153,14 @@ export default function ImportPage() {
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
 
+           // These are the Excel headers that map to specific, non-score fields in studentDataSchema
+           // or are used for logic (like INE for doc ID). Score headers are also main.
            const mainHeadersForOptionsLogic = new Set([
             'Série', 'Code Etablissement', 'Libellé Etablissement', 'Commune Etablissement',
             'Division de classe', 'Catégorie candidat', 'Numéro Candidat', 'INE',
             'Nom candidat', 'Prénom candidat', 'Date de naissance', 'Résultat',
             'TOTAL GENERAL', 'TOTAL POUR MENTION', 'Moyenne sur 20',
+            // Score headers (these map to camelCase fields in Zod schema but are main headers from Excel)
             '001 - 1 - Français - Ponctuel',
             '002 - 1 - Mathématiques - Ponctuel',
             '003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel',
@@ -171,32 +177,37 @@ export default function ImportPage() {
           dataObjects.forEach((rawRow, index) => {
             const getExcelVal = (headerName: string) => rawRow[headerName];
 
-            const ine = String(getExcelVal('INE') || getExcelVal('Numéro Candidat') || '').trim();
-            const nom = String(getExcelVal('Nom candidat') || '').trim();
-            const prenoms = String(getExcelVal('Prénom candidat') || '').trim();
+            const ine = String(getExcelVal('INE') || '').trim(); // INE is primary for doc ID
+            const nomCandidat = String(getExcelVal('Nom candidat') || '').trim();
+            const prenomsCandidat = String(getExcelVal('Prénom candidat') || '').trim();
 
-            if (!ine || !nom || !prenoms) {
-              console.warn(`Ligne ${index + 2} ignorée : INE, Nom ou Prénom manquant.`);
-              return; 
+            // Ensure essential fields for document ID and basic identification are present
+            if (!ine || !nomCandidat || !prenomsCandidat) {
+              console.warn(`Ligne ${index + 2} ignorée : INE, Nom candidat ou Prénom candidat manquant.`);
+              return;
             }
 
             const studentInput: any = {
-              serie: getExcelVal('Série'), 
-              anneeScolaireImportee: importYear, 
-              codeEtablissement: getExcelVal('Code Etablissement'),
-              libelleEtablissement: getExcelVal('Libellé Etablissement'),
-              communeEtablissement: getExcelVal('Commune Etablissement'),
-              divisionEleve: getExcelVal('Division de classe'),
-              categorieCandidat: getExcelVal('Catégorie candidat'), // Changed from categorieSocioPro
-              numeroCandidatINE: ine,
-              nomCandidat: nom,
-              prenomsCandidat: prenoms,
-              dateNaissance: getExcelVal('Date de naissance') instanceof Date 
-                             ? (getExcelVal('Date de naissance') as Date).toLocaleDateString('fr-FR') 
-                             : getExcelVal('Date de naissance'),
-              resultat: getExcelVal('Résultat'),
-              totalGeneral: getExcelVal('TOTAL GENERAL'),
-              totalPourcentage: getExcelVal('Moyenne sur 20'),
+              'Série': getExcelVal('Série'),
+              anneeScolaireImportee: importYear, // Added by the app
+              'Code Etablissement': getExcelVal('Code Etablissement'),
+              'Libellé Etablissement': getExcelVal('Libellé Etablissement'),
+              'Commune Etablissement': getExcelVal('Commune Etablissement'),
+              'Division de classe': getExcelVal('Division de classe'),
+              'Catégorie candidat': getExcelVal('Catégorie candidat'),
+              'Numéro Candidat': getExcelVal('Numéro Candidat'),
+              'INE': ine, // Storing the INE value from Excel under the 'INE' key
+              'Nom candidat': nomCandidat,
+              'Prénom candidat': prenomsCandidat,
+              'Date de naissance': getExcelVal('Date de naissance') instanceof Date
+                                 ? (getExcelVal('Date de naissance') as Date).toLocaleDateString('fr-FR')
+                                 : getExcelVal('Date de naissance'),
+              'Résultat': getExcelVal('Résultat'),
+              'TOTAL GENERAL': getExcelVal('TOTAL GENERAL'),
+              'TOTAL POUR MENTION': getExcelVal('TOTAL POUR MENTION'),
+              'Moyenne sur 20': getExcelVal('Moyenne sur 20'),
+
+              // Score fields map to camelCase keys in Zod schema
               scoreFrancais: getExcelVal('001 - 1 - Français - Ponctuel'),
               scoreMaths: getExcelVal('002 - 1 - Mathématiques - Ponctuel'),
               scoreHistoireGeo: getExcelVal('003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel'),
@@ -208,6 +219,7 @@ export default function ImportPage() {
               scoreEPS: getExcelVal('EPS CCF01A /100'),
               scorePhysiqueChimie: getExcelVal('Phy Chi01A /50'),
               scoreSciencesVie: getExcelVal('Sci Vie01A /50'),
+
               options: {},
               rawRowData: rawRow,
             };
@@ -230,7 +242,7 @@ export default function ImportPage() {
             if (validationResult.success) {
               transformedData.push(validationResult.data);
             } else {
-              validationErrors.push({ row: index + 2, errors: validationResult.error.flatten() }); 
+              validationErrors.push({ row: index + 2, errors: validationResult.error.flatten() });
             }
           });
 
@@ -341,4 +353,3 @@ export default function ImportPage() {
     </div>
   );
 }
-

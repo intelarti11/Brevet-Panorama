@@ -7,11 +7,11 @@ import { getFirestore, collection, getDocs, QuerySnapshot, DocumentData } from '
 import { db } from '@/lib/firebase';
 
 export interface ProcessedStudentData {
-  id: string; // INE
+  id: string; // INE, used as document ID
   nom: string;
   prenom: string;
   etablissement: string;
-  anneeOriginale: string; // The raw data.serie or other original year/serie field from Firestore
+  anneeOriginale: string; // The raw data['Série'] or other original year/serie field from Firestore
   academicYear?: string; // Parsed or directly imported e.g., "2023-2024"
   serieType?: string; // Parsed e.g., "GÉNÉRALE"
   resultat: string;
@@ -20,13 +20,14 @@ export interface ProcessedStudentData {
   scoreMaths?: number;
   scoreHistoireGeo?: number;
   scoreSciences?: number;
+  // Potentially add other fields from StudentData if needed directly in components, like 'TOTAL POUR MENTION'
 }
 
 interface FilterContextType {
   allProcessedStudents: ProcessedStudentData[];
   isLoading: boolean;
   error: string | null;
-  
+
   availableAcademicYears: string[];
   selectedAcademicYear: string;
   setSelectedAcademicYear: (year: string) => void;
@@ -82,11 +83,11 @@ const parseOriginalSerieField = (rawSerieOriginale: string | undefined): { acade
       break;
     }
   }
-  
+
   if (foundSerieKeyword === "N/A" && serieTypePart && serieTypePart.trim() !== "") {
       foundSerieKeyword = serieTypePart.trim();
   }
-  
+
   return { academicYearFallback, serieType: foundSerieKeyword === "" ? "N/A" : foundSerieKeyword };
 };
 
@@ -101,27 +102,26 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
   const [availableSerieTypes, setAvailableSerieTypes] = useState<string[]>([]);
   const [selectedSerieType, setSelectedSerieType] = useState<string>(ALL_SERIE_TYPES_VALUE);
-  
+
   const [availableEstablishments, setAvailableEstablishments] = useState<string[]>([]);
   const [selectedEstablishment, setSelectedEstablishment] = useState<string>(ALL_ESTABLISHMENTS_VALUE);
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true); // Set loading true at the start of fetch
-      setError(null); // Reset error
+      setIsLoading(true);
+      setError(null);
 
       if (!db) {
         setError("La base de données Firestore n'est pas initialisée. Vérifiez la configuration Firebase (src/lib/firebase.ts) et votre connexion internet. Assurez-vous que Firestore est activé dans votre projet Firebase et que les règles de sécurité autorisent la lecture.");
         setIsLoading(false);
         return;
       }
-      
+
       try {
         const studentCollectionRef = collection(db, 'brevetResults');
         const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(studentCollectionRef);
-        
+
         if (querySnapshot.empty) {
-          // setError("Aucune donnée élève trouvée dans la base de données. Veuillez en importer.");
           // No error, but filters will be empty. User should import data.
         }
 
@@ -132,23 +132,25 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          const anneeOriginaleField = data.serie || ""; 
-          const importedYear = data.anneeScolaireImportee; 
+          // Use the new harmonized field names for reading from Firestore
+          const anneeOriginaleField = data['Série'] || ""; // From Excel 'Série' field
+          const importedYear = data.anneeScolaireImportee; // Field added by the app during import
 
           const { academicYearFallback, serieType } = parseOriginalSerieField(anneeOriginaleField);
-          
+
           const finalAcademicYear = importedYear || academicYearFallback;
 
           students.push({
-            id: doc.id, 
-            nom: data.nomCandidat || 'N/A',
-            prenom: data.prenomsCandidat || 'N/A',
-            etablissement: data.libelleEtablissement || 'N/A',
+            id: doc.id, // doc.id is the INE
+            nom: data['Nom candidat'] || 'N/A',
+            prenom: data['Prénom candidat'] || 'N/A',
+            etablissement: data['Libellé Etablissement'] || 'N/A',
             anneeOriginale: anneeOriginaleField,
             academicYear: finalAcademicYear,
             serieType: serieType,
-            resultat: data.resultat || 'N/A',
-            moyenne: data.totalPourcentage !== undefined && data.totalPourcentage !== null ? Number(data.totalPourcentage) : undefined,
+            resultat: data['Résultat'] || 'N/A',
+            moyenne: data['Moyenne sur 20'] !== undefined && data['Moyenne sur 20'] !== null ? Number(data['Moyenne sur 20']) : undefined,
+            // Score fields are still read by their camelCase names from data (as defined in Zod schema)
             scoreFrancais: data.scoreFrancais !== undefined && data.scoreFrancais !== null ? Number(data.scoreFrancais) : undefined,
             scoreMaths: data.scoreMaths !== undefined && data.scoreMaths !== null ? Number(data.scoreMaths) : undefined,
             scoreHistoireGeo: data.scoreHistoireGeo !== undefined && data.scoreHistoireGeo !== null ? Number(data.scoreHistoireGeo) : undefined,
@@ -161,25 +163,27 @@ export function FilterProvider({ children }: { children: ReactNode }) {
           if (serieType && serieType !== "N/A" && String(serieType).trim() !== "") {
             serieTypesSet.add(String(serieType).trim());
           }
-          if (data.libelleEtablissement && String(data.libelleEtablissement).trim() !== "") {
-            establishmentsSet.add(String(data.libelleEtablissement).trim());
+          // Use 'Libellé Etablissement' for establishmentsSet
+          const etablissementName = data['Libellé Etablissement'];
+          if (etablissementName && String(etablissementName).trim() !== "") {
+            establishmentsSet.add(String(etablissementName).trim());
           }
         });
 
         setAllProcessedStudents(students);
-        
+
         const sortedAcademicYears = Array.from(academicYearsSet).sort((a, b) => {
-            if (!a || !b) return 0; // Should not happen with the trim() and !== "" checks
+            if (!a || !b) return 0;
             const yearAVal = parseInt(String(a).substring(0,4));
             const yearBVal = parseInt(String(b).substring(0,4));
             if (isNaN(yearAVal) || isNaN(yearBVal)) return String(b).localeCompare(String(a));
-            if (yearBVal !== yearAVal) return yearBVal - yearAVal; 
-            return String(b).localeCompare(String(a)); 
+            if (yearBVal !== yearAVal) return yearBVal - yearAVal;
+            return String(b).localeCompare(String(a));
         });
 
         setAvailableAcademicYears(sortedAcademicYears);
         if (sortedAcademicYears.length > 0) {
-          setSelectedAcademicYear(sortedAcademicYears[0]); 
+          setSelectedAcademicYear(sortedAcademicYears[0]);
         } else {
           setSelectedAcademicYear(ALL_ACADEMIC_YEARS_VALUE);
         }
@@ -194,14 +198,12 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         } else {
           setSelectedSerieType(ALL_SERIE_TYPES_VALUE);
         }
-        
+
         const sortedEstablishments = Array.from(establishmentsSet).sort();
         setAvailableEstablishments(sortedEstablishments);
-        if (sortedEstablishments.length > 0) {
-           setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE); 
-        } else {
-           setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE);
-        }
+        // Default to "All Establishments"
+        setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE);
+
 
       } catch (err: any) {
         console.error("Erreur de récupération des données Firestore:", err);
