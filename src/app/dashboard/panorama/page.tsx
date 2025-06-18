@@ -347,6 +347,7 @@ export default function PanoramaPage() {
                 <ChartContainer config={{}} className="mx-auto aspect-square max-h-[300px]">
                   <PieChart>
                     <ChartTooltip
+                        cursor={false}
                         content={<ChartTooltipContent
                             hideLabel
                             formatter={(value, name, props) => (
@@ -415,7 +416,7 @@ export default function PanoramaPage() {
                       <XAxis type="number" dataKey="value" allowDecimals={false} />
                       <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} />
                       <ChartTooltip
-                          cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
+                          cursor={false}
                           content={
                               <ChartTooltipContent
                                   formatter={(value, name, props) => (
@@ -527,3 +528,4 @@ export default function PanoramaPage() {
     </div>
   );
 }
+
