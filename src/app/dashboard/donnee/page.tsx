@@ -2,13 +2,14 @@
 "use client";
 
 import type { ChangeEvent } from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Search, Loader2, AlertTriangle, ArrowUp, ArrowDown, ChevronsUpDown, SlidersHorizontal } from 'lucide-react';
 import { useFilters, type ProcessedStudentData, ALL_ACADEMIC_YEARS_VALUE, ALL_SERIE_TYPES_VALUE, ALL_ESTABLISHMENTS_VALUE } from '@/contexts/FilterContext';
+import { StudentDetailModal } from '@/components/student-detail-modal';
 
 const normalizeText = (text: string | undefined): string => {
   if (text === null || text === undefined) return "";
@@ -31,6 +32,8 @@ export default function DonneePage() {
   const [filteredData, setFilteredData] = useState<ProcessedStudentData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof ProcessedStudentData | null; direction: 'ascending' | 'descending' }>({ key: null, direction: 'ascending' });
+  const [selectedStudentForModal, setSelectedStudentForModal] = useState<ProcessedStudentData | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     let data = [...allProcessedStudents]; 
@@ -91,7 +94,8 @@ export default function DonneePage() {
     setSortConfig({ key, direction });
   };
 
-  const getBadgeVariant = (resultat: string): "default" | "secondary" | "destructive" | "outline" => {
+  const getBadgeVariant = (resultat: string | undefined): "default" | "secondary" | "destructive" | "outline" => {
+    if (!resultat) return "secondary";
     const lowerResultat = resultat.toLowerCase();
     if (lowerResultat.includes('refusé')) return "destructive";
     if (lowerResultat.includes('admis')) return "default";
@@ -105,6 +109,11 @@ export default function DonneePage() {
     return sortConfig.direction === 'ascending' 
       ? <ArrowUp className="ml-2 h-4 w-4 text-foreground" /> 
       : <ArrowDown className="ml-2 h-4 w-4 text-foreground" />;
+  };
+
+  const handleRowClick = (student: ProcessedStudentData) => {
+    setSelectedStudentForModal(student);
+    setIsDetailModalOpen(true);
   };
 
   if (isLoadingContext) {
@@ -168,6 +177,7 @@ export default function DonneePage() {
           <CardTitle className="text-xl">Résultats des Élèves</CardTitle>
           <CardDescription>
             Liste des élèves correspondant aux critères sélectionnés. Affichage de {filteredData.length} sur {allProcessedStudents.length} élèves au total.
+            Cliquez sur une ligne pour voir les détails.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -204,7 +214,11 @@ export default function DonneePage() {
                 </TableHeader>
                 <TableBody>
                   {filteredData.map((student) => (
-                    <TableRow key={student.id} className="hover:bg-muted/30">
+                    <TableRow 
+                        key={student.id} 
+                        className="cursor-pointer hover:bg-muted/30"
+                        onClick={() => handleRowClick(student)}
+                    >
                       <TableCell className="font-mono text-xs">{student.id}</TableCell>
                       <TableCell className="font-medium">{student.nom}</TableCell>
                       <TableCell>{student.prenom}</TableCell>
@@ -213,7 +227,7 @@ export default function DonneePage() {
                       <TableCell>{student.serieType || 'N/A'}</TableCell>
                       <TableCell>
                         <Badge variant={getBadgeVariant(student.resultat)} className="text-xs">
-                          {student.resultat}
+                          {student.resultat || 'N/A'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">
@@ -235,6 +249,14 @@ export default function DonneePage() {
           )}
         </CardContent>
       </Card>
+
+      {selectedStudentForModal && (
+        <StudentDetailModal
+          student={selectedStudentForModal}
+          isOpen={isDetailModalOpen}
+          onOpenChange={setIsDetailModalOpen}
+        />
+      )}
     </div>
   );
 }
