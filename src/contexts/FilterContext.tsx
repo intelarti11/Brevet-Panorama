@@ -16,6 +16,7 @@ export interface ProcessedStudentData {
   serieType?: string; // Parsed e.g., "GÉNÉRALE"
   resultat?: string;
   moyenne?: number;
+  totalGeneral?: number; // Added for the total score
   scoreFrancais?: number;
   scoreMaths?: number;
   scoreHistoireGeo?: number;
@@ -167,7 +168,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
             serieType: finalSerieType,
             resultat: data['Résultat'],
             moyenne: data['Moyenne sur 20'] !== undefined && data['Moyenne sur 20'] !== null ? Number(data['Moyenne sur 20']) : undefined,
-            
+            totalGeneral: data['TOTAL GENERAL'] !== undefined && data['TOTAL GENERAL'] !== null ? Number(data['TOTAL GENERAL']) : undefined,
             scoreFrancais: data.scoreFrancais !== undefined && data.scoreFrancais !== null ? Number(data.scoreFrancais) : undefined,
             scoreMaths: data.scoreMaths !== undefined && data.scoreMaths !== null ? Number(data.scoreMaths) : undefined,
             scoreHistoireGeo: data.scoreHistoireGeo !== undefined && data.scoreHistoireGeo !== null ? Number(data.scoreHistoireGeo) : undefined,

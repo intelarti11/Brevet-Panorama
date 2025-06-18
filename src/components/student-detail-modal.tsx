@@ -60,7 +60,7 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
   }
 
   const getBadgeVariantForModal = (resultat?: string): "default" | "secondary" | "destructive" | "outline" | "success" | "warning" => {
-    if (!resultat || normalizeTextForModal(resultat) === 'n/a') return "outline"; 
+    if (!resultat || normalizeTextForModal(resultat) === 'n/a') return "outline";
     const lowerResultat = normalizeTextForModal(resultat);
 
     if (lowerResultat.includes('refuse')) return "destructive";
@@ -100,7 +100,7 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
 
         <ScrollArea className="flex-grow overflow-y-auto px-6">
           <div className="space-y-1 py-4">
-            <h3 className={sectionTitleClass}>Informations Personnelles</h3>
+            
             <DetailItem label="Nom Complet" value={`${student.prenom} ${student.nom}`} />
             <DetailItem label="N° INE" value={student.id} />
             
@@ -120,6 +120,7 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
                 badgeVariant={getBadgeVariantForModal(student.resultat)}
             />
             <DetailItem label="Moyenne Générale" value={student.moyenne !== undefined && student.moyenne !== null ? student.moyenne.toFixed(2) + " / 20" : "N/A"} />
+            <DetailItem label="Total Général des Points" value={student.totalGeneral !== undefined && student.totalGeneral !== null ? `${student.totalGeneral.toFixed(0)} points` : "N/A"} />
             
             <h3 className={sectionTitleClass}>Détail des Épreuves et Compétences</h3>
             <DetailItem label="Français (Épreuve)" value={formatScoreWithBareme(student.scoreFrancais, 100)} />
