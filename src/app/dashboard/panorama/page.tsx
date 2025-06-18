@@ -334,7 +334,7 @@ export default function PanoramaPage() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
-          <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
+          <Card className="shadow-md rounded-lg">
             <CardHeader className="p-6">
               <CardTitle className="flex items-center text-xl text-primary">
                 <PieChartIcon className="mr-2 h-5 w-5 text-primary" />
@@ -398,7 +398,7 @@ export default function PanoramaPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
+          <Card className="shadow-md rounded-lg">
             <CardHeader className="p-6">
               <CardTitle className="flex items-center text-xl text-primary">
                 <BarChart2 className="mr-2 h-5 w-5 text-primary" />
@@ -527,6 +527,3 @@ export default function PanoramaPage() {
     </div>
   );
 }
-
-
-    
