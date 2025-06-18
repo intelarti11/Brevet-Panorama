@@ -3,8 +3,8 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle, LogOut } from 'lucide-react';
 
 import Logo from '@/components/logo';
 import {
@@ -30,6 +30,7 @@ import {
   ALL_ESTABLISHMENTS_VALUE 
 } from '@/contexts/FilterContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -133,6 +134,16 @@ function SidebarFilters() {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const handleLogout = () => {
+    toast({
+      title: "Déconnexion",
+      description: "Vous avez été déconnecté.",
+    });
+    router.push('/login');
+  };
 
   return (
     <FilterProvider>
@@ -145,6 +156,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu className="p-2">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={handleLogout}
+                  tooltip={{ children: "Déconnexion", side: "right", align: "center" }}
+                >
+                  <LogOut />
+                  <span> Déconnexion</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
