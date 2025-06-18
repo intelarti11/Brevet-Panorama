@@ -96,7 +96,7 @@ export default function DonneePage() {
 
   const getBadgeVariant = (resultat: string | undefined): "default" | "secondary" | "destructive" | "outline" | "success" | "warning" => {
     if (!resultat) return "secondary";
-    const lowerResultat = normalizeText(resultat); // Use normalized text for comparisons
+    const lowerResultat = normalizeText(resultat);
 
     if (lowerResultat.includes('refusé')) return "destructive"; 
 
