@@ -29,6 +29,7 @@ export default function ImportPage() {
   const [importYear, setImportYear] = useState<string>(''); 
   const [selectedStartYear, setSelectedStartYear] = useState<number | null>(null); 
   const [initialPickerYear, setInitialPickerYear] = useState<number>(new Date().getFullYear());
+  const [defaultHighlightYear, setDefaultHighlightYear] = useState<number>(new Date().getFullYear());
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -48,6 +49,7 @@ export default function ImportPage() {
         academicStartYear = currentCalYear;
     }
     setInitialPickerYear(academicStartYear); 
+    setDefaultHighlightYear(academicStartYear); // Set for default highlight in picker
   }, []);
 
   const processFile = (selectedFile: File | null | undefined) => {
@@ -79,7 +81,7 @@ export default function ImportPage() {
       processFile(null);
     }
     if (fileInputRef.current) {
-      fileInputRef.current.value = ''; // Reset input pour permettre la re-sélection du même fichier
+      fileInputRef.current.value = ''; 
     }
   };
 
@@ -106,7 +108,7 @@ export default function ImportPage() {
     event.stopPropagation();
     event.dataTransfer.dropEffect = 'copy';
     if (!isDraggingOver) {
-        setIsDraggingOver(true); // Ensure it's true if somehow missed by enter
+        setIsDraggingOver(true); 
     }
   };
 
@@ -120,7 +122,7 @@ export default function ImportPage() {
     if (droppedFiles && droppedFiles.length > 0) {
       processFile(droppedFiles[0]);
       if (fileInputRef.current) {
-        fileInputRef.current.value = ''; // Reset input
+        fileInputRef.current.value = ''; 
       }
     }
   };
@@ -165,7 +167,7 @@ export default function ImportPage() {
       setSelectedStartYear(null); 
       setImportYear(''); 
       if (fileInputRef.current) {
-        fileInputRef.current.value = ''; // Reset input
+        fileInputRef.current.value = ''; 
       }
     } catch (importError: any) {
       console.error("Erreur d'importation Firestore:", importError);
@@ -376,7 +378,7 @@ export default function ImportPage() {
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
                 <YearPicker
-                  selectedYear={selectedStartYear}
+                  selectedYear={selectedStartYear ?? defaultHighlightYear}
                   onSelectYear={(year) => {
                     setSelectedStartYear(year);
                     setImportYear(String(year)); 
@@ -442,3 +444,4 @@ export default function ImportPage() {
   );
 }
     
+
