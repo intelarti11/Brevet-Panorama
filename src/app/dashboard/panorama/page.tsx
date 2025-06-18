@@ -434,7 +434,7 @@ export default function PanoramaPage() {
                       <Bar
                         dataKey="value"
                         radius={4}
-                        activeBar={{ fill: 'transparent', stroke: 'none' }}
+                        activeBar={false}
                         onMouseEnter={(_data, index) => setHoveredBarIndex(index)}
                         onMouseLeave={() => setHoveredBarIndex(null)}
                       >
