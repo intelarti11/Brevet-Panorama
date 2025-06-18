@@ -60,18 +60,24 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
   }
 
   const getBadgeVariantForModal = (resultat?: string): "default" | "secondary" | "destructive" | "outline" | "success" | "warning" => {
-    if (!resultat) return "secondary";
+    if (!resultat || normalizeTextForModal(resultat) === 'n/a') return "outline"; // N/A or empty -> Light Gray
+
     const lowerResultat = normalizeTextForModal(resultat);
 
-    if (lowerResultat.includes('refusé')) return "destructive";
+    if (lowerResultat.includes('refusé')) return "destructive"; // Red
+    if (lowerResultat.includes('absent')) return "outline";   // Light Gray
 
-    if (lowerResultat.includes('très bien') || lowerResultat.includes('tres bien')) return "success";
-    if (lowerResultat.includes('assez bien')) return "warning"; // Vérifié avant "bien"
-    if (lowerResultat.includes('bien')) return "success";
+    // Mentions for admitted students - Order is important
+    if (lowerResultat.includes('très bien') || lowerResultat.includes('tres bien')) return "success"; // Dark Green
+    // "assez bien" should be checked before "bien" because "assez bien" also contains "bien"
+    if (lowerResultat.includes('assez bien')) return "warning"; // Yellow
+    // "bien" checked after more specific mentions. Catches "Admis Mention Bien"
+    if (lowerResultat.includes('bien')) return "success";       // Dark Green
+
+    // Generic "admis" if no specific mention was caught above, e.g., just "Admis"
+    if (lowerResultat.includes('admis')) return "success";     // Dark Green
     
-    if (lowerResultat.includes('admis')) return "success";
-    
-    return "secondary";
+    return "secondary"; // Default for other cases
   };
 
   const formatScore = (score?: number) => {
