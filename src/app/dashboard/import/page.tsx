@@ -16,7 +16,7 @@ import * as XLSX from 'xlsx';
 import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { YearPicker } from '@/components/ui/year-picker'; // Import YearPicker
+import { YearPicker } from '@/components/ui/year-picker';
 
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -25,8 +25,8 @@ export default function ImportPage() {
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   
-  const [importYear, setImportYear] = useState<string>(''); // e.g., "2023-2024", starts empty
-  const [selectedStartYear, setSelectedStartYear] = useState<number | null>(null); // e.g., 2023
+  const [importYear, setImportYear] = useState<string>(''); 
+  const [selectedStartYear, setSelectedStartYear] = useState<number | null>(null); 
   const [initialPickerYear, setInitialPickerYear] = useState<number>(new Date().getFullYear());
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
@@ -42,11 +42,8 @@ export default function ImportPage() {
     } else { 
         academicStartYear = currentCalYear;
     }
-    // Don't set importYear here initially, let the placeholder show
-    // const initialImportYearFormat = `${academicStartYear}-${academicStartYear + 1}`;
-    // setImportYear(initialImportYearFormat); 
-    setSelectedStartYear(academicStartYear); // This will highlight the year in YearPicker
-    setInitialPickerYear(academicStartYear); // This will make YearPicker open to the block containing this year
+    // setSelectedStartYear(academicStartYear); // Do not set selectedStartYear initially
+    setInitialPickerYear(academicStartYear); 
   }, []);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -355,5 +352,3 @@ export default function ImportPage() {
     </div>
   );
 }
-
-    
