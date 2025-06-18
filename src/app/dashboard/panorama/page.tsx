@@ -285,33 +285,33 @@ export default function PanoramaPage() {
       ) : (
       <>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
+          <Card className="group shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-foreground">Nombre d'Élèves</CardTitle>
               <Users className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-6">
-              <div className="text-4xl font-bold text-primary">{stats.totalStudents}</div>
+              <div className="text-4xl font-bold text-primary group-hover:scale-105 transition-transform duration-200 ease-in-out">{stats.totalStudents}</div>
               <p className="text-xs text-muted-foreground mt-1">total des élèves pour la sélection</p>
             </CardContent>
           </Card>
-          <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
+          <Card className="group shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-foreground">Taux de Réussite</CardTitle>
               <Percent className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-6">
-              <div className="text-4xl font-bold text-primary">{stats.successRate}%</div>
+              <div className="text-4xl font-bold text-primary group-hover:scale-105 transition-transform duration-200 ease-in-out">{stats.successRate}%</div>
               <p className="text-xs text-muted-foreground mt-1">{stats.admis} admis sur {stats.admis + stats.refuse > 0 ? stats.admis + stats.refuse : stats.totalStudents} élèves considérés</p>
             </CardContent>
           </Card>
-          <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
+          <Card className="group shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-foreground">Moyenne Générale (Admis)</CardTitle>
               <GraduationCap className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-6">
-              <div className="text-4xl font-bold text-primary">
+              <div className="text-4xl font-bold text-primary group-hover:scale-105 transition-transform duration-200 ease-in-out">
                 {stats.averageOverallScoreAdmitted !== undefined ? `${stats.averageOverallScoreAdmitted.toFixed(1)}/20` : 'N/A'}
               </div>
               <p className="text-xs text-muted-foreground mt-1">moyenne des élèves admis</p>
@@ -471,25 +471,25 @@ export default function PanoramaPage() {
             <Award className="h-6 w-6 text-primary" />
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 pt-4 sm:grid-cols-4 p-6 pb-6">
-            <div className="p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
+            <div className="group p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
               <p className="text-sm font-semibold text-foreground">Très Bien</p>
-              <p className="text-4xl font-bold text-primary">{stats.mentions.tresBien}</p>
-              <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.tresBien : 0}% des admis</p>
+              <p className="text-4xl font-bold text-primary group-hover:scale-105 transition-transform duration-200 ease-in-out">{stats.mentions.tresBien}</p>
+              <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">{stats.admis > 0 ? stats.mentionPercentages.tresBien : 0}% des admis</p>
             </div>
-            <div className="p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
+            <div className="group p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
               <p className="text-sm font-semibold text-foreground">Assez Bien</p>
-              <p className="text-4xl font-bold text-primary">{stats.mentions.assezBien}</p>
-              <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.assezBien : 0}% des admis</p>
+              <p className="text-4xl font-bold text-primary group-hover:scale-105 transition-transform duration-200 ease-in-out">{stats.mentions.assezBien}</p>
+              <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">{stats.admis > 0 ? stats.mentionPercentages.assezBien : 0}% des admis</p>
             </div>
-            <div className="p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
+            <div className="group p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
               <p className="text-sm font-semibold text-foreground">Bien</p>
-              <p className="text-4xl font-bold text-primary">{stats.mentions.bien}</p>
-              <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.bien : 0}% des admis</p>
+              <p className="text-4xl font-bold text-primary group-hover:scale-105 transition-transform duration-200 ease-in-out">{stats.mentions.bien}</p>
+              <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">{stats.admis > 0 ? stats.mentionPercentages.bien : 0}% des admis</p>
             </div>
-            <div className="p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
+            <div className="group p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
               <p className="text-sm font-semibold text-foreground">Sans Mention</p>
-              <p className="text-4xl font-bold text-primary">{stats.mentions.sansMention}</p>
-              <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.sansMention : 0}% des admis</p>
+              <p className="text-4xl font-bold text-primary group-hover:scale-105 transition-transform duration-200 ease-in-out">{stats.mentions.sansMention}</p>
+              <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">{stats.admis > 0 ? stats.mentionPercentages.sansMention : 0}% des admis</p>
             </div>
           </CardContent>
         </Card>
