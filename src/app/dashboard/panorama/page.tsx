@@ -234,7 +234,7 @@ export default function PanoramaPage() {
         } else {
           newStats.mentions.sansMention++;
         }
-      } else if (normalizedResultat.includes(normalizeForComparison("refuse"))) {
+      } else if (normalizedResultat.includes("refuse")) { // Corrected: without accent
         newStats.refuse++;
       }
 
@@ -366,9 +366,8 @@ export default function PanoramaPage() {
         </CardHeader>
         <CardContent className="p-6">
           {totalCount > 0 && data.length > 0 ? (
-            <>
-            <ChartContainer config={{}} className="mx-auto aspect-square max-h-[250px]" background="hsl(var(--card))">
-              <PieChart background="hsl(var(--card))">
+            <ChartContainer config={{}} className="mx-auto aspect-square max-h-[250px]">
+              <PieChart>
                 <ChartTooltip
                     cursor={false}
                     content={<ChartTooltipContent
@@ -408,12 +407,9 @@ export default function PanoramaPage() {
                     style={{ pointerEvents: 'none' }}
                   />
                 </Pie>
+                <ChartLegend content={<ChartLegendContent payload={scoreLegendPayload} className="flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-4" />} />
               </PieChart>
             </ChartContainer>
-            <div className="mt-4">
-               <ChartLegend content={<ChartLegendContent payload={scoreLegendPayload} className="flex-wrap justify-center gap-x-4 gap-y-1 text-xs" />} />
-            </div>
-            </>
           ) : (
             <p className="text-center text-muted-foreground py-10">Pas de données de notes à afficher pour {title}.</p>
           )}
@@ -500,8 +496,8 @@ export default function PanoramaPage() {
             </CardHeader>
             <CardContent className="p-6">
               {stats.admis + stats.refuse > 0 ? (
-                <ChartContainer config={{}} className="mx-auto aspect-square max-h-[300px]" background="hsl(var(--card))">
-                  <PieChart background="hsl(var(--card))">
+                <ChartContainer config={{}} className="mx-auto aspect-square max-h-[300px]">
+                  <PieChart>
                     <ChartTooltip
                         cursor={false}
                         content={<ChartTooltipContent
@@ -566,9 +562,9 @@ export default function PanoramaPage() {
             </CardHeader>
             <CardContent className="p-6">
               {stats.admis > 0 && mentionsChartData.length > 0 ? (
-                <ChartContainer config={{}} className="w-full h-[300px]" background="hsl(var(--card))">
+                <ChartContainer config={{}} className="w-full h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={mentionsChartData} layout="vertical" margin={{left:10, right:30, top: 5, bottom: 5}} background="hsl(var(--card))">
+                    <BarChart data={mentionsChartData} layout="vertical" margin={{left:10, right:30, top: 5, bottom: 5}}>
                       <XAxis type="number" dataKey="value" allowDecimals={false} axisLine={false} tickLine={false} />
                       <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} />
                       <ChartTooltip
