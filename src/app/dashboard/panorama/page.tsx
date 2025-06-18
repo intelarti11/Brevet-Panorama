@@ -387,9 +387,9 @@ export default function PanoramaPage() {
                         }}
                     >
                       {resultsChartData.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={hoveredPieIndex === index ? lightenHslColor(entry.fill as string, 15) : (entry.fill as string)} 
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={hoveredPieIndex === index ? lightenHslColor(entry.fill as string, 15) : (entry.fill as string)}
                         />
                       ))}
                     </Pie>
@@ -431,17 +431,17 @@ export default function PanoramaPage() {
                               />
                           }
                       />
-                      <Bar 
-                        dataKey="value" 
+                      <Bar
+                        dataKey="value"
                         radius={4}
-                        activeBar={false} 
+                        activeBar={{ fill: 'transparent', stroke: 'none' }}
                         onMouseEnter={(_data, index) => setHoveredBarIndex(index)}
                         onMouseLeave={() => setHoveredBarIndex(null)}
                       >
                          {mentionsChartData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-mention-${index}`} 
-                            fill={hoveredBarIndex === index ? lightenHslColor(entry.fill as string, 30) : (entry.fill as string)} 
+                          <Cell
+                            key={`cell-mention-${index}`}
+                            fill={hoveredBarIndex === index ? lightenHslColor(entry.fill as string, 30) : (entry.fill as string)}
                           />
                         ))}
                          <LabelList dataKey="value" position="right" offset={8} className="fill-foreground" fontSize={12} />
