@@ -16,8 +16,7 @@ import * as XLSX from 'xlsx';
 import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-// import { format } from 'date-fns'; // Not strictly needed for current year format
+import { YearPicker } from '@/components/ui/year-picker'; // Import YearPicker
 
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -26,25 +25,27 @@ export default function ImportPage() {
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   
-  const [importYear, setImportYear] = useState<string>('');
-  const [calendarDate, setCalendarDate] = useState<Date | undefined>();
+  const [importYear, setImportYear] = useState<string>(''); // e.g., "2023-2024"
+  const [selectedStartYear, setSelectedStartYear] = useState<number | null>(null); // e.g., 2023
+  const [initialPickerYear, setInitialPickerYear] = useState<number>(new Date().getFullYear());
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   const { toast } = useToast();
 
   useEffect(() => {
-    const currentMonth = new Date().getMonth(); // 0 (Jan) to 11 (Dec)
+    const currentMonth = new Date().getMonth(); 
     const currentCalYear = new Date().getFullYear();
     let academicStartYear;
 
-    if (currentMonth < 7) { // Before August (0-6 means Jan-July)
+    if (currentMonth < 7) { 
         academicStartYear = currentCalYear - 1;
-    } else { // August or later (7-11 means Aug-Dec)
+    } else { 
         academicStartYear = currentCalYear;
     }
-    const initialImportYear = `${academicStartYear}-${academicStartYear + 1}`;
-    setImportYear(initialImportYear);
-    setCalendarDate(new Date(academicStartYear, 0, 1)); // January 1st of the academic start year
+    const initialImportYearFormat = `${academicStartYear}-${academicStartYear + 1}`;
+    setImportYear(initialImportYearFormat);
+    setSelectedStartYear(academicStartYear);
+    setInitialPickerYear(academicStartYear);
   }, []);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -309,27 +310,14 @@ export default function ImportPage() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={calendarDate}
-                  defaultMonth={calendarDate}
-                  onSelect={(newDate) => {
-                    if (newDate) {
-                      const year = newDate.getFullYear();
-                      setImportYear(`${year}-${year + 1}`);
-                      setCalendarDate(new Date(year, 0, 1)); // Set to Jan 1st of selected year
-                      setIsPopoverOpen(false);
-                    }
+                <YearPicker
+                  selectedYear={selectedStartYear}
+                  onSelectYear={(year) => {
+                    setSelectedStartYear(year);
+                    setImportYear(`${year}-${year + 1}`);
+                    setIsPopoverOpen(false);
                   }}
-                  onMonthChange={(monthFirstDay) => {
-                     const year = monthFirstDay.getFullYear();
-                     setImportYear(`${year}-${year + 1}`);
-                     setCalendarDate(new Date(year, 0, 1)); // Set to Jan 1st of selected year
-                  }}
-                  captionLayout="dropdown-buttons"
-                  fromYear={new Date().getFullYear() - 10}
-                  toYear={new Date().getFullYear() + 10}
-                  initialFocus
+                  initialDisplayYear={initialPickerYear}
                 />
               </PopoverContent>
             </Popover>
