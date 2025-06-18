@@ -29,7 +29,6 @@ export default function ImportPage() {
   const [importYear, setImportYear] = useState<string>(''); 
   const [selectedStartYear, setSelectedStartYear] = useState<number | null>(null); 
   const [initialPickerYear, setInitialPickerYear] = useState<number>(new Date().getFullYear());
-  const [defaultHighlightYear, setDefaultHighlightYear] = useState<number>(new Date().getFullYear());
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -43,13 +42,14 @@ export default function ImportPage() {
     const currentCalYear = new Date().getFullYear();
     let academicStartYear;
 
-    if (currentMonth < 7) { 
+    if (currentMonth < 7) { // Months 0-6 (Jan-July) belong to the academic year that started in the previous calendar year
         academicStartYear = currentCalYear - 1;
-    } else { 
+    } else { // Months 7-11 (Aug-Dec) belong to the academic year that started in the current calendar year
         academicStartYear = currentCalYear;
     }
     setInitialPickerYear(academicStartYear); 
-    setDefaultHighlightYear(academicStartYear); // Set for default highlight in picker
+    setSelectedStartYear(academicStartYear); 
+    setImportYear(String(academicStartYear)); 
   }, []);
 
   const processFile = (selectedFile: File | null | undefined) => {
@@ -164,8 +164,8 @@ export default function ImportPage() {
       toast({ title: "Importation Réussie", description: `${documentsAddedToBatch} enregistrements importés pour l'année ${yearToImportForToast} dans Firestore.` });
       setFile(null);
       setFileName(null);
-      setSelectedStartYear(null); 
-      setImportYear(''); 
+      //setSelectedStartYear(null); // No longer need to reset as it's defaulted
+      //setImportYear(''); // No longer need to reset as it's defaulted
       if (fileInputRef.current) {
         fileInputRef.current.value = ''; 
       }
@@ -247,7 +247,7 @@ export default function ImportPage() {
 
           rawDataObjects.forEach((rawRow, index) => {
             const studentInput: any = {
-              'anneeScolaireImportee': importYear,
+              'anneeScolaireImportee': importYear, // Uses the single year format
               'Série': rawRow['Série'],
               'Code Etablissement': rawRow['Code Etablissement'],
               'Libellé Etablissement': rawRow['Libellé Etablissement'],
@@ -378,7 +378,7 @@ export default function ImportPage() {
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
                 <YearPicker
-                  selectedYear={selectedStartYear ?? defaultHighlightYear}
+                  selectedYear={selectedStartYear}
                   onSelectYear={(year) => {
                     setSelectedStartYear(year);
                     setImportYear(String(year)); 
@@ -444,4 +444,3 @@ export default function ImportPage() {
   );
 }
     
-
