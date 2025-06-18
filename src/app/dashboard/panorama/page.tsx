@@ -69,10 +69,9 @@ const initialStats: Stats = {
   countSciences: 0,
 };
 
-// Updated CHART_COLORS to use new CSS variables
 const CHART_COLORS = {
   admis: "hsl(var(--chart-admis))",
-  refuse: "hsl(var(--destructive))", // Maps to --color-error
+  refuse: "hsl(var(--destructive))",
   tresBien: "hsl(var(--chart-tres-bien))",
   bien: "hsl(var(--chart-bien))",
   assezBien: "hsl(var(--chart-assez-bien))",
@@ -351,7 +350,7 @@ export default function PanoramaPage() {
                         cx="50%"
                         cy="50%"
                         outerRadius={100}
-                        innerRadius={60} // Makes it a donut chart
+                        innerRadius={60}
                         labelLine={false}
                         label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }) => {
                             const RADIAN = Math.PI / 180;
@@ -431,37 +430,37 @@ export default function PanoramaPage() {
                 <CardDescription className="mt-1">Moyenne des notes (/20) pour les élèves de la sélection ayant une note enregistrée.</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-6 pt-4 md:grid-cols-4 p-6">
-                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
-                    <BookText className="h-7 w-7 text-primary mb-2" />
+                <div className="group flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
+                    <BookText className="h-7 w-7 text-primary mb-2 group-hover:scale-110 transition-transform duration-200" />
                     <p className="text-sm font-medium text-foreground">Français</p>
-                    <p className="text-2xl font-bold mt-1 text-primary">
+                    <p className="text-2xl font-bold mt-1 text-primary group-hover:text-3xl group-hover:font-extrabold transition-all duration-200">
                         {stats.averageFrancais !== undefined ? stats.averageFrancais.toFixed(1) : 'N/A'}
                     </p>
-                    <p className="text-xs text-muted-foreground">({stats.countFrancais ?? 0} élèves)</p>
+                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countFrancais ?? 0} élèves)</p>
                 </div>
-                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
-                    <Calculator className="h-7 w-7 text-primary mb-2" />
+                <div className="group flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
+                    <Calculator className="h-7 w-7 text-primary mb-2 group-hover:scale-110 transition-transform duration-200" />
                     <p className="text-sm font-medium text-foreground">Mathématiques</p>
-                    <p className="text-2xl font-bold mt-1 text-primary">
+                    <p className="text-2xl font-bold mt-1 text-primary group-hover:text-3xl group-hover:font-extrabold transition-all duration-200">
                         {stats.averageMaths !== undefined ? stats.averageMaths.toFixed(1) : 'N/A'}
                     </p>
-                    <p className="text-xs text-muted-foreground">({stats.countMaths ?? 0} élèves)</p>
+                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countMaths ?? 0} élèves)</p>
                 </div>
-                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
-                    <Landmark className="h-7 w-7 text-primary mb-2" />
+                <div className="group flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
+                    <Landmark className="h-7 w-7 text-primary mb-2 group-hover:scale-110 transition-transform duration-200" />
                     <p className="text-sm font-medium text-foreground">Histoire-Géo.</p>
-                    <p className="text-2xl font-bold mt-1 text-primary">
+                    <p className="text-2xl font-bold mt-1 text-primary group-hover:text-3xl group-hover:font-extrabold transition-all duration-200">
                         {stats.averageHistoireGeo !== undefined ? stats.averageHistoireGeo.toFixed(1) : 'N/A'}
                     </p>
-                    <p className="text-xs text-muted-foreground">({stats.countHistoireGeo ?? 0} élèves)</p>
+                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countHistoireGeo ?? 0} élèves)</p>
                 </div>
-                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
-                    <FlaskConical className="h-7 w-7 text-primary mb-2" />
+                <div className="group flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
+                    <FlaskConical className="h-7 w-7 text-primary mb-2 group-hover:scale-110 transition-transform duration-200" />
                     <p className="text-sm font-medium text-foreground">Sciences</p>
-                    <p className="text-2xl font-bold mt-1 text-primary">
+                    <p className="text-2xl font-bold mt-1 text-primary group-hover:text-3xl group-hover:font-extrabold transition-all duration-200">
                         {stats.averageSciences !== undefined ? stats.averageSciences.toFixed(1) : 'N/A'}
                     </p>
-                    <p className="text-xs text-muted-foreground">({stats.countSciences ?? 0} élèves)</p>
+                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countSciences ?? 0} élèves)</p>
                 </div>
             </CardContent>
         </Card>
@@ -499,3 +498,4 @@ export default function PanoramaPage() {
     </div>
   );
 }
+
