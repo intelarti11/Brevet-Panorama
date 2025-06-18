@@ -45,6 +45,14 @@ export default {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
+        success: { // New color type for success states
+          DEFAULT: 'hsl(var(--color-success-hsl))',
+          foreground: 'hsl(var(--primary-foreground))', // Assuming primary-foreground is light
+        },
+        warning: { // New color type for warning/attention states
+          DEFAULT: 'hsl(var(--color-warning-hsl))',
+          foreground: 'hsl(var(--secondary-foreground))', // Assuming secondary-foreground is dark
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

@@ -94,13 +94,21 @@ export default function DonneePage() {
     setSortConfig({ key, direction });
   };
 
-  const getBadgeVariant = (resultat: string | undefined): "default" | "secondary" | "destructive" | "outline" => {
+  const getBadgeVariant = (resultat: string | undefined): "default" | "secondary" | "destructive" | "outline" | "success" | "warning" => {
     if (!resultat) return "secondary";
-    const lowerResultat = resultat.toLowerCase();
-    if (lowerResultat.includes('refusé')) return "destructive";
-    if (lowerResultat.includes('admis')) return "default";
-    return "secondary";
+    const lowerResultat = normalizeText(resultat); // Use normalized text for comparisons
+
+    if (lowerResultat.includes('refusé')) return "destructive"; 
+
+    if (lowerResultat.includes('très bien') || lowerResultat.includes('tres bien')) return "success"; 
+    if (lowerResultat.includes('bien')) return "success";       
+    if (lowerResultat.includes('assez bien')) return "warning"; 
+
+    if (lowerResultat.includes('admis')) return "success";     
+
+    return "secondary"; 
   };
+
 
   const renderSortIcon = (columnKey: keyof ProcessedStudentData) => {
     if (sortConfig.key !== columnKey) {

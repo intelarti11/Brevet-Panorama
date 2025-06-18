@@ -21,11 +21,19 @@ interface StudentDetailModalProps {
   onOpenChange: (isOpen: boolean) => void;
 }
 
+const normalizeTextForModal = (text: string | undefined): string => {
+  if (text === null || text === undefined) return "";
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+};
+
 const DetailItem = ({ label, value, isBadge = false, badgeVariant }: { 
     label: string; 
     value?: string | number | null;
     isBadge?: boolean;
-    badgeVariant?: "default" | "secondary" | "destructive" | "outline";
+    badgeVariant?: "default" | "secondary" | "destructive" | "outline" | "success" | "warning";
  }) => {
   if (value === undefined || value === null || String(value).trim() === "") {
     return null;
@@ -51,11 +59,18 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
     return null;
   }
 
-  const getBadgeVariant = (resultat?: string): "default" | "secondary" | "destructive" | "outline" => {
+  const getBadgeVariantForModal = (resultat?: string): "default" | "secondary" | "destructive" | "outline" | "success" | "warning" => {
     if (!resultat) return "secondary";
-    const lowerResultat = resultat.toLowerCase();
+    const lowerResultat = normalizeTextForModal(resultat);
+
     if (lowerResultat.includes('refusé')) return "destructive";
-    if (lowerResultat.includes('admis')) return "default";
+
+    if (lowerResultat.includes('très bien') || lowerResultat.includes('tres bien')) return "success";
+    if (lowerResultat.includes('bien')) return "success";
+    if (lowerResultat.includes('assez bien')) return "warning";
+    
+    if (lowerResultat.includes('admis')) return "success";
+    
     return "secondary";
   };
 
@@ -91,7 +106,7 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
                 label="Résultat" 
                 value={student.resultat || 'N/A'}
                 isBadge
-                badgeVariant={getBadgeVariant(student.resultat)}
+                badgeVariant={getBadgeVariantForModal(student.resultat)}
             />
             <DetailItem label="Moyenne Générale" value={student.moyenne !== undefined && student.moyenne !== null ? student.moyenne.toFixed(2) + " / 20" : "N/A"} />
             
