@@ -94,23 +94,17 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
             Détails de l'Élève
           </DialogTitle>
           <DialogDescription>
-            Informations complètes pour {student.prenom} {student.nom}.
+            Informations complètes pour {student.prenom} {student.nom} (INE: {student.id}).
           </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-grow overflow-y-auto px-6">
           <div className="space-y-1 py-4">
             
-            <DetailItem label="Nom Complet" value={`${student.prenom} ${student.nom}`} />
-            <DetailItem label="N° INE" value={student.id} />
-            
             <h3 className={sectionTitleClass}>Parcours Scolaire</h3>
             <DetailItem label="Établissement" value={student.etablissement} />
             <DetailItem label="Année Scolaire" value={student.academicYear || 'N/A'} />
             <DetailItem label="Série" value={student.serieType || 'N/A'} />
-            {student.anneeOriginale && student.anneeOriginale !== student.academicYear && student.anneeOriginale.trim() !== "" && (
-                <DetailItem label="Champ 'Série' (Fichier)" value={student.anneeOriginale} />
-             )}
 
             <h3 className={sectionTitleClass}>Résultats au Brevet</h3>
             <DetailItem 
