@@ -101,11 +101,6 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
         <ScrollArea className="flex-grow overflow-y-auto px-6">
           <div className="space-y-1 py-4">
             
-            <h3 className={sectionTitleClass}>Parcours Scolaire</h3>
-            <DetailItem label="Établissement" value={student.etablissement} />
-            <DetailItem label="Année Scolaire" value={student.academicYear || 'N/A'} />
-            <DetailItem label="Série" value={student.serieType || 'N/A'} />
-
             <h3 className={sectionTitleClass}>Résultats au Brevet</h3>
             <DetailItem 
                 label="Résultat Global" 
