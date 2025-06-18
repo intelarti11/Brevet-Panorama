@@ -86,6 +86,17 @@ const normalizeForComparison = (text: string | undefined): string => {
     .replace(/[\u0300-\u036f]/g, "");
 };
 
+const lightenHslColor = (hslColor: string, amount: number): string => {
+  if (!hslColor || !hslColor.startsWith('hsl')) return hslColor;
+  const match = hslColor.match(/hsl\(\s*([\d.]+)\s*,\s*([\d.]+%)\s*,\s*([\d.]+%)\s*\)/);
+  if (!match) return hslColor;
+  const [, h, s, l] = match;
+  let lightness = parseFloat(l);
+  lightness = Math.min(100, lightness + amount);
+  return `hsl(${h}, ${s}, ${lightness}%)`;
+};
+
+
 export default function PanoramaPage() {
   const {
     allProcessedStudents,
@@ -98,6 +109,9 @@ export default function PanoramaPage() {
 
   const [filteredStudentsData, setFilteredStudentsData] = useState<ProcessedStudentData[]>([]);
   const [stats, setStats] = useState<Stats>(initialStats);
+  const [hoveredPieIndex, setHoveredPieIndex] = useState<number | null>(null);
+  const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
+
 
   useEffect(() => {
     let data = [...allProcessedStudents];
@@ -352,6 +366,9 @@ export default function PanoramaPage() {
                         outerRadius={100}
                         innerRadius={60}
                         labelLine={false}
+                        activeIndex={hoveredPieIndex ?? undefined}
+                        onMouseEnter={(_data, index) => setHoveredPieIndex(index)}
+                        onMouseLeave={() => setHoveredPieIndex(null)}
                         label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }) => {
                             const RADIAN = Math.PI / 180;
                             const effectiveOuterRadius = Math.max(0, outerRadius);
@@ -367,7 +384,10 @@ export default function PanoramaPage() {
                         }}
                     >
                       {resultsChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill as string} />
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={hoveredPieIndex === index ? lightenHslColor(entry.fill as string, 15) : (entry.fill as string)} 
+                        />
                       ))}
                     </Pie>
                   </PieChart>
@@ -395,7 +415,7 @@ export default function PanoramaPage() {
                       <XAxis type="number" dataKey="value" allowDecimals={false} />
                       <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} />
                       <ChartTooltip
-                          cursor={false}
+                          cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
                           content={
                               <ChartTooltipContent
                                   formatter={(value, name, props) => (
@@ -408,9 +428,18 @@ export default function PanoramaPage() {
                               />
                           }
                       />
-                      <Bar dataKey="value" radius={4}>
+                      <Bar 
+                        dataKey="value" 
+                        radius={4}
+                        activeBar={false} 
+                        onMouseEnter={(_data, index) => setHoveredBarIndex(index)}
+                        onMouseLeave={() => setHoveredBarIndex(null)}
+                      >
                          {mentionsChartData.map((entry, index) => (
-                          <Cell key={`cell-mention-${index}`} fill={entry.fill as string} />
+                          <Cell 
+                            key={`cell-mention-${index}`} 
+                            fill={hoveredBarIndex === index ? lightenHslColor(entry.fill as string, 20) : (entry.fill as string)} 
+                          />
                         ))}
                          <LabelList dataKey="value" position="right" offset={8} className="fill-foreground" fontSize={12} />
                       </Bar>
@@ -499,3 +528,5 @@ export default function PanoramaPage() {
   );
 }
 
+
+    
