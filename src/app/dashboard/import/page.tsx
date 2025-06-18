@@ -42,7 +42,6 @@ export default function ImportPage() {
     } else { 
         academicStartYear = currentCalYear;
     }
-    // setSelectedStartYear(academicStartYear); // Do not set selectedStartYear initially
     setInitialPickerYear(academicStartYear); 
   }, []);
 
@@ -100,8 +99,8 @@ export default function ImportPage() {
       toast({ title: "Importation Réussie", description: `${documentsAddedToBatch} enregistrements importés pour l'année ${yearToImportForToast} dans Firestore.` });
       setFile(null);
       setFileName(null);
-      setSelectedStartYear(null); // Reset selected year display
-      setImportYear(''); // Reset import year for logic
+      setSelectedStartYear(null); 
+      setImportYear(''); 
     } catch (importError: any) {
       console.error("Erreur d'importation Firestore:", importError);
       let userMessage = `Échec de l'importation: ${importError.message}.`;
@@ -123,7 +122,6 @@ export default function ImportPage() {
       toast({ variant: "destructive", title: "Erreur", description: "Aucun fichier sélectionné." });
       return;
     }
-    // importYear now holds the YYYY-YYYY+1 format, critical for validation
     if (!importYear || importYear.trim() === "") {
       setError("L'année d'importation est requise.");
       toast({ variant: "destructive", title: "Erreur", description: "Veuillez spécifier l'année d'importation.", duration: 5000 });
@@ -181,7 +179,7 @@ export default function ImportPage() {
 
           rawDataObjects.forEach((rawRow, index) => {
             const studentInput: any = {
-              'anneeScolaireImportee': importYear, // Use the YYYY-YYYY+1 formatted string
+              'anneeScolaireImportee': importYear, // Use the YYYY formatted string
               'Série': rawRow['Série'],
               'Code Etablissement': rawRow['Code Etablissement'],
               'Libellé Etablissement': rawRow['Libellé Etablissement'],
@@ -246,7 +244,6 @@ export default function ImportPage() {
           }
 
           if (transformedData.length > 0) {
-            // Pass importYear (YYYY-YYYY+1) for the toast message for consistency
             await handleImportToFirestore(transformedData, importYear);
           } else if (error) { 
             // Do nothing, error is already set and will be displayed
@@ -316,7 +313,7 @@ export default function ImportPage() {
                   selectedYear={selectedStartYear}
                   onSelectYear={(year) => {
                     setSelectedStartYear(year);
-                    setImportYear(`${year}-${year + 1}`); // Set the YYYY-YYYY+1 string for logic
+                    setImportYear(String(year)); // Set the YYYY string for logic
                     setIsPopoverOpen(false);
                   }}
                   initialDisplayYear={initialPickerYear}
@@ -356,3 +353,5 @@ export default function ImportPage() {
     </div>
   );
 }
+
+    

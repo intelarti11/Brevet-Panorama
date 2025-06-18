@@ -12,7 +12,7 @@ export interface ProcessedStudentData {
   prenom: string;
   etablissement: string;
   anneeOriginale?: string; // The raw data['Série'] or other original year/serie field from Firestore
-  academicYear?: string; // Parsed or directly imported e.g., "2023-2024"
+  academicYear?: string; // Parsed or directly imported e.g., "2023"
   serieType?: string; // Parsed e.g., "GÉNÉRALE"
   resultat?: string;
   moyenne?: number;
@@ -58,10 +58,13 @@ const normalizeTextForComparison = (text: string | undefined): string => {
     .replace(/[\u0300-\u036f]/g, "");
 };
 
+// Parses the 'Série' field which might contain year and serie type.
+// Returns a potential academic year (could be YYYY or YYYY-YYYY) and serie type.
 const parseOriginalSerieField = (rawSerieOriginale: string | undefined): { academicYearFallback?: string; serieType?: string } => {
   if (!rawSerieOriginale || String(rawSerieOriginale).trim() === "") return { academicYearFallback: undefined, serieType: undefined };
 
   const serieStr = String(rawSerieOriginale);
+  // Regex to find YYYY-YYYY or just YYYY
   const yearRegex = /(\d{4}[-\/]\d{4}|\b\d{4}\b)/;
   const yearMatch = serieStr.match(yearRegex);
   let academicYearFallback: string | undefined = undefined;
@@ -69,6 +72,8 @@ const parseOriginalSerieField = (rawSerieOriginale: string | undefined): { acade
 
   if (yearMatch && yearMatch[0]) {
     academicYearFallback = yearMatch[0];
+    // If it's a range YYYY-YYYY, keep it. If it's just YYYY, also keep it.
+    // This part is mostly for fallback if anneeScolaireImportee is missing or old format.
     serieTypePart = serieStr.replace(yearMatch[0], '').trim();
   }
 
@@ -136,9 +141,12 @@ export function FilterProvider({ children }: { children: ReactNode }) {
           const data = doc.data();
           
           const anneeOriginaleField = data['Série'];
-          const importedYear = data['anneeScolaireImportee'] || data.anneeScolaireImportee; // Handle both key styles just in case
+          // anneeScolaireImportee should now be in "YYYY" format from new imports.
+          const importedYear: string | undefined = data['anneeScolaireImportee'] || data.anneeScolaireImportee; 
 
           const { academicYearFallback, serieType: parsedSerieType } = parseOriginalSerieField(anneeOriginaleField);
+          
+          // Prefer the direct importedYear (YYYY format). Fallback to parsed from 'Série' only if necessary.
           const finalAcademicYear = importedYear || academicYearFallback;
           const finalSerieType = parsedSerieType;
 
@@ -148,7 +156,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
             prenom: data['Prénom candidat'] || 'N/A',
             etablissement: data['Libellé Etablissement'] || 'N/A',
             anneeOriginale: anneeOriginaleField, 
-            academicYear: finalAcademicYear,
+            academicYear: finalAcademicYear, // Will be "YYYY" if importedYear is present and correct
             serieType: finalSerieType,
             resultat: data['Résultat'],
             moyenne: data['Moyenne sur 20'] !== undefined && data['Moyenne sur 20'] !== null ? Number(data['Moyenne sur 20']) : undefined,
@@ -174,27 +182,39 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
         setAllProcessedStudents(students);
 
+        // Sort academic years (now potentially mixed "YYYY" and "YYYY-YYYY")
+        // Prioritize "YYYY" format for sorting if both exist.
         const sortedAcademicYears = Array.from(academicYearsSet)
           .filter(year => year !== undefined && year !== null && String(year).trim() !== "")
           .sort((a, b) => {
             const sA = String(a);
             const sB = String(b);
-            const startYearA = parseInt(sA.substring(0, 4), 10);
-            const startYearB = parseInt(sB.substring(0, 4), 10);
+            
+            // Helper to get the start year (e.g., 2023 from "2023" or "2023-2024")
+            const getStartYear = (yearStr: string) => parseInt(yearStr.substring(0, 4), 10);
 
-            if (isNaN(startYearA) && isNaN(startYearB)) return sB.localeCompare(sA);
+            const startYearA = getStartYear(sA);
+            const startYearB = getStartYear(sB);
+
+            if (isNaN(startYearA) && isNaN(startYearB)) return sB.localeCompare(sA); // Fallback for non-numeric
             if (isNaN(startYearA)) return 1; 
             if (isNaN(startYearB)) return -1;
 
+            // Sort by start year descending
             if (startYearB !== startYearA) {
                 return startYearB - startYearA; 
             }
+            // If start years are a, prefer shorter string (e.g. "2023" over "2023-2024") for stability, or longer for range
+            // Given new format is "YYYY", this part of logic might be less critical for new data.
+            // For descending, if start years are same, put longer (range) before shorter (single year)
             return sB.length - sA.length; 
         });
 
         setAvailableAcademicYears(sortedAcademicYears);
         if (sortedAcademicYears.length > 0) {
-          setSelectedAcademicYear(sortedAcademicYears[0]); 
+          // Try to select the latest single year format if available, else first in sorted list
+          const latestSingleYear = sortedAcademicYears.find(year => /^\d{4}$/.test(year));
+          setSelectedAcademicYear(latestSingleYear || sortedAcademicYears[0]); 
         } else {
           setSelectedAcademicYear(ALL_ACADEMIC_YEARS_VALUE);
         }
@@ -217,7 +237,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
          .sort();
         setAvailableEstablishments(sortedEstablishments);
         if (sortedEstablishments.length > 0) {
-          setSelectedEstablishment(sortedEstablishments[0]); // Default to first establishment found
+          setSelectedEstablishment(sortedEstablishments[0]); 
         } else {
           setSelectedEstablishment(ALL_ESTABLISHMENTS_VALUE);
         }
@@ -263,3 +283,5 @@ export function useFilters(): FilterContextType {
   }
   return context;
 }
+
+    

@@ -33,7 +33,7 @@ const preprocessOptionalStringToNumber = (val: unknown): number | null => {
 
 
 export const studentDataSchema = z.object({
-  'anneeScolaireImportee': z.string().min(1, "Année scolaire d'importation requise"),
+  'anneeScolaireImportee': z.string().regex(/^\d{4}$/, "L'année d'importation doit être au format AAAA (ex: 2023)").min(1, "Année scolaire d'importation requise"),
   
   // Fields matching Excel headers exactly
   'Série': z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
@@ -50,7 +50,6 @@ export const studentDataSchema = z.object({
   'Résultat': z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
   'TOTAL GENERAL': z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
   'Moyenne sur 20': z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
-  // 'TOTAL POUR MENTION' was removed as it's always empty
 
   // Score fields retain camelCase names from original complex headers
   scoreFrancais: z.preprocess(preprocessOptionalStringToNumber, z.number().nullable().optional()),
@@ -71,3 +70,4 @@ export const studentDataSchema = z.object({
 
 export type StudentData = z.infer<typeof studentDataSchema>;
 
+    
