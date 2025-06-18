@@ -25,7 +25,7 @@ export default function ImportPage() {
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   
-  const [importYear, setImportYear] = useState<string>(''); // e.g., "2023-2024"
+  const [importYear, setImportYear] = useState<string>(''); // e.g., "2023-2024", starts empty
   const [selectedStartYear, setSelectedStartYear] = useState<number | null>(null); // e.g., 2023
   const [initialPickerYear, setInitialPickerYear] = useState<number>(new Date().getFullYear());
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -42,10 +42,11 @@ export default function ImportPage() {
     } else { 
         academicStartYear = currentCalYear;
     }
-    const initialImportYearFormat = `${academicStartYear}-${academicStartYear + 1}`;
-    setImportYear(initialImportYearFormat);
-    setSelectedStartYear(academicStartYear);
-    setInitialPickerYear(academicStartYear);
+    // Don't set importYear here initially, let the placeholder show
+    // const initialImportYearFormat = `${academicStartYear}-${academicStartYear + 1}`;
+    // setImportYear(initialImportYearFormat); 
+    setSelectedStartYear(academicStartYear); // This will highlight the year in YearPicker
+    setInitialPickerYear(academicStartYear); // This will make YearPicker open to the block containing this year
   }, []);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -306,7 +307,7 @@ export default function ImportPage() {
                   disabled={isLoading || isImporting}
                 >
                   <CalendarDays className="mr-2 h-4 w-4" />
-                  {importYear || "Sélectionner l'année"}
+                  {importYear || "Choisissez l'année"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
@@ -322,7 +323,7 @@ export default function ImportPage() {
               </PopoverContent>
             </Popover>
             <p className="text-xs text-muted-foreground">
-              L'année scolaire commence en septembre. Par défaut, l'année en cours est sélectionnée. Ce champ est obligatoire.
+              L'année scolaire commence en septembre. Ce champ est obligatoire.
             </p>
           </div>
 
@@ -354,3 +355,5 @@ export default function ImportPage() {
     </div>
   );
 }
+
+    
