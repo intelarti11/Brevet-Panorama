@@ -302,7 +302,7 @@ export default function PanoramaPage() {
           <Card className="group shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-foreground">Nombre d'Élèves</CardTitle>
-              <Users className="h-5 w-5 text-muted-foreground" />
+              <Users className="h-6 w-6 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-6">
               <div className="text-4xl font-bold text-primary group-hover:scale-105 transition-transform duration-200 ease-in-out">{stats.totalStudents}</div>
@@ -312,7 +312,7 @@ export default function PanoramaPage() {
           <Card className="group shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-foreground">Taux de Réussite</CardTitle>
-              <Percent className="h-5 w-5 text-muted-foreground" />
+              <Percent className="h-6 w-6 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-6">
               <div className="text-4xl font-bold text-primary group-hover:scale-105 transition-transform duration-200 ease-in-out">{stats.successRate}%</div>
@@ -322,7 +322,7 @@ export default function PanoramaPage() {
           <Card className="group shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-foreground">Moyenne Générale (Admis)</CardTitle>
-              <GraduationCap className="h-5 w-5 text-muted-foreground" />
+              <GraduationCap className="h-6 w-6 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-6">
               <div className="text-4xl font-bold text-primary group-hover:scale-105 transition-transform duration-200 ease-in-out">
@@ -344,7 +344,7 @@ export default function PanoramaPage() {
             </CardHeader>
             <CardContent className="p-6">
               {stats.admis + stats.refuse > 0 ? (
-                <ChartContainer config={{}} className="mx-auto aspect-square max-h-[300px]">
+                <ChartContainer config={{}} className="mx-auto aspect-square max-h-[300px]" background="hsl(var(--card))">
                   <PieChart background="hsl(var(--card))">
                     <ChartTooltip
                         cursor={false}
@@ -403,13 +403,13 @@ export default function PanoramaPage() {
             <CardHeader className="p-6">
               <CardTitle className="flex items-center text-xl text-primary">
                 <BarChart2 className="mr-2 h-5 w-5 text-primary" />
-                Répartition des Mentions (Admis)
+                Répartition des Mentions
               </CardTitle>
               <CardDescription className="mt-1">Distribution des mentions pour les élèves admis.</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               {stats.admis > 0 && mentionsChartData.length > 0 ? (
-                <ChartContainer config={{}} className="w-full h-[300px]">
+                <ChartContainer config={{}} className="w-full h-[300px]" background="hsl(var(--card))">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={mentionsChartData} layout="vertical" margin={{left:10, right:30, top: 5, bottom: 5}} background="hsl(var(--card))">
                       <XAxis type="number" dataKey="value" allowDecimals={false} axisLine={false} tickLine={false} />
@@ -497,7 +497,7 @@ export default function PanoramaPage() {
 
         <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
-            <CardTitle className="text-xl font-medium text-primary">Mentions (parmi admis)</CardTitle>
+            <CardTitle className="text-xl font-medium text-primary">Mentions</CardTitle>
             <Award className="h-6 w-6 text-primary" />
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 pt-4 sm:grid-cols-4 p-6 pb-6">
