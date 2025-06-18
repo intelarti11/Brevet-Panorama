@@ -66,8 +66,8 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
     if (lowerResultat.includes('refusé')) return "destructive";
 
     if (lowerResultat.includes('très bien') || lowerResultat.includes('tres bien')) return "success";
+    if (lowerResultat.includes('assez bien')) return "warning"; // Vérifié avant "bien"
     if (lowerResultat.includes('bien')) return "success";
-    if (lowerResultat.includes('assez bien')) return "warning";
     
     if (lowerResultat.includes('admis')) return "success";
     
