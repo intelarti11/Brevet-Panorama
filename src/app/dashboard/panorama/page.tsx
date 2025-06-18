@@ -68,14 +68,13 @@ const initialStats: Stats = {
   countSciences: 0,
 };
 
-// Using direct HSL values derived from globals.css for reliable JS manipulation
 const ACTUAL_CHART_COLORS = {
-  admis: "hsl(160, 82%, 40%)",    // from --color-success-hsl
-  refuse: "hsl(0, 84%, 60%)",     // from --color-error-hsl
-  tresBien: "hsl(49, 96%, 77%)",  // from --chart-tres-bien (direct value from globals.css --chart-tres-bien: 49 96% 77%; /* #FDE68A */)
-  bien: "hsl(223, 78%, 48%)",     // from --chart-bien (direct value from globals.css --chart-bien: 223 78% 48%; /* #1D4ED8 */)
-  assezBien: "hsl(38, 92%, 51%)", // from --color-warning-hsl
-  sansMention: "hsl(215, 9%, 68%)",// from --chart-sans-mention (direct value from globals.css --chart-sans-mention: 215 9% 68%; /* #9CA3AF */)
+  admis: "hsl(160, 82%, 40%)",    
+  refuse: "hsl(0, 84%, 60%)",     
+  tresBien: "hsl(49, 96%, 77%)",  
+  bien: "hsl(223, 78%, 48%)",     
+  assezBien: "hsl(38, 92%, 51%)", 
+  sansMention: "hsl(215, 9%, 68%)",
 };
 
 
@@ -346,7 +345,7 @@ export default function PanoramaPage() {
             <CardContent className="p-6">
               {stats.admis + stats.refuse > 0 ? (
                 <ChartContainer config={{}} className="mx-auto aspect-square max-h-[300px]">
-                  <PieChart>
+                  <PieChart background="hsl(var(--card))">
                     <ChartTooltip
                         cursor={{ stroke: 'none', fill: 'none' }}
                         content={<ChartTooltipContent
@@ -412,8 +411,8 @@ export default function PanoramaPage() {
               {stats.admis > 0 && mentionsChartData.length > 0 ? (
                 <ChartContainer config={{}} className="w-full h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={mentionsChartData} layout="vertical" margin={{left:10, right:30, top: 5, bottom: 5}} background={{ fill: 'transparent' }}>
-                      <XAxis type="number" dataKey="value" allowDecimals={false} />
+                    <BarChart data={mentionsChartData} layout="vertical" margin={{left:10, right:30, top: 5, bottom: 5}} background="hsl(var(--card))">
+                      <XAxis type="number" dataKey="value" allowDecimals={false} axisLine={false} tickLine={false} />
                       <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} />
                       <ChartTooltip
                           cursor={{ stroke: 'none', fill: 'none' }}
