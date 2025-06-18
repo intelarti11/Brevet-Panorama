@@ -17,7 +17,6 @@ import {
   Bar,
   XAxis,
   YAxis,
-  CartesianGrid,
   ResponsiveContainer,
   LabelList
 } from 'recharts';
@@ -413,14 +412,14 @@ export default function PanoramaPage() {
               {stats.admis > 0 && mentionsChartData.length > 0 ? (
                 <ChartContainer config={{}} className="w-full h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={mentionsChartData} layout="vertical" margin={{left:10, right:30, top: 5, bottom: 5}}>
-                      {/* <CartesianGrid strokeDasharray="3 3" horizontal={false} /> Removed to eliminate gray background */}
+                    <BarChart data={mentionsChartData} layout="vertical" margin={{left:10, right:30, top: 5, bottom: 5}} background={{ fill: 'transparent' }}>
                       <XAxis type="number" dataKey="value" allowDecimals={false} />
                       <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} />
                       <ChartTooltip
                           cursor={{ stroke: 'none', fill: 'none' }}
                           content={
                               <ChartTooltipContent
+                                  hideLabel
                                   formatter={(value, name, props) => (
                                       <div className="flex flex-col p-1">
                                           <span className="font-semibold">{props.payload.name}</span>
