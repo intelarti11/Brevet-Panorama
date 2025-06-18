@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle, LogOut } from 'lucide-react';
+import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle, LogOut, CalendarRange } from 'lucide-react';
 
 import Logo from '@/components/logo';
 import {
@@ -174,6 +174,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <Link href="/dashboard/panorama">
                     <LayoutGrid />
                     <span> Panorama</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === '/dashboard/pluriannuel'}
+                  tooltip={{ children: "Pluriannuel", side: "right", align: "center" }}
+                >
+                  <Link href="/dashboard/pluriannuel">
+                    <CalendarRange />
+                    <span>Pluriannuel</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
