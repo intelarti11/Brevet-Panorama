@@ -10,14 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import type { StudentData } from '@/lib/excel-types';
 import { studentDataSchema } from '@/lib/excel-types';
-import { Loader2, UploadCloud, Import, AlertTriangle, CalendarDays } from 'lucide-react';
+import { Loader2, Import, AlertTriangle, CalendarDays } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns'; // For potential date formatting if needed
+// import { format } from 'date-fns'; // Not strictly needed for current year format
 
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -317,14 +317,14 @@ export default function ImportPage() {
                     if (newDate) {
                       const year = newDate.getFullYear();
                       setImportYear(`${year}-${year + 1}`);
-                      setCalendarDate(newDate);
+                      setCalendarDate(new Date(year, 0, 1)); // Set to Jan 1st of selected year
                       setIsPopoverOpen(false);
                     }
                   }}
                   onMonthChange={(monthFirstDay) => {
                      const year = monthFirstDay.getFullYear();
                      setImportYear(`${year}-${year + 1}`);
-                     setCalendarDate(monthFirstDay);
+                     setCalendarDate(new Date(year, 0, 1)); // Set to Jan 1st of selected year
                   }}
                   captionLayout="dropdown-buttons"
                   fromYear={new Date().getFullYear() - 10}
@@ -365,5 +365,4 @@ export default function ImportPage() {
       </Card>
     </div>
   );
-
-    
+}
