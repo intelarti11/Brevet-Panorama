@@ -15,6 +15,9 @@ import * as XLSX from 'xlsx';
 
 import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns'; // For potential date formatting if needed
 
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -22,23 +25,26 @@ export default function ImportPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  
   const [importYear, setImportYear] = useState<string>('');
+  const [calendarDate, setCalendarDate] = useState<Date | undefined>();
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
   const { toast } = useToast();
 
   useEffect(() => {
     const currentMonth = new Date().getMonth(); // 0 (Jan) to 11 (Dec)
-    const currentYear = new Date().getFullYear();
-    let academicYearStart;
+    const currentCalYear = new Date().getFullYear();
+    let academicStartYear;
 
-    // Academic year typically starts around August/September (index 7 or 8)
-    // If current month is before August, assume current academic year started last calendar year
-    if (currentMonth < 7) { // Before August
-        academicYearStart = currentYear - 1;
-    } else { // August or later
-        academicYearStart = currentYear;
+    if (currentMonth < 7) { // Before August (0-6 means Jan-July)
+        academicStartYear = currentCalYear - 1;
+    } else { // August or later (7-11 means Aug-Dec)
+        academicStartYear = currentCalYear;
     }
-    setImportYear(`${academicYearStart}-${academicYearStart + 1}`);
-
+    const initialImportYear = `${academicStartYear}-${academicStartYear + 1}`;
+    setImportYear(initialImportYear);
+    setCalendarDate(new Date(academicStartYear, 0, 1)); // January 1st of the academic start year
   }, []);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -156,8 +162,7 @@ export default function ImportPage() {
             'Série', 'Code Etablissement', 'Libellé Etablissement', 'Commune Etablissement',
             'Division de classe', 'Catégorie candidat', 'Numéro Candidat', 'INE',
             'Nom candidat', 'Prénom candidat', 'Date de naissance', 'Résultat',
-            'TOTAL GENERAL', 'Moyenne sur 20', // 'TOTAL POUR MENTION' removed
-            // Explicit score headers
+            'TOTAL GENERAL', 'Moyenne sur 20',
             '001 - 1 - Français - Ponctuel',
             '002 - 1 - Mathématiques - Ponctuel',
             '003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel',
@@ -175,7 +180,6 @@ export default function ImportPage() {
           rawDataObjects.forEach((rawRow, index) => {
             const studentInput: any = {
               'anneeScolaireImportee': importYear, 
-              // Exact Excel header mapping
               'Série': rawRow['Série'],
               'Code Etablissement': rawRow['Code Etablissement'],
               'Libellé Etablissement': rawRow['Libellé Etablissement'],
@@ -190,9 +194,6 @@ export default function ImportPage() {
               'Résultat': rawRow['Résultat'],
               'TOTAL GENERAL': rawRow['TOTAL GENERAL'],
               'Moyenne sur 20': rawRow['Moyenne sur 20'],
-              // 'TOTAL POUR MENTION': rawRow['TOTAL POUR MENTION'], // Removed
-
-              // Explicit score fields
               scoreFrancais: rawRow['001 - 1 - Français - Ponctuel'],
               scoreMaths: rawRow['002 - 1 - Mathématiques - Ponctuel'],
               scoreHistoireGeo: rawRow['003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel'],
@@ -204,7 +205,6 @@ export default function ImportPage() {
               scoreEPS: rawRow['EPS CCF01A /100'],
               scorePhysiqueChimie: rawRow['Phy Chi01A /50'],
               scoreSciencesVie: rawRow['Sci Vie01A /50'],
-              
               rawRowData: rawRow, 
               options: {} 
             };
@@ -240,7 +240,6 @@ export default function ImportPage() {
                 return `${field}: Erreur de validation inconnue`;
               })
               .join('; ');
-            // console.error("Erreurs de validation:", validationErrors); // Removed verbose logging
             throw new Error(`Validation échouée pour certaines lignes. Ex: Ligne ${firstError.row}: ${errorMessages}`);
           }
 
@@ -296,21 +295,46 @@ export default function ImportPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="importYear" className="text-sm font-medium">Année Scolaire d'Importation</Label>
-            <div className="relative">
-                <CalendarDays className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                    id="importYear"
-                    type="text"
-                    placeholder="Ex: 2023-2024 ou 2024"
-                    value={importYear}
-                    onChange={(e) => setImportYear(e.target.value)}
-                    className="pl-10"
-                    disabled={isLoading || isImporting}
+            <Label htmlFor="importYear-trigger" className="text-sm font-medium">Année Scolaire d'Importation</Label>
+            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  id="importYear-trigger"
+                  variant={"outline"}
+                  className={`w-full justify-start text-left font-normal ${!importYear && "text-muted-foreground"}`}
+                  disabled={isLoading || isImporting}
+                >
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  {importYear || "Sélectionner l'année"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={calendarDate}
+                  defaultMonth={calendarDate}
+                  onSelect={(newDate) => {
+                    if (newDate) {
+                      const year = newDate.getFullYear();
+                      setImportYear(`${year}-${year + 1}`);
+                      setCalendarDate(newDate);
+                      setIsPopoverOpen(false);
+                    }
+                  }}
+                  onMonthChange={(monthFirstDay) => {
+                     const year = monthFirstDay.getFullYear();
+                     setImportYear(`${year}-${year + 1}`);
+                     setCalendarDate(monthFirstDay);
+                  }}
+                  captionLayout="dropdown-buttons"
+                  fromYear={new Date().getFullYear() - 10}
+                  toYear={new Date().getFullYear() + 10}
+                  initialFocus
                 />
-            </div>
+              </PopoverContent>
+            </Popover>
             <p className="text-xs text-muted-foreground">
-              Format suggéré: AAAA-AAAA (ex: 2023-2024) ou AAAA (ex: 2024). Ce champ est obligatoire.
+              L'année scolaire commence en septembre. Par défaut, l'année en cours est sélectionnée. Ce champ est obligatoire.
             </p>
           </div>
 
@@ -341,4 +365,5 @@ export default function ImportPage() {
       </Card>
     </div>
   );
-}
+
+    
