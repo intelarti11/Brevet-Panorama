@@ -38,15 +38,9 @@ export default function ImportPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const currentMonth = new Date().getMonth(); 
     const currentCalYear = new Date().getFullYear();
-    let academicStartYear;
+    const academicStartYear = currentCalYear; // Default to current calendar year
 
-    if (currentMonth < 7) { // Months 0-6 (Jan-July) belong to the academic year that started in the previous calendar year
-        academicStartYear = currentCalYear - 1;
-    } else { // Months 7-11 (Aug-Dec) belong to the academic year that started in the current calendar year
-        academicStartYear = currentCalYear;
-    }
     setInitialPickerYear(academicStartYear); 
     setSelectedStartYear(academicStartYear); 
     setImportYear(String(academicStartYear)); 
@@ -164,8 +158,6 @@ export default function ImportPage() {
       toast({ title: "Importation Réussie", description: `${documentsAddedToBatch} enregistrements importés pour l'année ${yearToImportForToast} dans Firestore.` });
       setFile(null);
       setFileName(null);
-      //setSelectedStartYear(null); // No longer need to reset as it's defaulted
-      //setImportYear(''); // No longer need to reset as it's defaulted
       if (fileInputRef.current) {
         fileInputRef.current.value = ''; 
       }
@@ -247,7 +239,7 @@ export default function ImportPage() {
 
           rawDataObjects.forEach((rawRow, index) => {
             const studentInput: any = {
-              'anneeScolaireImportee': importYear, // Uses the single year format
+              'anneeScolaireImportee': importYear, 
               'Série': rawRow['Série'],
               'Code Etablissement': rawRow['Code Etablissement'],
               'Libellé Etablissement': rawRow['Libellé Etablissement'],
