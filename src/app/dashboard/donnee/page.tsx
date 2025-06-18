@@ -95,21 +95,17 @@ export default function DonneePage() {
   };
 
   const getBadgeVariant = (resultat: string | undefined): "default" | "secondary" | "destructive" | "outline" | "success" | "warning" => {
-    if (!resultat || normalizeText(resultat) === 'n/a') return "outline"; // N/A or empty -> Light Gray
+    if (!resultat || normalizeText(resultat) === 'n/a') return "outline"; 
 
     const lowerResultat = normalizeText(resultat);
 
-    if (lowerResultat.includes('refusé')) return "destructive"; // Red
+    if (lowerResultat.includes('refuse')) return "destructive"; // Red - check against normalized "refuse"
     if (lowerResultat.includes('absent')) return "outline";   // Light Gray
 
     // Mentions for admitted students - Order is important
     if (lowerResultat.includes('très bien') || lowerResultat.includes('tres bien')) return "success"; // Dark Green
-    // "assez bien" should be checked before "bien" because "assez bien" also contains "bien"
     if (lowerResultat.includes('assez bien')) return "warning"; // Yellow
-    // "bien" checked after more specific mentions. Catches "Admis Mention Bien"
     if (lowerResultat.includes('bien')) return "success";       // Dark Green
-
-    // Generic "admis" if no specific mention was caught above, e.g., just "Admis"
     if (lowerResultat.includes('admis')) return "success";     // Dark Green
 
     return "secondary"; // Default for other cases
