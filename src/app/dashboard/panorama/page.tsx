@@ -8,6 +8,8 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
 } from "@/components/ui/chart"
 import {
   PieChart,
@@ -21,6 +23,21 @@ import {
   LabelList
 } from 'recharts';
 import { useFilters, type ProcessedStudentData, ALL_ACADEMIC_YEARS_VALUE, ALL_SERIE_TYPES_VALUE, ALL_ESTABLISHMENTS_VALUE } from '@/contexts/FilterContext';
+
+interface ScoreDistribution {
+  gte15: number;
+  gte10lt15: number;
+  gte8lt10: number;
+  lt8: number;
+  count: number; // Total students with a score for this subject
+}
+
+interface SubjectScoreDistributions {
+  francais: ScoreDistribution;
+  maths: ScoreDistribution;
+  histoireGeo: ScoreDistribution;
+  sciences: ScoreDistribution;
+}
 
 interface Stats {
   totalStudents: number;
@@ -48,7 +65,10 @@ interface Stats {
   countHistoireGeo?: number;
   averageSciences?: number;
   countSciences?: number;
+  scoreDistribution: SubjectScoreDistributions;
 }
+
+const initialScoreDistribution: ScoreDistribution = { gte15: 0, gte10lt15: 0, gte8lt10: 0, lt8: 0, count: 0 };
 
 const initialStats: Stats = {
   totalStudents: 0,
@@ -66,6 +86,12 @@ const initialStats: Stats = {
   countHistoireGeo: 0,
   averageSciences: undefined,
   countSciences: 0,
+  scoreDistribution: {
+    francais: { ...initialScoreDistribution },
+    maths: { ...initialScoreDistribution },
+    histoireGeo: { ...initialScoreDistribution },
+    sciences: { ...initialScoreDistribution },
+  }
 };
 
 const ACTUAL_CHART_COLORS = {
@@ -75,6 +101,13 @@ const ACTUAL_CHART_COLORS = {
   bien: "hsl(223, 78%, 48%)",     
   assezBien: "hsl(38, 92%, 51%)", 
   sansMention: "hsl(215, 9%, 68%)",
+};
+
+const SCORE_CHART_COLORS = {
+  gte15: "hsl(140, 70%, 35%)",      // Vert foncé
+  gte10lt15: "hsl(110, 50%, 65%)",  // Vert clair
+  gte8lt10: "hsl(45, 90%, 55%)",   // Jaune/Orange
+  lt8: "hsl(0, 80%, 60%)",         // Rouge
 };
 
 
@@ -96,6 +129,19 @@ const lightenHslColor = (hslColor: string, amount: number): string => {
   return `hsl(${h}, ${s}, ${lightness}%)`;
 };
 
+const calculateScoreOutOf20 = (score: number | undefined, maxScore: number): number | undefined => {
+  if (score === undefined || score === null || maxScore <= 0) return undefined;
+  return (score / maxScore) * 20;
+};
+
+const categorizeScore = (scoreOutOf20: number | undefined, distribution: ScoreDistribution) => {
+  if (scoreOutOf20 === undefined) return;
+  distribution.count++;
+  if (scoreOutOf20 >= 15) distribution.gte15++;
+  else if (scoreOutOf20 >= 10) distribution.gte10lt15++;
+  else if (scoreOutOf20 >= 8) distribution.gte8lt10++;
+  else distribution.lt8++;
+};
 
 export default function PanoramaPage() {
   const {
@@ -111,6 +157,7 @@ export default function PanoramaPage() {
   const [stats, setStats] = useState<Stats>(initialStats);
   const [hoveredPieIndex, setHoveredPieIndex] = useState<number | null>(null);
   const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
+  const [hoveredScorePie, setHoveredScorePie] = useState<{ subject: keyof SubjectScoreDistributions; index: number | null } | null>(null);
 
 
   useEffect(() => {
@@ -143,7 +190,17 @@ export default function PanoramaPage() {
       return;
     }
 
-    const newStats: Stats = { ...initialStats, mentions: { ...initialStats.mentions }, mentionPercentages: { ...initialStats.mentionPercentages} };
+    const newStats: Stats = { 
+      ...initialStats, 
+      mentions: { ...initialStats.mentions }, 
+      mentionPercentages: { ...initialStats.mentionPercentages},
+      scoreDistribution: {
+        francais: { ...initialScoreDistribution },
+        maths: { ...initialScoreDistribution },
+        histoireGeo: { ...initialScoreDistribution },
+        sciences: { ...initialScoreDistribution },
+      }
+    };
     newStats.totalStudents = filteredStudentsData.length;
 
     const normalizedAdmisStr = normalizeForComparison('admis');
@@ -177,25 +234,30 @@ export default function PanoramaPage() {
         } else {
           newStats.mentions.sansMention++;
         }
-      } else if (normalizedResultat.includes(normalizedRefuseStr)) {
+      } else if (normalizedResultat.includes(normalizeForComparison("refuse"))) {
         newStats.refuse++;
       }
 
+      // Average scores calculation
       if (student.scoreFrancais !== undefined && student.scoreFrancais !== null) {
         sumFrancais += student.scoreFrancais;
         countFrancais++;
+        categorizeScore(calculateScoreOutOf20(student.scoreFrancais, 100), newStats.scoreDistribution.francais);
       }
       if (student.scoreMaths !== undefined && student.scoreMaths !== null) {
         sumMaths += student.scoreMaths;
         countMaths++;
+        categorizeScore(calculateScoreOutOf20(student.scoreMaths, 100), newStats.scoreDistribution.maths);
       }
       if (student.scoreHistoireGeo !== undefined && student.scoreHistoireGeo !== null) {
         sumHistoireGeo += student.scoreHistoireGeo;
         countHistoireGeo++;
+        categorizeScore(calculateScoreOutOf20(student.scoreHistoireGeo, 50), newStats.scoreDistribution.histoireGeo);
       }
       if (student.scoreSciences !== undefined && student.scoreSciences !== null) {
         sumSciences += student.scoreSciences;
         countSciences++;
+        categorizeScore(calculateScoreOutOf20(student.scoreSciences, 50), newStats.scoreDistribution.sciences);
       }
     });
 
@@ -245,6 +307,24 @@ export default function PanoramaPage() {
     { name: 'Sans Mention', value: stats.mentions.sansMention, fill: ACTUAL_CHART_COLORS.sansMention, percentage: stats.mentionPercentages.sansMention },
   ].filter(item => item.value > 0), [stats.mentions, stats.mentionPercentages]);
 
+  const subjectScoreChartData = (subjectKey: keyof SubjectScoreDistributions) => {
+    const distribution = stats.scoreDistribution[subjectKey];
+    if (!distribution || distribution.count === 0) return [];
+    return [
+      { name: '>= 15', value: distribution.gte15, fill: SCORE_CHART_COLORS.gte15, percentage: (distribution.gte15 / distribution.count) * 100 },
+      { name: '10-14.9', value: distribution.gte10lt15, fill: SCORE_CHART_COLORS.gte10lt15, percentage: (distribution.gte10lt15 / distribution.count) * 100 },
+      { name: '8-9.9', value: distribution.gte8lt10, fill: SCORE_CHART_COLORS.gte8lt10, percentage: (distribution.gte8lt10 / distribution.count) * 100 },
+      { name: '< 8', value: distribution.lt8, fill: SCORE_CHART_COLORS.lt8, percentage: (distribution.lt8 / distribution.count) * 100 },
+    ].filter(item => item.value > 0);
+  };
+
+  const scoreLegendPayload = [
+      { value: 'Note >= 15', type: 'square', id: 's1', color: SCORE_CHART_COLORS.gte15 },
+      { value: '10 <= Note < 15', type: 'square', id: 's2', color: SCORE_CHART_COLORS.gte10lt15 },
+      { value: '8 <= Note < 10', type: 'square', id: 's3', color: SCORE_CHART_COLORS.gte8lt10 },
+      { value: 'Note < 8', type: 'square', id: 's4', color: SCORE_CHART_COLORS.lt8 },
+  ];
+
 
   if (isLoadingContext) {
     return (
@@ -266,6 +346,82 @@ export default function PanoramaPage() {
   }
 
   const noDataForFilters = filteredStudentsData.length === 0 && allProcessedStudents.length > 0 && !isLoadingContext;
+
+  const renderSubjectScorePieChart = (
+    subjectKey: keyof SubjectScoreDistributions, 
+    title: string, 
+    Icon: React.ElementType
+  ) => {
+    const data = subjectScoreChartData(subjectKey);
+    const totalCount = stats.scoreDistribution[subjectKey]?.count || 0;
+
+    return (
+      <Card className="shadow-md rounded-lg">
+        <CardHeader className="p-6">
+          <CardTitle className="flex items-center text-xl text-primary">
+            <Icon className="mr-2 h-5 w-5 text-primary" />
+            Répartition Notes {title}
+          </CardTitle>
+          <CardDescription className="mt-1">Distribution des notes (/20) pour {totalCount} élèves.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
+          {totalCount > 0 && data.length > 0 ? (
+            <>
+            <ChartContainer config={{}} className="mx-auto aspect-square max-h-[250px]" background="hsl(var(--card))">
+              <PieChart background="hsl(var(--card))">
+                <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent
+                        hideLabel
+                        formatter={(value, name, props) => (
+                            <div className="flex flex-col">
+                                <span className="font-semibold capitalize">{props.payload?.name}</span>
+                                <span>Nombre: {value} ({props.payload?.percentage?.toFixed(1) ?? 0}%)</span>
+                            </div>
+                        )}
+                    />}
+                />
+                <Pie
+                    data={data}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    innerRadius={40}
+                    labelLine={false}
+                    activeIndex={hoveredScorePie?.subject === subjectKey ? hoveredScorePie.index ?? undefined : undefined}
+                    onMouseEnter={(_d, index) => setHoveredScorePie({ subject: subjectKey, index })}
+                    onMouseLeave={() => setHoveredScorePie(null)}
+                >
+                  {data.map((entry, index) => (
+                    <Cell
+                      key={`cell-score-${subjectKey}-${index}`}
+                      fill={hoveredScorePie?.subject === subjectKey && hoveredScorePie?.index === index ? lightenHslColor(entry.fill as string, 15) : (entry.fill as string)}
+                    />
+                  ))}
+                  <LabelList
+                    dataKey="percentage"
+                    position="inside"
+                    formatter={(value: number) => value > 5 ? `${value.toFixed(0)}%` : ''}
+                    className="fill-primary-foreground text-xs font-medium"
+                    style={{ pointerEvents: 'none' }}
+                  />
+                </Pie>
+              </PieChart>
+            </ChartContainer>
+            <div className="mt-4">
+               <ChartLegend content={<ChartLegendContent payload={scoreLegendPayload} className="flex-wrap justify-center gap-x-4 gap-y-1 text-xs" />} />
+            </div>
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground py-10">Pas de données de notes à afficher pour {title}.</p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -377,6 +533,7 @@ export default function PanoramaPage() {
                             const radius = effectiveInnerRadius + (effectiveOuterRadius - effectiveInnerRadius) * 0.5;
                             const x = cx + radius * Math.cos(-midAngle * RADIAN);
                             const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                            if (percent < 0.05) return null; // Hide label for very small slices
                             return (
                                 <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="12px" fontWeight="medium">
                                 {`${name} (${value})`}
@@ -453,11 +610,22 @@ export default function PanoramaPage() {
             </CardContent>
           </Card>
         </div>
+        
+        <div className="mt-6">
+            <h2 className="text-2xl font-semibold text-primary mb-4 tracking-tight">Analyse des Notes par Matière (/20)</h2>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
+                {renderSubjectScorePieChart('francais', 'Français', BookText)}
+                {renderSubjectScorePieChart('maths', 'Mathématiques', Calculator)}
+                {renderSubjectScorePieChart('histoireGeo', 'Histoire-Géo.', Landmark)}
+                {renderSubjectScorePieChart('sciences', 'Sciences', FlaskConical)}
+            </div>
+        </div>
 
-        <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
+
+        <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30 mt-6">
             <CardHeader className="p-6">
-                <CardTitle className="text-xl text-primary">Moyennes par Matières Principales</CardTitle>
-                <CardDescription className="mt-1">Moyenne des notes (/20) pour les élèves de la sélection ayant une note enregistrée.</CardDescription>
+                <CardTitle className="text-xl text-primary">Moyennes par Matières Principales (Brutes)</CardTitle>
+                <CardDescription className="mt-1">Moyenne des notes brutes pour les élèves de la sélection ayant une note enregistrée. Français et Maths sur 100, Histoire-Géo et Sciences sur 50.</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-6 pt-4 md:grid-cols-4 p-6">
                 <div className="group flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
@@ -466,7 +634,7 @@ export default function PanoramaPage() {
                     <p className="text-2xl font-bold mt-1 text-primary group-hover:text-3xl group-hover:font-extrabold transition-all duration-200">
                         {stats.averageFrancais !== undefined ? stats.averageFrancais.toFixed(1) : 'N/A'}
                     </p>
-                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countFrancais ?? 0} élèves)</p>
+                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countFrancais ?? 0} élèves, /100)</p>
                 </div>
                 <div className="group flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
                     <Calculator className="h-7 w-7 text-primary mb-2 group-hover:scale-110 transition-transform duration-200" />
@@ -474,7 +642,7 @@ export default function PanoramaPage() {
                     <p className="text-2xl font-bold mt-1 text-primary group-hover:text-3xl group-hover:font-extrabold transition-all duration-200">
                         {stats.averageMaths !== undefined ? stats.averageMaths.toFixed(1) : 'N/A'}
                     </p>
-                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countMaths ?? 0} élèves)</p>
+                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countMaths ?? 0} élèves, /100)</p>
                 </div>
                 <div className="group flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
                     <Landmark className="h-7 w-7 text-primary mb-2 group-hover:scale-110 transition-transform duration-200" />
@@ -482,7 +650,7 @@ export default function PanoramaPage() {
                     <p className="text-2xl font-bold mt-1 text-primary group-hover:text-3xl group-hover:font-extrabold transition-all duration-200">
                         {stats.averageHistoireGeo !== undefined ? stats.averageHistoireGeo.toFixed(1) : 'N/A'}
                     </p>
-                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countHistoireGeo ?? 0} élèves)</p>
+                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countHistoireGeo ?? 0} élèves, /50)</p>
                 </div>
                 <div className="group flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
                     <FlaskConical className="h-7 w-7 text-primary mb-2 group-hover:scale-110 transition-transform duration-200" />
@@ -490,12 +658,12 @@ export default function PanoramaPage() {
                     <p className="text-2xl font-bold mt-1 text-primary group-hover:text-3xl group-hover:font-extrabold transition-all duration-200">
                         {stats.averageSciences !== undefined ? stats.averageSciences.toFixed(1) : 'N/A'}
                     </p>
-                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countSciences ?? 0} élèves)</p>
+                    <p className="text-xs text-muted-foreground group-hover:font-semibold group-hover:text-muted-foreground/80 transition-all duration-200">({stats.countSciences ?? 0} élèves, /50)</p>
                 </div>
             </CardContent>
         </Card>
 
-        <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
+        <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30 mt-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
             <CardTitle className="text-xl font-medium text-primary">Mentions</CardTitle>
             <Award className="h-6 w-6 text-primary" />
