@@ -1,8 +1,8 @@
 
 "use client";
 
-import type { ChangeEvent } from 'react';
-import { useState, useEffect } from 'react';
+import type { ChangeEvent, DragEvent } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,13 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import type { StudentData } from '@/lib/excel-types';
 import { studentDataSchema } from '@/lib/excel-types';
-import { Loader2, Import, AlertTriangle, CalendarDays } from 'lucide-react';
+import { Loader2, Import, AlertTriangle, CalendarDays, UploadCloud } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { YearPicker } from '@/components/ui/year-picker';
+import { cn } from '@/lib/utils';
 
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -29,6 +30,10 @@ export default function ImportPage() {
   const [selectedStartYear, setSelectedStartYear] = useState<number | null>(null); 
   const [initialPickerYear, setInitialPickerYear] = useState<number>(new Date().getFullYear());
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const dragCounter = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
 
@@ -45,8 +50,7 @@ export default function ImportPage() {
     setInitialPickerYear(academicStartYear); 
   }, []);
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
+  const processFile = (selectedFile: File | null | undefined) => {
     if (selectedFile) {
       const fileType = selectedFile.type;
       const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
@@ -55,13 +59,72 @@ export default function ImportPage() {
         setFileName(selectedFile.name);
         setError(null);
       } else {
-        setError("Format de fichier invalide. Veuillez sélectionner un fichier .xlsx ou .xls.");
+        const errorMsg = "Format de fichier invalide. Veuillez sélectionner un fichier .xlsx ou .xls.";
+        setError(errorMsg);
         setFile(null);
         setFileName(null);
-        toast({ variant: "destructive", title: "Erreur de fichier", description: "Format de fichier invalide. Veuillez sélectionner un fichier .xlsx ou .xls." });
+        toast({ variant: "destructive", title: "Erreur de fichier", description: errorMsg });
+      }
+    } else {
+      setFile(null);
+      setFileName(null);
+    }
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      processFile(files[0]);
+    } else {
+      processFile(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''; // Reset input pour permettre la re-sélection du même fichier
+    }
+  };
+
+  const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragCounter.current++;
+    if (event.dataTransfer.items && event.dataTransfer.items.length > 0) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDraggingOver(false);
+    }
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'copy';
+    if (!isDraggingOver) {
+        setIsDraggingOver(true); // Ensure it's true if somehow missed by enter
+    }
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingOver(false);
+    dragCounter.current = 0;
+
+    const droppedFiles = event.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      processFile(droppedFiles[0]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''; // Reset input
       }
     }
   };
+
 
   const handleImportToFirestore = async (dataToImport: StudentData[], yearToImportForToast: string) => {
     if (dataToImport.length === 0) {
@@ -101,6 +164,9 @@ export default function ImportPage() {
       setFileName(null);
       setSelectedStartYear(null); 
       setImportYear(''); 
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''; // Reset input
+      }
     } catch (importError: any) {
       console.error("Erreur d'importation Firestore:", importError);
       let userMessage = `Échec de l'importation: ${importError.message}.`;
@@ -179,7 +245,7 @@ export default function ImportPage() {
 
           rawDataObjects.forEach((rawRow, index) => {
             const studentInput: any = {
-              'anneeScolaireImportee': importYear, // Use the YYYY formatted string
+              'anneeScolaireImportee': importYear,
               'Série': rawRow['Série'],
               'Code Etablissement': rawRow['Code Etablissement'],
               'Libellé Etablissement': rawRow['Libellé Etablissement'],
@@ -313,7 +379,7 @@ export default function ImportPage() {
                   selectedYear={selectedStartYear}
                   onSelectYear={(year) => {
                     setSelectedStartYear(year);
-                    setImportYear(String(year)); // Set the YYYY string for logic
+                    setImportYear(String(year)); 
                     setIsPopoverOpen(false);
                   }}
                   initialDisplayYear={initialPickerYear}
@@ -325,24 +391,46 @@ export default function ImportPage() {
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-[1fr_auto] items-end">
-            <div className="space-y-2">
-              <Label htmlFor="file-upload" className="text-sm font-medium">Fichier Excel</Label>
-              <Input
-                id="file-upload"
-                type="file"
-                accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                onChange={handleFileChange}
-                className="w-full"
-                disabled={isLoading || isImporting}
-              />
-               {fileName && <p className="text-xs text-muted-foreground">Fichier sélectionné : {fileName}</p>}
-            </div>
-            <Button onClick={parseAndImportData} disabled={!file || isLoading || isImporting || !importYear.trim()} className="w-full sm:w-auto">
+          <div
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            className={cn(
+              "relative flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/70 transition-colors duration-150 ease-in-out",
+              isDraggingOver ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"
+            )}
+          >
+            <UploadCloud className={cn("w-10 h-10 mb-4", isDraggingOver ? "text-primary" : "text-muted-foreground")} />
+            <Label htmlFor="file-upload-input" className="text-sm font-medium text-center text-foreground">
+              Glissez-déposez votre fichier Excel ici ou{" "}
+              <span className="font-semibold text-primary hover:underline">cliquez pour sélectionner</span>
+            </Label>
+            <Input
+              id="file-upload-input"
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+              onChange={handleFileChange}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              disabled={isLoading || isImporting}
+            />
+            {fileName && (
+              <p className="mt-3 text-sm text-muted-foreground">Fichier sélectionné : {fileName}</p>
+            )}
+          </div>
+          
+          <div className="flex justify-end mt-4">
+            <Button 
+              onClick={parseAndImportData} 
+              disabled={!file || isLoading || isImporting || !importYear.trim()} 
+              className="w-full sm:w-auto"
+            >
               {(isLoading || isImporting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />}
               {isLoading ? "Lecture..." : (isImporting ? "Importation..." : "Importer")}
             </Button>
           </div>
+
           {error && (
             <div className="flex items-center text-sm text-destructive bg-destructive/10 p-3 rounded-md">
               <AlertTriangle className="mr-2 h-4 w-4" /> {error}
@@ -353,5 +441,4 @@ export default function ImportPage() {
     </div>
   );
 }
-
     
