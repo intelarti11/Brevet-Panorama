@@ -64,7 +64,7 @@ export default function ImportPage() {
     }
   };
 
-  const handleImportToFirestore = async (dataToImport: StudentData[], yearToImport: string) => {
+  const handleImportToFirestore = async (dataToImport: StudentData[], yearToImportForToast: string) => {
     if (dataToImport.length === 0) {
       toast({ variant: "destructive", title: "Aucune Donnée", description: "Aucune donnée valide à importer." });
       return;
@@ -97,9 +97,11 @@ export default function ImportPage() {
 
     try {
       await batch.commit();
-      toast({ title: "Importation Réussie", description: `${documentsAddedToBatch} enregistrements importés pour l'année ${yearToImport} dans Firestore.` });
+      toast({ title: "Importation Réussie", description: `${documentsAddedToBatch} enregistrements importés pour l'année ${yearToImportForToast} dans Firestore.` });
       setFile(null);
       setFileName(null);
+      setSelectedStartYear(null); // Reset selected year display
+      setImportYear(''); // Reset import year for logic
     } catch (importError: any) {
       console.error("Erreur d'importation Firestore:", importError);
       let userMessage = `Échec de l'importation: ${importError.message}.`;
@@ -121,6 +123,7 @@ export default function ImportPage() {
       toast({ variant: "destructive", title: "Erreur", description: "Aucun fichier sélectionné." });
       return;
     }
+    // importYear now holds the YYYY-YYYY+1 format, critical for validation
     if (!importYear || importYear.trim() === "") {
       setError("L'année d'importation est requise.");
       toast({ variant: "destructive", title: "Erreur", description: "Veuillez spécifier l'année d'importation.", duration: 5000 });
@@ -178,7 +181,7 @@ export default function ImportPage() {
 
           rawDataObjects.forEach((rawRow, index) => {
             const studentInput: any = {
-              'anneeScolaireImportee': importYear, 
+              'anneeScolaireImportee': importYear, // Use the YYYY-YYYY+1 formatted string
               'Série': rawRow['Série'],
               'Code Etablissement': rawRow['Code Etablissement'],
               'Libellé Etablissement': rawRow['Libellé Etablissement'],
@@ -243,6 +246,7 @@ export default function ImportPage() {
           }
 
           if (transformedData.length > 0) {
+            // Pass importYear (YYYY-YYYY+1) for the toast message for consistency
             await handleImportToFirestore(transformedData, importYear);
           } else if (error) { 
             // Do nothing, error is already set and will be displayed
@@ -300,11 +304,11 @@ export default function ImportPage() {
                 <Button
                   id="importYear-trigger"
                   variant={"outline"}
-                  className={`w-full justify-start text-left font-normal ${!importYear && "text-muted-foreground"}`}
+                  className={`w-full justify-start text-left font-normal ${!selectedStartYear && "text-muted-foreground"}`}
                   disabled={isLoading || isImporting}
                 >
                   <CalendarDays className="mr-2 h-4 w-4" />
-                  {importYear || "Choisissez l'année"}
+                  {selectedStartYear ? String(selectedStartYear) : "Choisissez l'année"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
@@ -312,7 +316,7 @@ export default function ImportPage() {
                   selectedYear={selectedStartYear}
                   onSelectYear={(year) => {
                     setSelectedStartYear(year);
-                    setImportYear(`${year}-${year + 1}`);
+                    setImportYear(`${year}-${year + 1}`); // Set the YYYY-YYYY+1 string for logic
                     setIsPopoverOpen(false);
                   }}
                   initialDisplayYear={initialPickerYear}
