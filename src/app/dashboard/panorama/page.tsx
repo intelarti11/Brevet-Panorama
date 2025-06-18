@@ -69,14 +69,16 @@ const initialStats: Stats = {
   countSciences: 0,
 };
 
-const CHART_COLORS = {
-  admis: "hsl(var(--chart-admis))",
-  refuse: "hsl(var(--destructive))",
-  tresBien: "hsl(var(--chart-tres-bien))",
-  bien: "hsl(var(--chart-bien))",
-  assezBien: "hsl(var(--chart-assez-bien))",
-  sansMention: "hsl(var(--chart-sans-mention))",
+// Using direct HSL values derived from globals.css for reliable JS manipulation
+const ACTUAL_CHART_COLORS = {
+  admis: "hsl(160, 82%, 40%)",    // from --color-success-hsl
+  refuse: "hsl(0, 84%, 60%)",     // from --color-error-hsl
+  tresBien: "hsl(49, 96%, 77%)",  // from --chart-tres-bien (direct value)
+  bien: "hsl(223, 78%, 48%)",     // from --chart-bien (direct value)
+  assezBien: "hsl(38, 92%, 51%)", // from --color-warning-hsl
+  sansMention: "hsl(215, 9%, 68%)",// from --chart-sans-mention (direct value)
 };
+
 
 const normalizeForComparison = (text: string | undefined): string => {
   if (text === null || text === undefined) return "";
@@ -234,15 +236,15 @@ export default function PanoramaPage() {
   }, [filteredStudentsData, isLoadingContext, allProcessedStudents.length, errorContext, selectedAcademicYear, selectedSerieType, selectedEstablishment]);
 
   const resultsChartData = useMemo(() => [
-    { name: 'Admis', value: stats.admis, fill: CHART_COLORS.admis },
-    { name: 'Refusé', value: stats.refuse, fill: CHART_COLORS.refuse },
+    { name: 'Admis', value: stats.admis, fill: ACTUAL_CHART_COLORS.admis },
+    { name: 'Refusé', value: stats.refuse, fill: ACTUAL_CHART_COLORS.refuse },
   ].filter(item => item.value > 0), [stats.admis, stats.refuse]);
 
   const mentionsChartData = useMemo(() => [
-    { name: 'Très Bien', value: stats.mentions.tresBien, fill: CHART_COLORS.tresBien, percentage: stats.mentionPercentages.tresBien },
-    { name: 'Assez Bien', value: stats.mentions.assezBien, fill: CHART_COLORS.assezBien, percentage: stats.mentionPercentages.assezBien },
-    { name: 'Bien', value: stats.mentions.bien, fill: CHART_COLORS.bien, percentage: stats.mentionPercentages.bien },
-    { name: 'Sans Mention', value: stats.mentions.sansMention, fill: CHART_COLORS.sansMention, percentage: stats.mentionPercentages.sansMention },
+    { name: 'Très Bien', value: stats.mentions.tresBien, fill: ACTUAL_CHART_COLORS.tresBien, percentage: stats.mentionPercentages.tresBien },
+    { name: 'Assez Bien', value: stats.mentions.assezBien, fill: ACTUAL_CHART_COLORS.assezBien, percentage: stats.mentionPercentages.assezBien },
+    { name: 'Bien', value: stats.mentions.bien, fill: ACTUAL_CHART_COLORS.bien, percentage: stats.mentionPercentages.bien },
+    { name: 'Sans Mention', value: stats.mentions.sansMention, fill: ACTUAL_CHART_COLORS.sansMention, percentage: stats.mentionPercentages.sansMention },
   ].filter(item => item.value > 0), [stats.mentions, stats.mentionPercentages]);
 
 
