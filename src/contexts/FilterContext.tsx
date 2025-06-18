@@ -20,6 +20,13 @@ export interface ProcessedStudentData {
   scoreMaths?: number;
   scoreHistoireGeo?: number;
   scoreSciences?: number;
+  scoreOralDNB?: number;
+  scoreLVE?: number;
+  scoreArtsPlastiques?: number;
+  scoreEducationMusicale?: number;
+  scoreEPS?: number;
+  scorePhysiqueChimie?: number;
+  scoreSciencesVie?: number;
 }
 
 interface FilterContextType {
@@ -165,6 +172,13 @@ export function FilterProvider({ children }: { children: ReactNode }) {
             scoreMaths: data.scoreMaths !== undefined && data.scoreMaths !== null ? Number(data.scoreMaths) : undefined,
             scoreHistoireGeo: data.scoreHistoireGeo !== undefined && data.scoreHistoireGeo !== null ? Number(data.scoreHistoireGeo) : undefined,
             scoreSciences: data.scoreSciences !== undefined && data.scoreSciences !== null ? Number(data.scoreSciences) : undefined,
+            scoreOralDNB: data.scoreOralDNB !== undefined && data.scoreOralDNB !== null ? Number(data.scoreOralDNB) : undefined,
+            scoreLVE: data.scoreLVE !== undefined && data.scoreLVE !== null ? Number(data.scoreLVE) : undefined,
+            scoreArtsPlastiques: data.scoreArtsPlastiques !== undefined && data.scoreArtsPlastiques !== null ? Number(data.scoreArtsPlastiques) : undefined,
+            scoreEducationMusicale: data.scoreEducationMusicale !== undefined && data.scoreEducationMusicale !== null ? Number(data.scoreEducationMusicale) : undefined,
+            scoreEPS: data.scoreEPS !== undefined && data.scoreEPS !== null ? Number(data.scoreEPS) : undefined,
+            scorePhysiqueChimie: data.scorePhysiqueChimie !== undefined && data.scorePhysiqueChimie !== null ? Number(data.scorePhysiqueChimie) : undefined,
+            scoreSciencesVie: data.scoreSciencesVie !== undefined && data.scoreSciencesVie !== null ? Number(data.scoreSciencesVie) : undefined,
           };
           students.push(studentToAdd);
 
@@ -182,37 +196,29 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
         setAllProcessedStudents(students);
 
-        // Sort academic years (now potentially mixed "YYYY" and "YYYY-YYYY")
-        // Prioritize "YYYY" format for sorting if both exist.
         const sortedAcademicYears = Array.from(academicYearsSet)
           .filter(year => year !== undefined && year !== null && String(year).trim() !== "")
           .sort((a, b) => {
             const sA = String(a);
             const sB = String(b);
             
-            // Helper to get the start year (e.g., 2023 from "2023" or "2023-2024")
             const getStartYear = (yearStr: string) => parseInt(yearStr.substring(0, 4), 10);
 
             const startYearA = getStartYear(sA);
             const startYearB = getStartYear(sB);
 
-            if (isNaN(startYearA) && isNaN(startYearB)) return sB.localeCompare(sA); // Fallback for non-numeric
+            if (isNaN(startYearA) && isNaN(startYearB)) return sB.localeCompare(sA); 
             if (isNaN(startYearA)) return 1; 
             if (isNaN(startYearB)) return -1;
 
-            // Sort by start year descending
             if (startYearB !== startYearA) {
                 return startYearB - startYearA; 
             }
-            // If start years are a, prefer shorter string (e.g. "2023" over "2023-2024") for stability, or longer for range
-            // Given new format is "YYYY", this part of logic might be less critical for new data.
-            // For descending, if start years are same, put longer (range) before shorter (single year)
             return sB.length - sA.length; 
         });
 
         setAvailableAcademicYears(sortedAcademicYears);
         if (sortedAcademicYears.length > 0) {
-          // Try to select the latest single year format if available, else first in sorted list
           const latestSingleYear = sortedAcademicYears.find(year => /^\d{4}$/.test(year));
           setSelectedAcademicYear(latestSingleYear || sortedAcademicYears[0]); 
         } else {
@@ -283,5 +289,3 @@ export function useFilters(): FilterContextType {
   }
   return context;
 }
-
-    

@@ -61,28 +61,34 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
 
   const getBadgeVariantForModal = (resultat?: string): "default" | "secondary" | "destructive" | "outline" | "success" | "warning" => {
     if (!resultat || normalizeTextForModal(resultat) === 'n/a') return "outline"; 
-
     const lowerResultat = normalizeTextForModal(resultat);
 
-    if (lowerResultat.includes('refuse')) return "destructive"; // Red - check against normalized "refuse"
-    if (lowerResultat.includes('absent')) return "outline";   // Light Gray
+    if (lowerResultat.includes('refuse')) return "destructive";
+    if (lowerResultat.includes('absent')) return "outline";
 
-    // Mentions for admitted students - Order is important
-    if (lowerResultat.includes('très bien') || lowerResultat.includes('tres bien')) return "success"; // Dark Green
-    if (lowerResultat.includes('assez bien')) return "warning"; // Yellow
-    if (lowerResultat.includes('bien')) return "success";       // Dark Green
-    if (lowerResultat.includes('admis')) return "success";     // Dark Green
+    if (lowerResultat.includes('très bien') || lowerResultat.includes('tres bien')) return "success";
+    if (lowerResultat.includes('assez bien')) return "warning";
+    if (lowerResultat.includes('bien')) return "success";
+    if (lowerResultat.includes('admis')) return "success";
     
-    return "secondary"; // Default for other cases
+    return "secondary";
   };
 
-  const formatScore = (score?: number) => {
-    return score !== undefined && score !== null ? score.toFixed(1) + " / 20" : undefined;
+  const formatScoreWithBareme = (score?: number, bareme?: number): string | undefined => {
+    if (score === undefined || score === null) {
+      return undefined;
+    }
+    if (bareme !== undefined && bareme !== null) {
+      return `${score.toFixed(1)} / ${bareme}`;
+    }
+    return score.toFixed(1); // Display score if no bareme
   };
+  
+  const sectionTitleClass = "text-base font-semibold text-foreground mb-2 pt-4 first:pt-2";
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg md:max-w-xl max-h-[85vh] flex flex-col p-0">
+      <DialogContent className="sm:max-w-lg md:max-w-2xl max-h-[85vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="text-xl font-semibold text-primary">
             Détails de l'Élève
@@ -94,38 +100,41 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
 
         <ScrollArea className="flex-grow overflow-y-auto px-6">
           <div className="space-y-1 py-4">
-            <h3 className="text-base font-semibold text-foreground mb-2 pt-2">Informations Personnelles</h3>
+            <h3 className={sectionTitleClass}>Informations Personnelles</h3>
             <DetailItem label="Nom Complet" value={`${student.prenom} ${student.nom}`} />
             <DetailItem label="N° INE" value={student.id} />
             
-            <h3 className="text-base font-semibold text-foreground mb-2 pt-4">Parcours Scolaire</h3>
+            <h3 className={sectionTitleClass}>Parcours Scolaire</h3>
             <DetailItem label="Établissement" value={student.etablissement} />
             <DetailItem label="Année Scolaire" value={student.academicYear || 'N/A'} />
             <DetailItem label="Série" value={student.serieType || 'N/A'} />
+            {student.anneeOriginale && student.anneeOriginale !== student.academicYear && student.anneeOriginale.trim() !== "" && (
+                <DetailItem label="Champ 'Série' (Fichier)" value={student.anneeOriginale} />
+             )}
 
-            <h3 className="text-base font-semibold text-foreground mb-2 pt-4">Résultats au Brevet</h3>
+            <h3 className={sectionTitleClass}>Résultats au Brevet</h3>
             <DetailItem 
-                label="Résultat" 
+                label="Résultat Global" 
                 value={student.resultat || 'N/A'}
                 isBadge
                 badgeVariant={getBadgeVariantForModal(student.resultat)}
             />
             <DetailItem label="Moyenne Générale" value={student.moyenne !== undefined && student.moyenne !== null ? student.moyenne.toFixed(2) + " / 20" : "N/A"} />
             
-            {(student.scoreFrancais !== undefined || student.scoreMaths !== undefined || student.scoreHistoireGeo !== undefined || student.scoreSciences !== undefined) && (
-                 <h3 className="text-base font-semibold text-foreground mb-2 pt-4">Scores par Matière</h3>
-            )}
-            <DetailItem label="Français" value={formatScore(student.scoreFrancais)} />
-            <DetailItem label="Mathématiques" value={formatScore(student.scoreMaths)} />
-            <DetailItem label="Histoire-Géo." value={formatScore(student.scoreHistoireGeo)} />
-            <DetailItem label="Sciences" value={formatScore(student.scoreSciences)} />
+            <h3 className={sectionTitleClass}>Détail des Épreuves et Compétences</h3>
+            <DetailItem label="Français (Épreuve)" value={formatScoreWithBareme(student.scoreFrancais, 100)} />
+            <DetailItem label="Mathématiques (Épreuve)" value={formatScoreWithBareme(student.scoreMaths, 100)} />
+            <DetailItem label="Histoire-Géo. EMC (Épreuve)" value={formatScoreWithBareme(student.scoreHistoireGeo, 50)} />
+            <DetailItem label="Sciences (Épreuve)" value={formatScoreWithBareme(student.scoreSciences, 50)} />
+            <DetailItem label="Soutenance Orale DNB" value={formatScoreWithBareme(student.scoreOralDNB, 100)} />
+            
+            <DetailItem label="Langues Vivantes" value={formatScoreWithBareme(student.scoreLVE)} />
+            <DetailItem label="Langages des Arts et du Corps" value={formatScoreWithBareme(student.scoreArtsPlastiques)} />
+            <DetailItem label="Éducation Musicale" value={formatScoreWithBareme(student.scoreEducationMusicale, 50)} />
+            <DetailItem label="EPS" value={formatScoreWithBareme(student.scoreEPS, 100)} />
+            <DetailItem label="Physique-Chimie (Cont. Continu)" value={formatScoreWithBareme(student.scorePhysiqueChimie, 50)} />
+            <DetailItem label="Sciences de la Vie (Cont. Continu)" value={formatScoreWithBareme(student.scoreSciencesVie, 50)} />
 
-             {student.anneeOriginale && student.anneeOriginale !== student.academicYear && student.anneeOriginale.trim() !== "" && (
-                <>
-                    <h3 className="text-base font-semibold text-foreground mb-2 pt-4">Information Originale</h3>
-                    <DetailItem label="Champ 'Série' (Fichier)" value={student.anneeOriginale} />
-                </>
-             )}
           </div>
         </ScrollArea>
 
