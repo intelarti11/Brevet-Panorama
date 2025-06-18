@@ -414,7 +414,7 @@ export default function PanoramaPage() {
                 <ChartContainer config={{}} className="w-full h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={mentionsChartData} layout="vertical" margin={{left:10, right:30, top: 5, bottom: 5}}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      {/* <CartesianGrid strokeDasharray="3 3" horizontal={false} /> Removed to eliminate gray background */}
                       <XAxis type="number" dataKey="value" allowDecimals={false} />
                       <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} />
                       <ChartTooltip
