@@ -73,10 +73,10 @@ const initialStats: Stats = {
 const ACTUAL_CHART_COLORS = {
   admis: "hsl(160, 82%, 40%)",    // from --color-success-hsl
   refuse: "hsl(0, 84%, 60%)",     // from --color-error-hsl
-  tresBien: "hsl(49, 96%, 77%)",  // from --chart-tres-bien (direct value)
-  bien: "hsl(223, 78%, 48%)",     // from --chart-bien (direct value)
+  tresBien: "hsl(49, 96%, 77%)",  // from --chart-tres-bien (direct value from globals.css --chart-tres-bien: 49 96% 77%; /* #FDE68A */)
+  bien: "hsl(223, 78%, 48%)",     // from --chart-bien (direct value from globals.css --chart-bien: 223 78% 48%; /* #1D4ED8 */)
   assezBien: "hsl(38, 92%, 51%)", // from --color-warning-hsl
-  sansMention: "hsl(215, 9%, 68%)",// from --chart-sans-mention (direct value)
+  sansMention: "hsl(215, 9%, 68%)",// from --chart-sans-mention (direct value from globals.css --chart-sans-mention: 215 9% 68%; /* #9CA3AF */)
 };
 
 
@@ -441,7 +441,7 @@ export default function PanoramaPage() {
                          {mentionsChartData.map((entry, index) => (
                           <Cell
                             key={`cell-mention-${index}`}
-                            fill={hoveredBarIndex === index ? lightenHslColor(entry.fill as string, 30) : (entry.fill as string)}
+                            fill={hoveredBarIndex === index ? lightenHslColor(entry.fill as string, 15) : (entry.fill as string)}
                           />
                         ))}
                          <LabelList dataKey="value" position="right" offset={8} className="fill-foreground" fontSize={12} />
