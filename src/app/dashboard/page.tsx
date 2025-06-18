@@ -2,5 +2,5 @@
 import { redirect } from 'next/navigation';
 
 export default function DashboardRootPage() {
-  redirect('/dashboard/donnee');
+  redirect('/dashboard/panorama'); // Updated redirect
 }

@@ -29,7 +29,7 @@ import Logo from '@/components/logo';
 import { User, LockKeyhole, Loader2, Eye, EyeOff } from 'lucide-react';
 
 const formSchema = z.object({
-  email: z.string().min(1, { message: "L'identifiant est requis." }), 
+  email: z.string().min(1, { message: "L'identifiant est requis." }),
   password: z.string().min(6, { message: "Le mot de passe doit contenir au moins 6 caractères." }),
 });
 
@@ -57,7 +57,7 @@ export default function LoginPage() {
         title: "Connexion réussie",
         description: "Bienvenue !",
       });
-      router.push('/dashboard');
+      router.push('/dashboard/panorama'); // Updated redirect
     } else {
       toast({
         variant: "destructive",
@@ -103,11 +103,11 @@ export default function LoginPage() {
                     <FormControl>
                        <div className="relative">
                         <LockKeyhole className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input 
-                          type={showPassword ? "text" : "password"} 
-                          placeholder="Entrez votre mot de passe" 
-                          {...field} 
-                          className="pl-10 pr-10" 
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Entrez votre mot de passe"
+                          {...field}
+                          className="pl-10 pr-10"
                         />
                         <Button
                           type="button"
@@ -132,7 +132,6 @@ export default function LoginPage() {
             </form>
           </Form>
         </CardContent>
-        {/* CardFooter with the link has been removed */}
       </Card>
     </div>
   );

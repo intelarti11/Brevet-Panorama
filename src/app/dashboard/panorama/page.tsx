@@ -4,20 +4,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, AlertTriangle, Users, Percent, Award, PieChart as PieChartIcon, BarChart2, GraduationCap, BookText, Calculator, Landmark, FlaskConical } from 'lucide-react';
-import { 
-  ChartContainer, 
-  ChartTooltip, 
+import {
+  ChartContainer,
+  ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   ResponsiveContainer,
   LabelList
 } from 'recharts';
@@ -71,12 +71,12 @@ const initialStats: Stats = {
 
 // Updated CHART_COLORS to use new CSS variables
 const CHART_COLORS = {
-  admis: "hsl(var(--chart-admis))", 
+  admis: "hsl(var(--chart-admis))",
   refuse: "hsl(var(--destructive))", // Maps to --color-error
-  tresBien: "hsl(var(--chart-tres-bien))", 
-  bien: "hsl(var(--chart-bien))", 
-  assezBien: "hsl(var(--chart-assez-bien))", 
-  sansMention: "hsl(var(--chart-sans-mention))", 
+  tresBien: "hsl(var(--chart-tres-bien))",
+  bien: "hsl(var(--chart-bien))",
+  assezBien: "hsl(var(--chart-assez-bien))",
+  sansMention: "hsl(var(--chart-sans-mention))",
 };
 
 const normalizeForComparison = (text: string | undefined): string => {
@@ -88,9 +88,9 @@ const normalizeForComparison = (text: string | undefined): string => {
 };
 
 export default function PanoramaPage() {
-  const { 
-    allProcessedStudents, 
-    isLoading: isLoadingContext, 
+  const {
+    allProcessedStudents,
+    isLoading: isLoadingContext,
     error: errorContext,
     selectedAcademicYear,
     selectedSerieType,
@@ -101,7 +101,7 @@ export default function PanoramaPage() {
   const [stats, setStats] = useState<Stats>(initialStats);
 
   useEffect(() => {
-    let data = [...allProcessedStudents]; 
+    let data = [...allProcessedStudents];
     if (selectedAcademicYear && selectedAcademicYear !== ALL_ACADEMIC_YEARS_VALUE) {
       data = data.filter(student => student.academicYear === selectedAcademicYear);
     }
@@ -116,15 +116,15 @@ export default function PanoramaPage() {
 
   useEffect(() => {
     if (isLoadingContext || (filteredStudentsData.length === 0 && allProcessedStudents.length > 0 && !errorContext &&
-        selectedAcademicYear === ALL_ACADEMIC_YEARS_VALUE && 
-        selectedSerieType === ALL_SERIE_TYPES_VALUE && 
+        selectedAcademicYear === ALL_ACADEMIC_YEARS_VALUE &&
+        selectedSerieType === ALL_SERIE_TYPES_VALUE &&
         selectedEstablishment === ALL_ESTABLISHMENTS_VALUE)) {
        if (isLoadingContext) {
-           setStats(initialStats); 
+           setStats(initialStats);
            return;
        }
     }
-    
+
     if (filteredStudentsData.length === 0 && !isLoadingContext) {
       setStats(initialStats);
       return;
@@ -148,7 +148,7 @@ export default function PanoramaPage() {
 
     filteredStudentsData.forEach(student => {
       const normalizedResultat = normalizeForComparison(student.resultat);
-      
+
       if (normalizedResultat.includes(normalizedAdmisStr)) {
         newStats.admis++;
         if (student.moyenne !== undefined && student.moyenne !== null) {
@@ -157,7 +157,7 @@ export default function PanoramaPage() {
         }
         if (normalizedResultat.includes(normalizedTresBienStr)) {
           newStats.mentions.tresBien++;
-        } else if (normalizedResultat.includes(normalizedAssezBienStr)) { 
+        } else if (normalizedResultat.includes(normalizedAssezBienStr)) {
           newStats.mentions.assezBien++;
         } else if (normalizedResultat.includes(normalizedBienStr)) {
           newStats.mentions.bien++;
@@ -207,7 +207,7 @@ export default function PanoramaPage() {
     }
 
     newStats.averageOverallScoreAdmitted = countOverallScoresAdmitted > 0 ? parseFloat((sumOverallScoresAdmitted / countOverallScoresAdmitted).toFixed(1)) : undefined;
-    
+
     newStats.averageFrancais = countFrancais > 0 ? parseFloat((sumFrancais / countFrancais).toFixed(1)) : undefined;
     newStats.countFrancais = countFrancais;
     newStats.averageMaths = countMaths > 0 ? parseFloat((sumMaths / countMaths).toFixed(1)) : undefined;
@@ -251,20 +251,20 @@ export default function PanoramaPage() {
       </div>
     );
   }
-  
+
   const noDataForFilters = filteredStudentsData.length === 0 && allProcessedStudents.length > 0 && !isLoadingContext;
 
   return (
-    <div className="space-y-6 p-4 md:p-6"> 
-      <header className="mb-8"> 
-        <h1 className="text-3xl font-bold text-primary tracking-tight">Panorama des Résultats</h1> 
-        <p className="text-muted-foreground mt-2"> 
+    <div className="space-y-6 p-4 md:p-6">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold text-primary tracking-tight">Panorama des Résultats</h1>
+        <p className="text-muted-foreground mt-2">
           Visualisez les statistiques clés et les répartitions des résultats au brevet. Utilisez les filtres dans la barre latérale.
         </p>
       </header>
 
       {noDataForFilters ? (
-         <Card className="shadow-md rounded-lg"> 
+         <Card className="shadow-md rounded-lg">
             <CardContent className="pt-6">
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                     <Users className="w-12 h-12 text-muted-foreground/50 mb-4" />
@@ -274,7 +274,7 @@ export default function PanoramaPage() {
             </CardContent>
          </Card>
       ) : allProcessedStudents.length === 0 && !isLoadingContext ? (
-        <Card className="shadow-md rounded-lg"> 
+        <Card className="shadow-md rounded-lg">
             <CardContent className="pt-6">
                  <div className="flex flex-col items-center justify-center py-10 text-center">
                     <Users className="w-12 h-12 text-muted-foreground/50 mb-4" />
@@ -285,46 +285,46 @@ export default function PanoramaPage() {
         </Card>
       ) : (
       <>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"> 
-          <Card className="shadow-md rounded-lg"> 
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-foreground">Nombre d'Élèves</CardTitle> 
+              <CardTitle className="text-sm font-medium text-foreground">Nombre d'Élèves</CardTitle>
               <Users className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-6"> 
-              <div className="text-4xl font-bold text-primary">{stats.totalStudents}</div> 
+            <CardContent className="p-6">
+              <div className="text-4xl font-bold text-primary">{stats.totalStudents}</div>
               <p className="text-xs text-muted-foreground mt-1">total des élèves pour la sélection</p>
             </CardContent>
           </Card>
-          <Card className="shadow-md rounded-lg"> 
+          <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-foreground">Taux de Réussite</CardTitle>
               <Percent className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-6">
-              <div className="text-4xl font-bold text-primary">{stats.successRate}%</div> 
+              <div className="text-4xl font-bold text-primary">{stats.successRate}%</div>
               <p className="text-xs text-muted-foreground mt-1">{stats.admis} admis sur {stats.admis + stats.refuse > 0 ? stats.admis + stats.refuse : stats.totalStudents} élèves considérés</p>
             </CardContent>
           </Card>
-          <Card className="shadow-md rounded-lg"> 
+          <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-foreground">Moyenne Générale (Admis)</CardTitle>
               <GraduationCap className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-6">
-              <div className="text-4xl font-bold text-primary"> 
+              <div className="text-4xl font-bold text-primary">
                 {stats.averageOverallScoreAdmitted !== undefined ? `${stats.averageOverallScoreAdmitted.toFixed(1)}/20` : 'N/A'}
               </div>
               <p className="text-xs text-muted-foreground mt-1">moyenne des élèves admis</p>
             </CardContent>
           </Card>
         </div>
-        
+
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
-          <Card className="shadow-md rounded-lg"> 
-            <CardHeader className="p-6"> 
-              <CardTitle className="flex items-center text-xl text-primary"> 
-                <PieChartIcon className="mr-2 h-5 w-5 text-primary" /> 
+          <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
+            <CardHeader className="p-6">
+              <CardTitle className="flex items-center text-xl text-primary">
+                <PieChartIcon className="mr-2 h-5 w-5 text-primary" />
                 Répartition des Résultats
               </CardTitle>
               <CardDescription className="mt-1">Distribution des élèves admis et refusés.</CardDescription>
@@ -333,26 +333,26 @@ export default function PanoramaPage() {
               {stats.admis + stats.refuse > 0 ? (
                 <ChartContainer config={{}} className="mx-auto aspect-square max-h-[300px]">
                   <PieChart>
-                    <ChartTooltip 
-                        content={<ChartTooltipContent 
-                            hideLabel 
+                    <ChartTooltip
+                        content={<ChartTooltipContent
+                            hideLabel
                             formatter={(value, name, props) => (
                                 <div className="flex flex-col">
                                     <span className="font-semibold capitalize">{props.payload?.name}</span>
                                     <span>Nombre: {value}</span>
                                 </div>
                             )}
-                        />} 
+                        />}
                     />
-                    <Pie 
-                        data={resultsChartData} 
-                        dataKey="value" 
-                        nameKey="name" 
-                        cx="50%" 
-                        cy="50%" 
-                        outerRadius={100} 
+                    <Pie
+                        data={resultsChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
                         innerRadius={60} // Makes it a donut chart
-                        labelLine={false} 
+                        labelLine={false}
                         label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }) => {
                             const RADIAN = Math.PI / 180;
                             const effectiveOuterRadius = Math.max(0, outerRadius);
@@ -379,10 +379,10 @@ export default function PanoramaPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-md rounded-lg"> 
+          <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="p-6">
-              <CardTitle className="flex items-center text-xl text-primary"> 
-                <BarChart2 className="mr-2 h-5 w-5 text-primary" /> 
+              <CardTitle className="flex items-center text-xl text-primary">
+                <BarChart2 className="mr-2 h-5 w-5 text-primary" />
                 Répartition des Mentions (Admis)
               </CardTitle>
               <CardDescription className="mt-1">Distribution des mentions pour les élèves admis.</CardDescription>
@@ -395,11 +395,11 @@ export default function PanoramaPage() {
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                       <XAxis type="number" dataKey="value" allowDecimals={false} />
                       <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} />
-                      <ChartTooltip 
+                      <ChartTooltip
                           cursor={false}
                           content={
-                              <ChartTooltipContent 
-                                  formatter={(value, name, props) => ( 
+                              <ChartTooltipContent
+                                  formatter={(value, name, props) => (
                                       <div className="flex flex-col p-1">
                                           <span className="font-semibold">{props.payload.name}</span>
                                           <span>Effectif: {value}</span>
@@ -407,7 +407,7 @@ export default function PanoramaPage() {
                                       </div>
                                   )}
                               />
-                          } 
+                          }
                       />
                       <Bar dataKey="value" radius={4}>
                          {mentionsChartData.map((entry, index) => (
@@ -425,21 +425,21 @@ export default function PanoramaPage() {
           </Card>
         </div>
 
-        <Card className="shadow-md rounded-lg"> 
+        <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
             <CardHeader className="p-6">
-                <CardTitle className="text-xl text-primary">Moyennes par Matières Principales</CardTitle> 
+                <CardTitle className="text-xl text-primary">Moyennes par Matières Principales</CardTitle>
                 <CardDescription className="mt-1">Moyenne des notes (/20) pour les élèves de la sélection ayant une note enregistrée.</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-6 pt-4 md:grid-cols-4 p-6"> 
-                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30"> 
+            <CardContent className="grid grid-cols-2 gap-6 pt-4 md:grid-cols-4 p-6">
+                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
                     <BookText className="h-7 w-7 text-primary mb-2" />
                     <p className="text-sm font-medium text-foreground">Français</p>
-                    <p className="text-2xl font-bold mt-1 text-primary"> 
+                    <p className="text-2xl font-bold mt-1 text-primary">
                         {stats.averageFrancais !== undefined ? stats.averageFrancais.toFixed(1) : 'N/A'}
                     </p>
                     <p className="text-xs text-muted-foreground">({stats.countFrancais ?? 0} élèves)</p>
                 </div>
-                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30">
+                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
                     <Calculator className="h-7 w-7 text-primary mb-2" />
                     <p className="text-sm font-medium text-foreground">Mathématiques</p>
                     <p className="text-2xl font-bold mt-1 text-primary">
@@ -447,7 +447,7 @@ export default function PanoramaPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">({stats.countMaths ?? 0} élèves)</p>
                 </div>
-                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30">
+                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
                     <Landmark className="h-7 w-7 text-primary mb-2" />
                     <p className="text-sm font-medium text-foreground">Histoire-Géo.</p>
                     <p className="text-2xl font-bold mt-1 text-primary">
@@ -455,7 +455,7 @@ export default function PanoramaPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">({stats.countHistoireGeo ?? 0} élèves)</p>
                 </div>
-                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30">
+                <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/30 transition-all duration-200 ease-in-out hover:bg-muted/50 hover:scale-[1.02]">
                     <FlaskConical className="h-7 w-7 text-primary mb-2" />
                     <p className="text-sm font-medium text-foreground">Sciences</p>
                     <p className="text-2xl font-bold mt-1 text-primary">
@@ -466,30 +466,30 @@ export default function PanoramaPage() {
             </CardContent>
         </Card>
 
-        <Card className="shadow-md rounded-lg"> 
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6"> 
-            <CardTitle className="text-xl font-medium text-primary">Mentions (parmi admis)</CardTitle> 
-            <Award className="h-6 w-6 text-primary" /> 
+        <Card className="shadow-md rounded-lg transition-all duration-200 ease-in-out hover:shadow-lg hover:ring-2 hover:ring-primary/30">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
+            <CardTitle className="text-xl font-medium text-primary">Mentions (parmi admis)</CardTitle>
+            <Award className="h-6 w-6 text-primary" />
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 pt-4 sm:grid-cols-4 p-6 pb-6"> 
-            <div>
+          <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 pt-4 sm:grid-cols-4 p-6 pb-6">
+            <div className="p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
               <p className="text-sm font-semibold text-foreground">Très Bien</p>
-              <p className="text-4xl font-bold text-primary">{stats.mentions.tresBien}</p> 
+              <p className="text-4xl font-bold text-primary">{stats.mentions.tresBien}</p>
               <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.tresBien : 0}% des admis</p>
             </div>
-            <div> 
+            <div className="p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
               <p className="text-sm font-semibold text-foreground">Assez Bien</p>
-              <p className="text-4xl font-bold text-primary">{stats.mentions.assezBien}</p> 
+              <p className="text-4xl font-bold text-primary">{stats.mentions.assezBien}</p>
               <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.assezBien : 0}% des admis</p>
             </div>
-            <div>
+            <div className="p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
               <p className="text-sm font-semibold text-foreground">Bien</p>
-              <p className="text-4xl font-bold text-primary">{stats.mentions.bien}</p> 
+              <p className="text-4xl font-bold text-primary">{stats.mentions.bien}</p>
               <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.bien : 0}% des admis</p>
             </div>
-            <div>
+            <div className="p-2 rounded-lg transition-all duration-200 ease-in-out hover:bg-primary/10 hover:scale-[1.02]">
               <p className="text-sm font-semibold text-foreground">Sans Mention</p>
-              <p className="text-4xl font-bold text-primary">{stats.mentions.sansMention}</p> 
+              <p className="text-4xl font-bold text-primary">{stats.mentions.sansMention}</p>
               <p className="text-xs text-muted-foreground">{stats.admis > 0 ? stats.mentionPercentages.sansMention : 0}% des admis</p>
             </div>
           </CardContent>
