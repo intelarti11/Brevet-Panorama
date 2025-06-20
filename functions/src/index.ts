@@ -1,5 +1,4 @@
 
-'use server';
 import * as admin from "firebase-admin";
 import {z} from "zod";
 import {
@@ -11,6 +10,7 @@ import {
 // Initialiser Firebase Admin SDK
 let adminAppInitialized = false;
 try {
+  console.log("Attempting Firebase Admin SDK initialization...");
   admin.initializeApp();
   console.log("Firebase Admin SDK initialized successfully.");
   adminAppInitialized = true;
@@ -23,6 +23,7 @@ try {
 let db: admin.firestore.Firestore | undefined = undefined;
 if (adminAppInitialized) {
   try {
+    console.log("Attempting to get Firestore DB instance...");
     db = admin.firestore();
     if (!db) {
       console.error(
