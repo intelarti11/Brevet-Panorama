@@ -6,9 +6,9 @@ import type {UserRecord} from "firebase-admin/auth";
 import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 
-const LOG_PREFIX = "INIT_V13";
+const LOG_PREFIX = "FN_V13"; // Raccourci
 
-logger.info(`${LOG_PREFIX}: Script top. Admin init.`);
+logger.info(`${LOG_PREFIX}: Top. Admin init.`);
 
 let db: admin.firestore.Firestore | null = null;
 let adminApp: admin.app.App | null = null;
@@ -23,19 +23,16 @@ try {
   logger.info(`${LOG_PREFIX}: admin.firestore() OK.`);
   logger.info(`${LOG_PREFIX}: FB Admin SDK init OK.`);
 } catch (error: unknown) {
-  let errMsg = "Unknown error during Firebase Admin init.";
-  let errStack = "No stack trace for Firebase Admin init error.";
+  let errMsg = "Unk err FB Admin init."; // Raccourci
+  let errStack = "No stack trace."; // Raccourci
   if (error instanceof Error) {
     errMsg = error.message;
-    errStack = error.stack || "No stack trace available";
+    errStack = error.stack || "No stack"; // Raccourci
   }
   logger.error(
-    `${LOG_PREFIX}: CRIT_ERR_FB_ADMIN_INIT.`,
-    {
-      msg: errMsg.slice(0, 50), // Shortened key and slice
-      stack: errStack.slice(0, 70), // Shortened key and slice
-      obj: String(error).slice(0, 50), // Shortened key and slice
-    }
+    `${LOG_PREFIX}: FB_INIT_FAIL.`, // Raccourci
+    // Raccourcir les clés et les valeurs
+    {m: errMsg.slice(0, 20), s: errStack.slice(0, 30), o: String(error).slice(0, 20)}
   );
   db = null;
   adminApp = null;
@@ -44,22 +41,22 @@ try {
 export const ultraMinimalFunction = onCall(
   {region: "europe-west1"},
   (request) => {
-    const logMarker = "MIN_V13_LOG";
+    const logMarker = "MIN"; // Raccourci
     logger.info(
       `${logMarker}: Called.`,
-      {structuredData: true, data: request.data}
+      {structuredData: true, d: request.data} // Clé 'd'
     );
     if (!db) {
-      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
+      logger.warn(`${logMarker}: DB not init.`);
       return {
         success: false,
-        message: "DB NA for UMF.", // Shortened message
+        message: "DB UMF KO.", // Raccourci
         receivedData: request.data,
       };
     }
     return {
       success: true,
-      message: "UMF (v13) OK.", // Shortened message
+      message: "UMF OK.", // Raccourci
       receivedData: request.data,
     };
   }
@@ -73,80 +70,77 @@ const requestInvitationOptions: HttpsOptions = {
 export const requestInvitation = onCall(
   requestInvitationOptions,
   async (request) => {
-    const logMarker = "INV_WR_V13";
+    const logMarker = "REQ"; // Raccourci
     logger.info(
-      `${logMarker}: Called. Data:`,
-      {structuredData: true, data: request.data}
+      `${logMarker}: Called.`,
+      {structuredData: true, d: request.data} // Clé 'd'
     );
 
     if (!adminApp) {
-      logger.error(`${logMarker}: AdminApp not init! Critical.`);
+      logger.error(`${logMarker}: AdminApp not init! Crit.`);
     }
     if (!db) {
-      logger.warn(`${logMarker}: Firestore (db) not init.`);
+      logger.warn(`${logMarker}: DB not init.`);
       return {
         success: false,
-        message: "Srv Err (DB indispo).",
+        message: "Srv Err (DB KO).", // Raccourci
         receivedData: request.data,
       };
     }
 
     const email = request.data.email;
     if (!email || typeof email !== "string" || !email.includes("@")) {
-      logger.error(`${logMarker}: Invalid/missing email.`, {email});
+      logger.error(`${logMarker}: Invalid mail.`, {email: String(email).slice(0,15)});
       return {
         success: false,
-        message: "Email invalide/manquant.",
+        message: "Mail invalide.", // Raccourci
         receivedData: request.data,
       };
     }
+    const emailShort = String(email).slice(0,15);
 
     try {
-      const collectionName = "invitationRequests";
-      const existingQuery = db.collection(collectionName)
+      const coll = "invitationRequests"; // Raccourci
+      const query = db.collection(coll)
         .where("email", "==", email)
         .where("status", "==", "pending");
-      const existingSnapshot = await existingQuery.get();
+      const snap = await query.get(); // Raccourci
 
-      if (!existingSnapshot.empty) {
-        const msg = `${logMarker}: Pend. req for ${email.slice(0, 25)} exists.`;
-        logger.info(msg);
+      if (!snap.empty) {
+        logger.info(`${logMarker}: Pend. req ${emailShort} exists.`);
         return {
           success: false,
-          message: `Demande ${email.slice(0, 25)} attente.`,
+          message: `Req ${emailShort} attente.`, // Raccourci
           receivedData: request.data,
         };
       }
 
-      const newRequestRef = db.collection(collectionName).doc();
-      await newRequestRef.set({
+      const newRef = db.collection(coll).doc(); // Raccourci
+      await newRef.set({
         email: email,
         requestedAt: admin.firestore.FieldValue.serverTimestamp(),
         status: "pending",
         notifiedAt: null,
       });
 
-      const successMsg = `Demande ${email.slice(0, 25)} OK.`;
-      const logOk = `${logMarker}: Write OK ${email.slice(0, 25)}. ID: ${newRequestRef.id.slice(0, 10)}`;
-      logger.info(logOk);
+      logger.info(`${logMarker}: OK ${emailShort}. ID: ${newRef.id.slice(0, 5)}`);
       return {
         success: true,
-        message: successMsg,
+        message: `Req ${emailShort} OK.`, // Raccourci
         receivedData: request.data,
       };
     } catch (writeError: unknown) {
-      let errorMsg = "Unknown Firestore write error.";
+      let errorMsg = "Unk FS write err."; // Raccourci
       if (writeError instanceof Error) {
         errorMsg = writeError.message;
       }
-      const logFail = `${logMarker}: Firestore write FAIL ${email.slice(0, 25)}.`;
       logger.error(
-        logFail,
-        {err: errorMsg.slice(0, 30), orig: String(writeError).slice(0, 20)}
+        `${logMarker}: FS write KO ${emailShort}.`,
+        {err: errorMsg.slice(0, 15), orig: String(writeError).slice(0, 10)}
       );
       return {
         success: false,
-        message: `Save KO: ${errorMsg.slice(0, 20)}`, // Shortened
+        message: `Save KO: ${errorMsg.slice(0, 15)}`, // Raccourci
         receivedData: request.data,
       };
     }
@@ -161,14 +155,14 @@ const listPendingInvitationsOptions: HttpsOptions = {
 export const listPendingInvitations = onCall(
   listPendingInvitationsOptions,
   async () => {
-    const logMarker = "LST_INV_V14";
+    const logMarker = "LST"; // Raccourci
     logger.info(`${logMarker}: Func start. Listing all invites.`);
 
     if (!db) {
-      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
+      logger.warn(`${logMarker}: DB not init.`);
       return {
         success: false,
-        message: "Err serveur: DB indispo.",
+        message: "Err srv: DB KO.", // Raccourci
         invitations: [],
       };
     }
@@ -179,62 +173,58 @@ export const listPendingInvitations = onCall(
       const snapshot = await query.get();
 
       if (snapshot.empty) {
-        logger.info(`${logMarker}: No invites found at all.`);
+        logger.info(`${logMarker}: No inv found.`);
         return {
           success: true,
-          message: "0 inv. attente.", // Shortened
+          message: "0 inv.", // Raccourci
           invitations: [],
         };
       }
 
       const invitations = snapshot.docs.map((doc) => {
         const data = doc.data();
-        const reqTimestamp = data.requestedAt as admin.firestore.Timestamp;
-        let requestedAtISO: string;
-        if (reqTimestamp && typeof reqTimestamp.toDate === "function") {
-          requestedAtISO = reqTimestamp.toDate().toISOString();
+        const reqTs = data.requestedAt as admin.firestore.Timestamp; // Raccourci
+        let reqAtISO: string; // Raccourci
+        if (reqTs && typeof reqTs.toDate === "function") {
+          reqAtISO = reqTs.toDate().toISOString();
         } else {
-          const shortId = doc.id.substring(0, 10);
-          const reqTsValStr = String(reqTimestamp);
-          logger.warn(`LST_INV: Bad reqAt ${shortId}`, {
-            ts: reqTsValStr.slice(0, 15),
+          logger.warn(`${logMarker}: Bad reqAt ${doc.id.slice(0,5)}`, {
+            ts: String(reqTs).slice(0, 10),
           });
-          requestedAtISO = new Date(0).toISOString();
+          reqAtISO = new Date(0).toISOString();
         }
 
-        const notifiedTimestamp = data.notifiedAt as admin.firestore.Timestamp;
-        let notifiedAtISO: string | undefined;
-        if (notifiedTimestamp && typeof notifiedTimestamp.toDate === "function") {
-          notifiedAtISO = notifiedTimestamp.toDate().toISOString();
+        const notifTs = data.notifiedAt as admin.firestore.Timestamp; // Raccourci
+        let notifAtISO: string | undefined; // Raccourci
+        if (notifTs && typeof notifTs.toDate === "function") {
+          notifAtISO = notifTs.toDate().toISOString();
         }
 
         return {
           id: doc.id,
           email: data.email,
-          requestedAt: requestedAtISO,
+          requestedAt: reqAtISO,
           status: data.status,
-          notifiedAt: notifiedAtISO,
+          notifiedAt: notifAtISO,
         };
       });
-      const logMsg = `${logMarker}: Found ${invitations.length} invites.`;
-      logger.info(logMsg);
+      logger.info(`${logMarker}: Found ${invitations.length} inv.`);
       return {
         success: true,
-        message: "Liste OK.", // Shortened
+        message: "Liste OK.", // Raccourci
         invitations: invitations,
       };
     } catch (error: unknown) {
-      let errorMsg = "Unknown error listing invites.";
+      let errorMsg = "Unk err listing."; // Raccourci
       if (error instanceof Error) {
         errorMsg = error.message;
       }
-      const shortError = String(error).slice(0, 20);
-      logger.error(`LST_INV: List fail. ${errorMsg.slice(0, 25)}`, {
-        orig: shortError,
+      logger.error(`${logMarker}: List fail. ${errorMsg.slice(0, 15)}`, {
+        orig: String(error).slice(0, 10),
       });
       return {
         success: false,
-        message: `Err liste: ${errorMsg.slice(0, 20)}`,
+        message: `Err liste: ${errorMsg.slice(0, 15)}`, // Raccourci
         invitations: [],
       };
     }
@@ -249,102 +239,95 @@ const approveInvitationOptions: HttpsOptions = {
 export const approveInvitation = onCall(
   approveInvitationOptions,
   async (request) => {
-    const logMarker = "APPR_V7";
+    const logMarker = "APR"; // Raccourci
     logger.info(
-      `${logMarker}: Called. Data:`,
-      {structuredData: true, data: request.data}
+      `${logMarker}: Called.`,
+      {structuredData: true, d: request.data} // Clé 'd'
     );
 
     if (!db || !adminApp) {
-      logger.warn(`${logMarker}: DB or AdminApp not init.`);
-      return {success: false, message: "Err serveur (DB/Admin)."};
+      logger.warn(`${logMarker}: DB/AdminApp KO.`);
+      return {success: false, message: "Err srv (DB/Admin)."};
     }
 
-    const invitationId = request.data.invitationId;
-    if (!invitationId || typeof invitationId !== "string") {
-      const invIdSl = String(invitationId).slice(0,10);
-      logger.error(`${logMarker}: Invalid ID.`, {invitationId: invIdSl});
-      return {success: false, message: "ID d'invitation invalide."};
+    const invId = request.data.invitationId; // Raccourci
+    if (!invId || typeof invId !== "string") {
+      logger.error(`${logMarker}: Invalid ID.`, {id: String(invId).slice(0,5)});
+      return {success: false, message: "ID inv invalide."}; // Raccourci
     }
-    const invIdShort = invitationId.slice(0,10);
+    const invIdShort = String(invId).slice(0,10);
 
     try {
-      const inviteRef = db.collection("invitationRequests").doc(invitationId);
-      const inviteDoc = await inviteRef.get();
+      const invRef = db.collection("invitationRequests").doc(invId); // Raccourci
+      const invDoc = await invRef.get();
 
-      if (!inviteDoc.exists) {
-        logger.warn(`${logMarker}: Invite ${invIdShort} not found.`);
-        return {success: false, message: "Invitation non trouvée."};
+      if (!invDoc.exists) {
+        logger.warn(`${logMarker}: Inv ${invIdShort} not found.`);
+        return {success: false, message: "Inv non trouvée."}; // Raccourci
       }
 
-      const docData = inviteDoc.data();
+      const docData = invDoc.data();
       if (docData?.status !== "pending") {
-        const msg = `Invite ${invIdShort} not pending.`;
-        logger.warn(`${logMarker}: ${msg} Status: ${docData?.status}`);
+        logger.warn(`${logMarker}: Inv ${invIdShort} not pend. St: ${docData?.status}`);
         return {
           success: false,
-          message: `Inv. déjà traitée (${docData?.status}).`,
+          message: `Inv traitée (${docData?.status}).`, // Raccourci
         };
       }
 
-      const emailToApprove = docData?.email;
-      if (!emailToApprove || typeof emailToApprove !== "string") {
-        logger.error(`${logMarker}: Mail absent ds ${invIdShort}.`);
-        return {success: false, message: "Email manquant."};
+      const email = docData?.email; // Raccourci
+      if (!email || typeof email !== "string") {
+        logger.error(`${logMarker}: Mail absent ${invIdShort}.`);
+        return {success: false, message: "Mail absent."}; // Raccourci
       }
-      const emailShort = emailToApprove.slice(0,25);
+      const emailShort = String(email).slice(0,15);
 
-      let userCreationMessage = "";
-      let userMessageShort = "";
+      let userCrMsg = ""; // Raccourci
+      let userMsgShort = "";
 
       try {
-        const tempPassword = crypto.randomBytes(16).toString("hex");
-        const userRecord: UserRecord = await admin.auth().createUser({
-          email: emailToApprove,
+        const tmpPwd = crypto.randomBytes(16).toString("hex"); // Raccourci
+        const userRec: UserRecord = await admin.auth().createUser({ // Raccourci
+          email: email,
           emailVerified: true,
-          password: tempPassword,
+          password: tmpPwd,
           disabled: false,
         });
-        const logUMsg = `${logMarker}: User ${userRecord.uid.slice(0, 10)} créé.`;
-        logger.info(logUMsg);
-        userCreationMessage = "Cpt créé. Mdp via 'Oublié'.";
-        userMessageShort = "Usr ok.";
+        logger.info(`${logMarker}: Usr ${userRec.uid.slice(0,5)} créé.`);
+        userCrMsg = "Cpt créé. Mdp via 'Oublié'."; // Raccourci
+        userMsgShort = "Usr ok.";
       } catch (authErrorUnknown: unknown) {
-        const authError = authErrorUnknown as {code?: string; message?: string};
-        if (authError.code === "auth/email-already-exists") {
-          logger.warn(`${logMarker}: User ${emailShort} exists.`);
-          userCreationMessage = "Cpt existant.";
-          userMessageShort = "Usr exist.";
+        const authErr = authErrorUnknown as {code?: string; message?: string}; // Raccourci
+        if (authErr.code === "auth/email-already-exists") {
+          logger.warn(`${logMarker}: Usr ${emailShort} exists.`);
+          userCrMsg = "Cpt existant."; // Raccourci
+          userMsgShort = "Usr exist.";
         } else {
-          const errMsg = authError.message || "Auth error";
-          const logErr = `${logMarker}: Auth FAIL: ${emailShort}.`;
-          logger.error(logErr, {err: errMsg.slice(0, 20)});
-          const displayErrMsg = errMsg.substring(0, 20);
-          return {success: false, message: `Échec Auth: ${displayErrMsg}`};
+          const errMsg = authErr.message || "Auth err"; // Raccourci
+          logger.error(`${logMarker}: Auth KO: ${emailShort}.`, {e: errMsg.slice(0,10)});
+          return {success: false, message: `Auth KO: ${errMsg.slice(0,10)}`}; // Raccourci
         }
       }
 
-      await inviteRef.update({
+      await invRef.update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const finalLogMsg = `${logMarker}: OK ${invIdShort}. ${userMessageShort}`;
-      logger.info(finalLogMsg);
-
+      logger.info(`${logMarker}: OK ${invIdShort}. ${userMsgShort}`);
       return {
         success: true,
-        message: `Approuvé. ${userCreationMessage}`,
+        message: `Approuvé. ${userCrMsg}`, // Raccourci
       };
     } catch (err: unknown) {
-      let errorMsg = "Unknown error approving invitation.";
+      let errorMsg = "Unk err approving."; // Raccourci
       if (err instanceof Error) {
         errorMsg = err.message;
       }
-      const logErr = `${logMarker}: Approve FAIL ${invIdShort}.`;
-      logger.error(logErr, {err: errorMsg.slice(0, 25), orig: String(err).slice(0, 20)});
-      const displayErrMsg = errorMsg.substring(0, 20);
-      return {success: false, message: `App. KO: ${displayErrMsg}`};
+      logger.error(`${logMarker}: Appr KO ${invIdShort}.`, 
+        {e: errorMsg.slice(0,15), o: String(err).slice(0,10)} // Clés 'e', 'o'
+      );
+      return {success: false, message: `App. KO: ${errorMsg.slice(0,15)}`}; // Raccourci
     }
   }
 );
@@ -356,46 +339,45 @@ const rejectInvitationOptions: HttpsOptions = {
 export const rejectInvitation = onCall(
   rejectInvitationOptions,
   async (request) => {
-    const logMarker = "REJ_V6";
+    const logMarker = "REJ"; // Raccourci
     logger.info(
-      `${logMarker}: Called. Data:`,
-      {structuredData: true, data: request.data}
+      `${logMarker}: Called.`,
+      {structuredData: true, d: request.data} // Clé 'd'
     );
 
     if (!db) {
-      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
-      return {success: false, message: "Erreur serveur (DB)."};
+      logger.warn(`${logMarker}: DB not init.`);
+      return {success: false, message: "Err srv (DB)."}; // Raccourci
     }
 
-    const invitationId = request.data.invitationId;
+    const invId = request.data.invitationId; // Raccourci
     const reason = request.data.reason;
-    const invIdShort = String(invitationId).slice(0,10);
+    const invIdShort = String(invId).slice(0,10);
 
-    if (!invitationId || typeof invitationId !== "string") {
-      logger.error(`${logMarker}: Invalid ID.`, {invitationId: invIdShort});
-      return {success: false, message: "ID d'invitation invalide."};
+    if (!invId || typeof invId !== "string") {
+      logger.error(`${logMarker}: Invalid ID.`, {id: invIdShort});
+      return {success: false, message: "ID inv invalide."}; // Raccourci
     }
 
     try {
-      const inviteRef = db.collection("invitationRequests").doc(invitationId);
-      const inviteDoc = await inviteRef.get();
+      const invRef = db.collection("invitationRequests").doc(invId); // Raccourci
+      const invDoc = await invRef.get();
 
-      if (!inviteDoc.exists) {
-        logger.warn(`${logMarker}: Invite ${invIdShort} not found.`);
-        return {success: false, message: "Invitation non trouvée."};
+      if (!invDoc.exists) {
+        logger.warn(`${logMarker}: Inv ${invIdShort} not found.`);
+        return {success: false, message: "Inv non trouvée."}; // Raccourci
       }
 
-      const docData = inviteDoc.data();
+      const docData = invDoc.data();
       if (docData?.status !== "pending") {
-        const msg = `Inv ${invIdShort} not pend.`;
-        logger.warn(`${logMarker}: ${msg} St: ${docData?.status}`);
+        logger.warn(`${logMarker}: Inv ${invIdShort} not pend. St: ${docData?.status}`);
         return {
           success: false,
-          message: `Inv. traitée (${docData?.status}).`, // Shortened
+          message: `Inv traitée (${docData?.status}).`, // Raccourci
         };
       }
 
-      const updatePayload: {
+      const payload: { // Raccourci
         status: string;
         rejectedAt: admin.firestore.FieldValue;
         rejectionReason?: string;
@@ -405,24 +387,23 @@ export const rejectInvitation = onCall(
       };
 
       if (reason && typeof reason === "string" && reason.trim() !== "") {
-        updatePayload.rejectionReason = reason.substring(0, 50);
+        payload.rejectionReason = reason.substring(0, 50);
       }
 
-      await inviteRef.update(updatePayload);
+      await invRef.update(payload);
 
-      const emailLog = docData?.email || "[no_email]";
-      const sucMsg = `${logMarker}: KO ${invIdShort} for ${emailLog.slice(0, 20)}.`;
-      logger.info(sucMsg);
-      return {success: true, message: `${emailLog.slice(0, 20)} Rej.`};
+      const emailLog = (docData?.email || "[no_mail]").slice(0,15); // Raccourci
+      logger.info(`${logMarker}: KO ${invIdShort} for ${emailLog}.`);
+      return {success: true, message: `${emailLog} Rej.`}; // Raccourci
     } catch (err: unknown) {
-      let errorMsg = "Unknown error rejecting invitation.";
+      let errorMsg = "Unk err rejecting."; // Raccourci
       if (err instanceof Error) {
         errorMsg = err.message;
       }
-      const logErr = `${logMarker}: Rej. FAIL ${invIdShort}.`;
-      logger.error(logErr, {err: errorMsg.slice(0, 25), orig: String(err).slice(0, 20)});
-      const displayErrMsg = errorMsg.substring(0, 25);
-      return {success: false, message: `Rej. KO: ${displayErrMsg}`}; // Shortened
+      logger.error(`${logMarker}: Rej. KO ${invIdShort}.`,
+        {e: errorMsg.slice(0,15), o: String(err).slice(0,10)} // Clés 'e', 'o'
+      );
+      return {success: false, message: `Rej. KO: ${errorMsg.slice(0,15)}`}; // Raccourci
     }
   }
 );
@@ -434,65 +415,64 @@ const markInvitationAsNotifiedOptions: HttpsOptions = {
 export const markInvitationAsNotified = onCall(
   markInvitationAsNotifiedOptions,
   async (request) => {
-    const logMarker = "NTFY_V1";
+    const logMarker = "NTF"; // Raccourci
     logger.info(
-      `${logMarker}: Called. Data:`,
-      {structuredData: true, data: request.data}
+      `${logMarker}: Called.`,
+      {structuredData: true, d: request.data} // Clé 'd'
     );
 
     if (!db) {
       logger.warn(`${logMarker}: DB not init.`);
-      return {success: false, message: "Erreur serveur (DB)."};
+      return {success: false, message: "Err srv (DB)."}; // Raccourci
     }
 
-    const invitationId = request.data.invitationId;
-    const invIdShort = String(invitationId).slice(0,10);
-    if (!invitationId || typeof invitationId !== "string") {
-      logger.error(`${logMarker}: Invalid ID.`, {invitationId: invIdShort});
-      return {success: false, message: "ID d'invitation invalide."};
+    const invId = request.data.invitationId; // Raccourci
+    const invIdShort = String(invId).slice(0,10);
+    if (!invId || typeof invId !== "string") {
+      logger.error(`${logMarker}: Invalid ID.`, {id: invIdShort});
+      return {success: false, message: "ID inv invalide."}; // Raccourci
     }
 
     try {
-      const inviteRef = db.collection("invitationRequests").doc(invitationId);
-      const inviteDoc = await inviteRef.get();
+      const invRef = db.collection("invitationRequests").doc(invId); // Raccourci
+      const invDoc = await invRef.get();
 
-      if (!inviteDoc.exists) {
+      if (!invDoc.exists) {
         logger.warn(`${logMarker}: Inv ${invIdShort} not found.`);
-        return {success: false, message: "Invitation non trouvée."};
+        return {success: false, message: "Inv non trouvée."}; // Raccourci
       }
 
-      const docData = inviteDoc.data();
+      const docData = invDoc.data();
       if (docData?.status !== "approved") {
-        const currSt = docData?.status ?? "unknown";
+        const currSt = docData?.status ?? "unk"; // Raccourci
         logger.warn(`${logMarker}: Inv ${invIdShort} not OK (St: ${currSt})`);
-        return {success: false, message: "Inv. non appr. pr notif."};
+        return {success: false, message: "Inv not appr."}; // Raccourci
       }
       if (docData?.notifiedAt) {
         logger.info(`${logMarker}: Inv ${invIdShort} already notified.`);
-        return {success: true, message: "Inv. déjà notifiée."};
+        return {success: true, message: "Inv déjà notif."}; // Raccourci
       }
 
-      await inviteRef.update({
+      await invRef.update({
         notifiedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const emailLog = docData?.email || "[no_email]";
-      const emailShort = emailLog.slice(0,20);
-      logger.info(`${logMarker}: Inv ${invIdShort} for ${emailShort} notif.`);
-      return {success: true, message: `Notif marquée ${emailShort}.`};
+      const emailLog = (docData?.email || "[no_mail]").slice(0,15); // Raccourci
+      logger.info(`${logMarker}: Inv ${invIdShort} for ${emailLog} notif.`);
+      return {success: true, message: `Notif marquée ${emailLog}.`}; // Raccourci
     } catch (err: unknown) {
-      let errorMsg = "Erreur lors du marquage de la notification.";
+      let errorMsg = "Err mark notif."; // Raccourci
       if (err instanceof Error) {
         errorMsg = err.message;
       }
-      const logErr = `${logMarker}: Mark notified FAIL ${invIdShort}.`;
-      logger.error(logErr, {err: errorMsg.slice(0, 25), orig: String(err).slice(0, 20)});
-      const displayErrMsg = errorMsg.substring(0, 20);
-      return {success: false, message: `Notif KO: ${displayErrMsg}`};
+      logger.error(`${logMarker}: Mark notif KO ${invIdShort}.`,
+        {e: errorMsg.slice(0,15), o: String(err).slice(0,10)} // Clés 'e', 'o'
+      );
+      return {success: false, message: `Notif KO: ${errorMsg.slice(0,10)}`}; // Raccourci
     }
   }
 );
 
 logger.info(
-  `${LOG_PREFIX}: Script end. Admin SDK init done.`
+  `${LOG_PREFIX}: End. SDK init OK.` // Raccourci
 );
