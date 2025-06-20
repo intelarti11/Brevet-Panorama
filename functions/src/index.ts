@@ -123,9 +123,11 @@ export const requestInvitation = onCall(
       logger.info(
         `${logMarker}: Firestore write OK for ${email}. ID: ${newRequestRef.id}`
       );
+      // Raccourci pour respecter max-len
+      const successMsg = `Demande pour ${email} enregistrée. Vous serez contacté.`;
       return {
         success: true,
-        message: `Demande pour ${email} enregistrée. Vous serez contacté.`,
+        message: successMsg,
         receivedData: request.data,
       };
     } catch (writeError: unknown) {
@@ -185,13 +187,18 @@ export const listPendingInvitations = onCall(
 
       const invitations = snapshot.docs.map((doc) => {
         const data = doc.data();
-        const reqTimestamp = data.requestedAt as admin.firestore.Timestamp;
+        const rawTimestamp = data.requestedAt;
         let requestedAtISO: string;
-        if (reqTimestamp) {
-          requestedAtISO = reqTimestamp.toDate().toISOString();
+
+        // Robustly check if rawTimestamp is a Firestore Timestamp and can call .toDate()
+        if (rawTimestamp && typeof rawTimestamp.toDate === 'function') {
+          requestedAtISO = (rawTimestamp as admin.firestore.Timestamp).toDate().toISOString();
         } else {
-          requestedAtISO = new Date().toISOString(); // Fallback
+          // Log a warning and use a fallback if it's not a valid Timestamp or is missing
+          logger.warn(`${logMarker}: requestedAt for doc ${doc.id} is not a valid Firestore Timestamp or is missing. Value: ${JSON.stringify(rawTimestamp)}. Using current date as fallback.`);
+          requestedAtISO = new Date().toISOString();
         }
+        
         return {
           id: doc.id,
           email: data.email,
