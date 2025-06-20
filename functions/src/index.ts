@@ -4,6 +4,7 @@ import {onCall, HttpsOptions} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
+// Log prefix pour cette version (V11 avec écriture Firestore)
 const LOG_PREFIX_V11 = "INIT_V11";
 
 logger.info(
@@ -47,6 +48,7 @@ try {
   adminApp = null;
 }
 
+// Ultra minimal function for basic testing
 export const ultraMinimalFunction = onCall(
   {region: "europe-west1"},
   (request) => {
@@ -73,7 +75,7 @@ export const ultraMinimalFunction = onCall(
   }
 );
 
-// Explicitly type the options object
+// RequestInvitation - Maintenant avec écriture Firestore
 const requestInvitationOptions: HttpsOptions = {
   region: "europe-west1",
   invoker: "public",
@@ -81,35 +83,68 @@ const requestInvitationOptions: HttpsOptions = {
 
 export const requestInvitation = onCall(
   requestInvitationOptions,
-  (request) => {
-    const logMarker = "REQUEST_INVITATION_SIMPLIFIED_V11_LOG";
+  async (request) => { // Note: 'async' est ajouté ici
+    const logMarker = "INVITE_WRITE_V11_LOG"; // Nouveau marqueur
     logger.info(
-      `${logMarker}: requestInvitation (simplified) called.`,
+      `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
     );
 
     if (!adminApp) {
-      logger.error(`${logMarker}: AdminApp not initialized!`);
+      logger.error(`${logMarker}: AdminApp not initialized! Critical.`);
     }
     if (!db) {
-      logger.warn(
-        `${logMarker}: Firestore (db) is not initialized.`
-      );
+      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
       return {
         success: false,
-        message: "Simplified v11: Firestore unavailable for requestInvite.",
+        message: "V11: Firestore unavailable for request.",
         receivedData: request.data,
       };
     }
 
-    logger.info(
-      `${logMarker}: Email rcvd (not processed): ${request.data.email}`
-    );
-    return {
-      success: true,
-      message: "Simplified v11: Req logged. No Firestore write.",
-      receivedData: request.data,
-    };
+    const email = request.data.email;
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      logger.error(`${logMarker}: Invalid/missing email.`, {email});
+      return {
+        success: false,
+        message: "V11: Email invalide ou manquant.",
+        receivedData: request.data,
+      };
+    }
+
+    try {
+      const collectionName = "invitationRequests";
+      const newRequestRef = db.collection(collectionName).doc();
+      await newRequestRef.set({
+        email: email,
+        requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "pending",
+      });
+
+      logger.info(
+        `${logMarker}: Firestore write OK for ${email}. ID: ${newRequestRef.id}`
+      );
+      return {
+        success: true,
+        message: `V11: Demande enregistrée. ID: ${newRequestRef.id}`,
+        receivedData: request.data,
+        requestId: newRequestRef.id,
+      };
+    } catch (writeError: unknown) {
+      let errorMsg = "Unknown Firestore write error.";
+      if (writeError instanceof Error) {
+        errorMsg = writeError.message;
+      }
+      logger.error(
+        `${logMarker}: Firestore write FAILED for ${email}.`,
+        {error: errorMsg, originalError: String(writeError)}
+      );
+      return {
+        success: false,
+        message: `V11: Erreur Firestore: ${errorMsg}`,
+        receivedData: request.data,
+      };
+    }
   }
 );
 
