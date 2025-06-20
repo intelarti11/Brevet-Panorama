@@ -100,7 +100,7 @@ export const requestInvitation = functions.region("europe-west1")
           }, {merge: true});
 
         functions.logger.info(
-          `Demande d'invitation MAJ et remise en attente pour ${lowerEmail}`
+          `Demande MAJ et remise en attente pour ${lowerEmail}`
         );
         return {
           success: true,
@@ -123,15 +123,19 @@ export const requestInvitation = functions.region("europe-west1")
         success: true,
         message: "Votre demande d'invitation a été soumise avec succès.",
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       functions.logger.error("Erreur dans requestInvitation:", error);
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
+      let errorMessage = "Erreur lors du traitement de votre demande.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       throw new functions.https.HttpsError(
         "internal",
-        "Erreur lors du traitement de votre demande.",
-        (error as Error).message
+        errorMessage,
+        error
       );
     }
   });
@@ -203,8 +207,13 @@ export const approveInvitation = functions.region("europe-west1")
           "pour email:",
           lowerEmail
         );
-      } catch (authError: any) {
-        if (authError.code === "auth/email-already-exists") {
+      } catch (authError: unknown) {
+        let code = "unknown";
+        if (typeof authError === "object" && authError !== null && "code" in authError) {
+          code = (authError as {code: string}).code;
+        }
+
+        if (code === "auth/email-already-exists") {
           functions.logger.warn(
             "Tentative d'approbation pour un e-mail existant:",
             lowerEmail
@@ -212,19 +221,18 @@ export const approveInvitation = functions.region("europe-west1")
           let existingUser;
           try {
             existingUser = await admin.auth().getUserByEmail(lowerEmail);
-          } catch (getUserError) {
+          } catch (getUserError: unknown) {
+            let msg = "Erreur vérification utilisateur existant.";
+            if (getUserError instanceof Error) {
+              msg = getUserError.message;
+            }
             functions.logger.error(
               `Erreur récupération utilisateur ${lowerEmail}:`,
               getUserError
             );
-            throw new functions.https.HttpsError(
-              "internal",
-              "Erreur vérification utilisateur existant.",
-              (getUserError as Error).message
-            );
+            throw new functions.https.HttpsError("internal", msg, getUserError);
           }
 
-          // Mettre à jour la demande comme approuvée même si l'utilisateur existait
           await db.collection("invitationRequests")
             .doc(invitationDoc.id).update({
               status: "approved",
@@ -243,19 +251,22 @@ export const approveInvitation = functions.region("europe-west1")
           "Erreur création utilisateur Firebase Auth:",
           authError
         );
+        let errorMessage = "Erreur création utilisateur.";
+        if (authError instanceof Error) {
+          errorMessage = authError.message;
+        }
         throw new functions.https.HttpsError(
           "internal",
-          "Erreur création utilisateur.",
-          authError.message
+          errorMessage,
+          authError
         );
       }
 
-      // Mettre à jour la demande d'invitation
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
         approvedBy: context.auth.uid,
-        authUid: userRecord.uid, // Lier à l'UID de Firebase Auth
+        authUid: userRecord.uid,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -267,15 +278,19 @@ export const approveInvitation = functions.region("europe-west1")
         message: `Invitation pour ${lowerEmail} approuvée. ` +
                  "L'utilisateur peut définir son mot de passe via 'Oublié?'.",
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       functions.logger.error("Erreur dans approveInvitation:", error);
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
+      let errorMessage = "Erreur lors de l'approbation.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       throw new functions.https.HttpsError(
         "internal",
-        "Erreur lors de l'approbation.",
-        (error as Error).message
+        errorMessage,
+        error
       );
     }
   });
@@ -347,15 +362,19 @@ export const rejectInvitation = functions.region("europe-west1")
         success: true,
         message: `L'invitation pour ${lowerEmail} a été rejetée.`,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       functions.logger.error("Erreur dans rejectInvitation:", error);
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
+      let errorMessage = "Erreur lors du rejet.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       throw new functions.https.HttpsError(
         "internal",
-        "Erreur lors du rejet.",
-        (error as Error).message
+        errorMessage,
+        error
       );
     }
   });
@@ -365,7 +384,7 @@ export const rejectInvitation = functions.region("europe-west1")
  * APPEL ADMIN SEULEMENT via interface sécurisée.
  */
 export const listPendingInvitations = functions.region("europe-west1")
-  .https.onCall(async (_data, context) => { // data param removed as unused
+  .https.onCall(async (_data, context) => {
     functions.logger.info("Demande de listage des invitations en attente.");
 
     if (!context.auth || !context.auth.token.admin) {
@@ -405,17 +424,20 @@ export const listPendingInvitations = functions.region("europe-west1")
       });
 
       return {success: true, invitations};
-    } catch (error: any) {
+    } catch (error: unknown) {
       functions.logger.error("Erreur dans listPendingInvitations:", error);
+      let errorMessage = "Erreur récupération des invitations.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       throw new functions.https.HttpsError(
         "internal",
-        "Erreur récupération des invitations.",
-        (error as Error).message
+        errorMessage,
+        error
       );
     }
   });
 
-// TODO: Cette fonction exemple doit être sécurisée/adaptée.
 const setAdminRoleSchema = z.object({
   email: z.string().email({message: "Adresse e-mail invalide."}).optional(),
   uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
@@ -427,7 +449,7 @@ type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
 
 export const setAdminRole = functions.region("europe-west1")
   .https.onCall(async (data: SetAdminRoleInput, context) => {
-    if (!context.auth || !context.auth.token.admin) {
+    if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error("Accès non autorisé à setAdminRole:", context.auth);
       throw new functions.https.HttpsError(
         "permission-denied",
@@ -451,7 +473,7 @@ export const setAdminRole = functions.region("europe-west1")
         functions.logger.error("Validation échouée setAdminRole:", errors);
         throw new functions.https.HttpsError("invalid-argument", errorMsg);
       }
-      const { email, uid: providedUid } = validationResult.data;
+      const {email, uid: providedUid} = validationResult.data;
       let targetUid = providedUid;
 
       if (email && !targetUid) {
@@ -466,22 +488,26 @@ export const setAdminRole = functions.region("europe-west1")
         );
       }
 
-      await admin.auth().setCustomUserClaims(targetUid, { admin: true });
+      await admin.auth().setCustomUserClaims(targetUid, {admin: true});
       functions.logger.info(`Rôle admin attribué à: ${targetUid}`);
       const targetIdentifier = email || targetUid;
       return {
         success: true,
         message: `Rôle admin attribué à ${targetIdentifier}.`,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       functions.logger.error("Erreur dans setAdminRole:", error);
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
+      let errorMessage = "Erreur attribution du rôle admin.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       throw new functions.https.HttpsError(
         "internal",
-        "Erreur attribution du rôle admin.",
-        (error as Error).message
+        errorMessage,
+        error
       );
     }
   });
