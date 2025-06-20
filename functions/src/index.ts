@@ -32,8 +32,8 @@ try {
   logger.error(
     \`${LOG_PREFIX}: CRIT_ERR_FB_ADMIN_INIT.\`,
     {
-      errorMessage: errMsg.slice(0, 50), // Shorten error message
-      errorStack: errStack.slice(0, 70), // Shorten stack
+      errorMessage: errMsg.slice(0, 50), 
+      errorStack: errStack.slice(0, 70), 
       errorObjectString: String(error).slice(0, 50),
     }
   );
@@ -53,13 +53,13 @@ export const ultraMinimalFunction = onCall(
       logger.warn(\`${logMarker}: Firestore (db) not initialized.\`);
       return {
         success: false,
-        message: "DB not avail for ultraMinFunc.", // Shortened
+        message: "DB not avail for ultraMinFunc.", 
         receivedData: request.data,
       };
     }
     return {
       success: true,
-      message: "Ultra minimal func (v13) exec.", // Shortened
+      message: "Ultra minimal func (v13) exec.", 
       receivedData: request.data,
     };
   }
@@ -86,7 +86,7 @@ export const requestInvitation = onCall(
       logger.warn(\`${logMarker}: Firestore (db) not init.\`);
       return {
         success: false,
-        message: "Srv Err (DB indispo).", // Shortened
+        message: "Srv Err (DB indispo).", 
         receivedData: request.data,
       };
     }
@@ -113,7 +113,7 @@ export const requestInvitation = onCall(
         logger.info(msg);
         return {
           success: false,
-          message: \`Demande ${email.slice(0, 25)} attente.\`, // Shortened
+          message: \`Demande ${email.slice(0, 25)} attente.\`, 
           receivedData: request.data,
         };
       }
@@ -126,7 +126,7 @@ export const requestInvitation = onCall(
         notifiedAt: null,
       });
 
-      const successMsg = \`Demande ${email.slice(0, 25)} OK.\`; // Shortened
+      const successMsg = \`Demande ${email.slice(0, 25)} OK.\`; 
       const logOk = \`${logMarker}: Write OK ${email.slice(0, 25)}. ID: ${newRequestRef.id.slice(0,10)}\`;
       logger.info(logOk);
       return {
@@ -146,7 +146,7 @@ export const requestInvitation = onCall(
       );
       return {
         success: false,
-        message: \`Échec save: ${errorMsg.slice(0, 20)}\`, // Shortened
+        message: \`Échec save: ${errorMsg.slice(0, 20)}\`, 
         receivedData: request.data,
       };
     }
@@ -182,7 +182,7 @@ export const listPendingInvitations = onCall(
         logger.info(\`${logMarker}: No invites found at all.\`);
         return {
           success: true,
-          message: "Aucune demande trouvée.", // Shortened
+          message: "Aucune demande trouvée.", 
           invitations: [],
         };
       }
@@ -220,8 +220,8 @@ export const listPendingInvitations = onCall(
       logger.info(logMsg);
       return {
         success: true,
-        message: "Liste OK.", // Shortened for line length
-        invitations: invitations, // Explicitly listing property
+        message: "Liste OK.", 
+        invitations: invitations,
       };
     } catch (error: unknown) {
       let errorMsg = "Unknown error listing invites.";
@@ -234,7 +234,7 @@ export const listPendingInvitations = onCall(
       });
       return {
         success: false,
-        message: \`Err liste: ${errorMsg.slice(0,20)}\`, // Shortened
+        message: \`Err liste: ${errorMsg.slice(0,20)}\`, 
         invitations: [],
       };
     }
@@ -252,7 +252,7 @@ export const approveInvitation = onCall(
     const logMarker = "APPR_V7";
     logger.info(
       \`${logMarker}: Called. Data:\`,
-      {structuredData: true, data: request.data} // Ensured space
+      {structuredData: true, data: request.data} 
     );
 
     if (!db || !adminApp) {
@@ -304,7 +304,7 @@ export const approveInvitation = onCall(
         });
         const logUMsg = \`${logMarker}: User ${userRecord.uid.slice(0,10)} créé.\`;
         logger.info(logUMsg);
-        userCreationMessage = "Cpt créé. Mdp via 'Oublié'."; // Shortened
+        userCreationMessage = "Cpt créé. Mdp via 'Oublié'."; 
         userMessageShort = "Usr ok.";
       } catch (authErrorUnknown: unknown) {
         const authError = authErrorUnknown as {code?: string; message?: string};
@@ -316,7 +316,7 @@ export const approveInvitation = onCall(
           const errMsg = authError.message || "Auth error";
           const logErr = \`${logMarker}: Auth FAIL: ${emailToApprove.slice(0,25)}.\`;
           logger.error(logErr, {error: errMsg.slice(0,20)});
-          const displayErrMsg = errMsg.substring(0, 20); // Shortened
+          const displayErrMsg = errMsg.substring(0, 20); 
           return {success: false, message: \`Échec Auth: ${displayErrMsg}\`};
         }
       }
@@ -340,7 +340,7 @@ export const approveInvitation = onCall(
       }
       const logErr = \`${logMarker}: Approve FAIL ${invitationId.slice(0,10)}.\`;
       logger.error(logErr, {error: errorMsg.slice(0,25), orig: String(err).slice(0,20)});
-      const displayErrMsg = errorMsg.substring(0, 20); // Shortened
+      const displayErrMsg = errorMsg.substring(0, 20); 
       return {success: false, message: \`App. KO: ${displayErrMsg}\`};
     }
   }
@@ -409,7 +409,7 @@ export const rejectInvitation = onCall(
       const emailLog = docData?.email || "[no_email]";
       const sucMsg = \`${logMarker}: KO ${invitationId.slice(0,10)} for ${emailLog.slice(0,20)}.\`;
       logger.info(sucMsg);
-      return {success: true, message: \`${emailLog.slice(0,20)} Rej.\`}; // Shortened line
+      return {success: true, message: \`${emailLog.slice(0,20)} Rej.\`}; 
     } catch (err: unknown) {
       let errorMsg = "Unknown error rejecting invitation.";
       if (err instanceof Error) {
@@ -417,7 +417,7 @@ export const rejectInvitation = onCall(
       }
       const logErr = \`${logMarker}: Rej. FAIL ${invitationId.slice(0,10)}.\`;
       logger.error(logErr, {error: errorMsg.slice(0,25), orig: String(err).slice(0,20)});
-      const displayErrMsg = errorMsg.substring(0, 25); // Shortened
+      const displayErrMsg = errorMsg.substring(0, 25); 
       return {success: false, message: \`Rejet échec: ${displayErrMsg}\`};
     }
   }
@@ -451,16 +451,16 @@ export const markInvitationAsNotified = onCall(
       const inviteRef = db.collection("invitationRequests").doc(invitationId);
       const inviteDoc = await inviteRef.get();
 
-      if (!inviteDoc.exists) { // Corrected: space before brace
+      if (!inviteDoc.exists) { 
         logger.warn(\`${logMarker}: Inv ${invitationId.slice(0,10)} not found.\`);
         return {success: false, message: "Invitation non trouvée."};
       }
       
-      const docData = inviteDoc.data(); // Removed trailing space
+      const docData = inviteDoc.data();
       if (docData?.status !== "approved") {
         const currSt = docData?.status ?? "unknown";
-        logger.warn(\`${logMarker}: Inv ${invitationId.slice(0,10)} not OK (St: ${currSt})\`); // Shortened
-        return {success: false, message: "Inv. non appr. pr notif."}; // Shortened
+        logger.warn(\`${logMarker}: Inv ${invitationId.slice(0,10)} not OK (St: ${currSt})\`); 
+        return {success: false, message: "Inv. non appr. pr notif."}; 
       }
       if (docData?.notifiedAt) {
         logger.info(\`${logMarker}: Inv ${invitationId.slice(0,10)} already notified.\`);
@@ -472,7 +472,7 @@ export const markInvitationAsNotified = onCall(
       });
 
       const emailLog = docData?.email || "[no_email]";
-      logger.info(\`${logMarker}: Inv ${invitationId.slice(0,10)} for ${emailLog.slice(0,20)} notif.\`); // Shortened
+      logger.info(\`${logMarker}: Inv ${invitationId.slice(0,10)} for ${emailLog.slice(0,20)} notif.\`); 
       return {success: true, message: \`Notif marquée ${emailLog.slice(0,20)}.\`};
     } catch (err: unknown) {
       let errorMsg = "Erreur lors du marquage de la notification.";
@@ -481,14 +481,14 @@ export const markInvitationAsNotified = onCall(
       }
       const logErr = \`${logMarker}: Mark notified FAIL ${invitationId.slice(0,10)}.\`;
       logger.error(logErr, {error: errorMsg.slice(0,25), orig: String(err).slice(0,20)});
-      const displayErrMsg = errorMsg.substring(0, 20); // Shortened
+      const displayErrMsg = errorMsg.substring(0, 20); 
       return {success: false, message: \`Notif KO: ${displayErrMsg}\`};
     }
   }
 );
 
 logger.info(
-  \`${LOG_PREFIX}: Script end. Admin SDK init done.\` // Shortened
+  \`${LOG_PREFIX}: Script end. Admin SDK init done.\`
 );
 
     
