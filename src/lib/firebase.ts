@@ -17,23 +17,31 @@ const firebaseConfig: FirebaseOptions = {
 };
 
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app, 'europe-west1');
 
-// Connect to emulators in development mode. This should only run on the client.
+// Connect to emulators in development mode.
+// This should only run on the client and only once.
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.log("Development mode: Connecting to Firebase emulators...");
-    try {
-      // Use 127.0.0.1 instead of localhost to avoid potential IPv6 issues
-      connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-      connectFirestoreEmulator(db, '127.0.0.1', 8080);
-      connectFunctionsEmulator(functions, '127.0.0.1', 5001);
-      console.log("Successfully configured to use Firebase emulators.");
-    } catch (error) {
-        console.error("Error connecting to emulators:", error);
+    // Use a property on the window to ensure this runs only once per page load,
+    // preventing issues with hot-reloading.
+    // @ts-ignore
+    if (!window.EMULATORS_CONNECTED) {
+        console.log("Connecting to Firebase emulators...");
+        try {
+            // Use 127.0.0.1 instead of localhost to avoid potential network issues.
+            connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+            connectFirestoreEmulator(db, '127.0.0.1', 8080);
+            connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+            console.log("Successfully connected to Firebase emulators.");
+            // @ts-ignore
+            window.EMULATORS_CONNECTED = true;
+        } catch (error) {
+            console.error("Error connecting to Firebase emulators:", error);
+        }
     }
 }
 
