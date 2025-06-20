@@ -1,37 +1,53 @@
 
+console.log("LOG_MARKER_A: Entered functions/src/index.ts (v5)");
+
 import * as admin from "firebase-admin";
+console.log("LOG_MARKER_B: Imported firebase-admin (v5)");
+
 import {z} from "zod";
+console.log("LOG_MARKER_C: Imported zod (v5)");
+
 import {
   onCall,
   HttpsError,
   type CallableRequest,
 } from "firebase-functions/v2/https";
+console.log("LOG_MARKER_D: Imported firebase-functions/v2/https (v5)");
 
-// Initialiser Firebase Admin SDK
-let db: admin.firestore.Firestore; // Déclaré ici, sera initialisé dans le try/catch
+
+let db: admin.firestore.Firestore | undefined = undefined; // Explicitly allow undefined initially
 
 try {
-  console.log("Attempting Firebase Admin SDK initialization (v3)...");
-  admin.initializeApp(); // Repose sur GOOGLE_APPLICATION_CREDENTIALS ou l'environnement GCF
-  console.log("Firebase Admin SDK initialized successfully (v3).");
-  
-  console.log("Attempting to get Firestore DB instance (v3)...");
+  console.log("LOG_MARKER_E: Attempting admin.initializeApp() (v5)");
+  admin.initializeApp(); // Relies on GOOGLE_APPLICATION_CREDENTIALS or GCF environment
+  console.log("LOG_MARKER_F: admin.initializeApp() succeeded (v5)");
+
+  console.log("LOG_MARKER_G: Attempting admin.firestore() (v5)");
   db = admin.firestore();
-  console.log("Firestore DB instance obtained successfully (v3).");
+  console.log("LOG_MARKER_H: admin.firestore() succeeded (v5)");
 
   if (!db) {
-    // Ce cas ne devrait pas arriver si admin.firestore() réussit sans erreur,
-    // mais c'est une double vérification.
-    throw new Error("Firestore DB instance is undefined after successful admin.firestore() call.");
+    console.error("CRITICAL_ERROR_DB_UNDEFINED: Firestore db object is undefined after initialization! (v5)");
+    // This specific error should be caught by the main catch block below if thrown.
+    throw new Error("Firestore db object is undefined after initialization! (v5)");
   }
+  console.log("LOG_MARKER_I: Firestore db object is valid (v5)");
 
-} catch (initError: any) {
-  console.error("CRITICAL_ERROR_DURING_FIREBASE_ADMIN_INIT (v3):", initError.message, initError.stack);
-  // Rendre l'échec explicite pour qu'il soit la cause principale du crash du conteneur
-  throw new Error(
-    "FATAL: Failed to initialize Firebase Admin SDK or Firestore. Function cannot start. Original error: " + 
-    (initError.message || "Unknown initialization error.")
-  );
+} catch (error: any) {
+  const errorMessage = error && error.message ? error.message : "Unknown error during initialization";
+  const errorStack = error && error.stack ? error.stack : "No stack trace available";
+  console.error(`CRITICAL_ERROR_INIT_FAILED (v5): Message - ${errorMessage}. Stack - ${errorStack}`);
+  // Re-throw a simple string error. This is crucial for Cloud Run to log it properly upon container exit.
+  throw `FATAL_INITIALIZATION_ERROR (v5): ${errorMessage}`;
+}
+
+// Guard all function definitions. If db is not initialized, they won't be defined.
+// This helps prevent runtime errors if init failed, but won't fix the startup crash itself.
+if (!db) {
+  console.error("CRITICAL_SYSTEM_ERROR: db was not initialized. Functions will not be defined. (v5)");
+  // To ensure the container exits if db is not set after the try-catch (shouldn't happen if catch throws).
+  // This line is more of a safeguard; the throw in the catch block should be the primary exit point on error.
+  throw "FATAL_DB_NOT_INITIALIZED_POST_CATCH (v5)";
 }
 
 // --- Schémas Zod pour la validation des données d'entrée ---
@@ -69,9 +85,9 @@ type SetAdminRoleInput = CallableRequest<SetAdminRoleData>;
 export const requestInvitation = onCall(
   {region: "europe-west1", enforceAppCheck: true},
   async (request: CallableRequest<InvitationRequestData>) => {
-    console.info("requestInvitation: Nouv. demande invit (v3):", request.data);
-    if (!db) { // Vérification critique
-        console.error("requestInvitation: Firestore DB not available at function call (v3). This indicates a severe initialization problem.");
+    console.info("requestInvitation: Nouv. demande invit (v5):", request.data);
+    if (!db) {
+        console.error("requestInvitation: Firestore DB not available at function call (v5). This indicates a severe initialization problem.");
         throw new HttpsError("internal", "Err. serveur critique.");
     }
 
@@ -79,7 +95,7 @@ export const requestInvitation = onCall(
       const validResult = invitationRequestDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        console.error("requestInvitation: Valid. échouée (v3):", flatErrors);
+        console.error("requestInvitation: Valid. échouée (v5):", flatErrors);
         throw new HttpsError("invalid-argument", "Donnees invalides.");
       }
 
@@ -113,7 +129,7 @@ export const requestInvitation = onCall(
             authUid: null,
           }, {merge: true});
 
-        console.info(`requestInvitation: Demande MAJ (v3): ${lowerEmail}`);
+        console.info(`requestInvitation: Demande MAJ (v5): ${lowerEmail}`);
         return {success: true, message: "Votre demande a été soumise."};
       }
 
@@ -124,34 +140,36 @@ export const requestInvitation = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.info(`requestInvitation: Demande enregistrée (v3): ${lowerEmail}`);
+      console.info(`requestInvitation: Demande enregistrée (v5): ${lowerEmail}`);
       return {success: true, message: "Demande d'invitation soumise."};
     } catch (error: unknown) {
       let code: typeof HttpsError.prototype.code = "internal";
-      let message = "Echec demande. Verif logs serveur (v3).";
+      let message = "Echec demande. Verif logs serveur (v5).";
 
       if (error instanceof HttpsError) {
         console.error(
-          `requestInvitation: Err (HttpsError ${error.code}) (v3):`,
+          `requestInvitation: Err (HttpsError ${error.code}) (v5):`,
           {message: error.message, details: error.details, data: request.data}
         );
         throw error; // Rethrow HttpsError as is
       } else if (error instanceof Error) {
         console.error(
-          "requestInvitation: Err (Error) (v3):",
+          "requestInvitation: Err (Error) (v5):",
           {name: error.name, message: error.message, stack: error.stack, data: request.data}
         );
         if (error.name === "ZodError") {
           code = "invalid-argument";
           message = "Donnees invalides.";
+        } else {
+          message = error.message.slice(0,100); // Truncate for safety
         }
       } else {
         console.error(
-            "requestInvitation: Err (unknown) (v3):",
-            {errorObject: error, data: request.data}
+            "requestInvitation: Err (unknown) (v5):",
+            {errorObject: String(error).slice(0,200), data: request.data}
         );
+         message = String(error).slice(0,100);
       }
-      // Pour les erreurs non-HttpsError, on envoie une HttpsError générique
       throw new HttpsError(code, message);
     }
   }
@@ -160,24 +178,24 @@ export const requestInvitation = onCall(
 export const approveInvitation = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<ManageInvitationData>) => {
-    console.info("approveInvitation: Approbation invit (v3):", request.data);
+    console.info("approveInvitation: Approbation invit (v5):", request.data);
      if (!db) {
-        console.error("approveInvitation: Firestore DB not available (v3).");
+        console.error("approveInvitation: Firestore DB not available (v5).");
         throw new HttpsError("internal", "Err. serveur critique.");
     }
 
     if (!request.auth || !request.auth.token.admin) {
-      console.error("approveInvitation: Acces non-autorise (v3).");
+      console.error("approveInvitation: Acces non-autorise (v5).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     const adminUid = request.auth.uid;
-    console.info(`approveInvitation: Admin OK (v3). UID: ${adminUid}`);
+    console.info(`approveInvitation: Admin OK (v5). UID: ${adminUid}`);
 
     try {
       const validResult = manageInvitationDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        console.error("approveInvitation: Valid. échouée (v3):", flatErrors);
+        console.error("approveInvitation: Valid. échouée (v5):", flatErrors);
         throw new HttpsError("invalid-argument", "Donnees invalides.");
       }
 
@@ -203,7 +221,7 @@ export const approveInvitation = onCall(
           emailVerified: false,
           disabled: false,
         });
-        console.info(`approveInvitation: User cree (v3): ${userRecord.uid}`);
+        console.info(`approveInvitation: User cree (v5): ${userRecord.uid}`);
       } catch (authError: unknown) {
         let code = "unknown";
         if (
@@ -215,12 +233,12 @@ export const approveInvitation = onCall(
         }
 
         if (code === "auth/email-already-exists") {
-          console.warn("approveInvitation: E-mail existant (v3):", lowerEmail);
+          console.warn("approveInvitation: E-mail existant (v5):", lowerEmail);
           let existingUser;
           try {
             existingUser = await admin.auth().getUserByEmail(lowerEmail);
           } catch (getUserError: unknown) {
-            console.error("approveInvitation: Err getUser (v3):", getUserError);
+            console.error("approveInvitation: Err getUser (v5):", getUserError);
             throw new HttpsError("internal", "Err verif user.");
           }
 
@@ -237,8 +255,10 @@ export const approveInvitation = onCall(
             message: `User ${lowerEmail} existe. Demande ok.`,
           };
         }
-        console.error("approveInvitation: Auth create err (v3):", authError);
-        throw new HttpsError("internal", "Err create user.");
+        console.error("approveInvitation: Auth create err (v5):", authError);
+        let errMsg = "Err create user.";
+        if(authError instanceof Error) errMsg = authError.message.slice(0,100);
+        throw new HttpsError("internal", errMsg);
       }
 
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
@@ -249,35 +269,38 @@ export const approveInvitation = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.info(`approveInvitation: Invit. ok, user cree (v3): ${lowerEmail}`);
+      console.info(`approveInvitation: Invit. ok, user cree (v5): ${lowerEmail}`);
       return {
         success: true,
         message: `Invit. ${lowerEmail} ok. MDP via 'Oublie?'.`,
       };
     } catch (error: unknown) {
       let code: typeof HttpsError.prototype.code = "internal";
-      let message = "Echec approbation. Verif logs serveur (v3).";
+      let message = "Echec approbation. Verif logs serveur (v5).";
 
       if (error instanceof HttpsError) {
         console.error(
-          `approveInvitation: Err (HttpsError ${error.code}) (v3):`,
+          `approveInvitation: Err (HttpsError ${error.code}) (v5):`,
           {message: error.message, details: error.details, data: request.data}
         );
         throw error;
       } else if (error instanceof Error) {
         console.error(
-          "approveInvitation: Err (Error) (v3):",
+          "approveInvitation: Err (Error) (v5):",
           {name: error.name, message: error.message, stack: error.stack, data: request.data}
         );
         if (error.name === "ZodError") {
           code = "invalid-argument";
           message = "Donnees invalides.";
+        } else {
+          message = error.message.slice(0,100);
         }
       } else {
         console.error(
-            "approveInvitation: Err (unknown) (v3):",
-            {errorObject: error, data: request.data}
+            "approveInvitation: Err (unknown) (v5):",
+            {errorObject: String(error).slice(0,200), data: request.data}
         );
+        message = String(error).slice(0,100);
       }
       throw new HttpsError(code, message);
     }
@@ -287,24 +310,24 @@ export const approveInvitation = onCall(
 export const rejectInvitation = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<RejectInvitationData>) => {
-    console.info("rejectInvitation: Rejet invit (v3):", request.data);
+    console.info("rejectInvitation: Rejet invit (v5):", request.data);
     if (!db) {
-        console.error("rejectInvitation: Firestore DB not available (v3).");
+        console.error("rejectInvitation: Firestore DB not available (v5).");
         throw new HttpsError("internal", "Err. serveur critique.");
     }
 
     if (!request.auth || !request.auth.token.admin) {
-      console.error("rejectInvitation: Acces non-autorise (v3).");
+      console.error("rejectInvitation: Acces non-autorise (v5).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     const adminUid = request.auth.uid;
-    console.info(`rejectInvitation: Admin OK (v3). UID: ${adminUid}`);
+    console.info(`rejectInvitation: Admin OK (v5). UID: ${adminUid}`);
 
     try {
       const validResult = rejectInvitationDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        console.error("rejectInvitation: Valid. échouée (v3):", flatErrors);
+        console.error("rejectInvitation: Valid. échouée (v5):", flatErrors);
         throw new HttpsError("invalid-argument", "Donnees invalides.");
       }
 
@@ -331,35 +354,38 @@ export const rejectInvitation = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.info(`rejectInvitation: Invitation rejetee (v3): ${lowerEmail}`);
+      console.info(`rejectInvitation: Invitation rejetee (v5): ${lowerEmail}`);
       return {
         success: true,
         message: `Invitation pour ${lowerEmail} rejetee.`,
       };
     } catch (error: unknown) {
       let code: typeof HttpsError.prototype.code = "internal";
-      let message = "Echec rejet. Verif logs serveur (v3).";
+      let message = "Echec rejet. Verif logs serveur (v5).";
 
       if (error instanceof HttpsError) {
         console.error(
-          `rejectInvitation: Err (HttpsError ${error.code}) (v3):`,
+          `rejectInvitation: Err (HttpsError ${error.code}) (v5):`,
           {message: error.message, details: error.details, data: request.data}
         );
         throw error;
       } else if (error instanceof Error) {
         console.error(
-          "rejectInvitation: Err (Error) (v3):",
+          "rejectInvitation: Err (Error) (v5):",
           {name: error.name, message: error.message, stack: error.stack, data: request.data}
         );
         if (error.name === "ZodError") {
           code = "invalid-argument";
           message = "Donnees invalides.";
+        } else {
+          message = error.message.slice(0,100);
         }
       } else {
         console.error(
-            "rejectInvitation: Err (unknown) (v3):",
-            {errorObject: error, data: request.data}
+            "rejectInvitation: Err (unknown) (v5):",
+            {errorObject: String(error).slice(0,200), data: request.data}
         );
+        message = String(error).slice(0,100);
       }
       throw new HttpsError(code, message);
     }
@@ -369,19 +395,19 @@ export const rejectInvitation = onCall(
 export const listPendingInvitations = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<void>) => {
-    console.info("listPendingInvitations: Listage invitations (v3).");
+    console.info("listPendingInvitations: Listage invitations (v5).");
     if (!db) {
-        console.error("listPendingInvitations: Firestore DB not available (v3).");
+        console.error("listPendingInvitations: Firestore DB not available (v5).");
         throw new HttpsError("internal", "Err. serveur critique.");
     }
 
     if (!request.auth || !request.auth.token.admin) {
-      console.error("listPendingInvitations: Acces non-autorise (v3).");
+      console.error("listPendingInvitations: Acces non-autorise (v5).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
-    console.info("listPendingInvitations: Admin OK (v3).");
+    console.info("listPendingInvitations: Admin OK (v5).");
     if (request.auth?.uid) {
-      console.info("listPendingInvitations: Admin UID (v3):", request.auth.uid);
+      console.info("listPendingInvitations: Admin UID (v5):", request.auth.uid);
     }
 
     try {
@@ -410,23 +436,23 @@ export const listPendingInvitations = onCall(
       return {success: true, invitations};
     } catch (error: unknown) {
       let code: typeof HttpsError.prototype.code = "internal";
-      const message = "Echec liste. Verif logs serveur (v3).";
+      const message = "Echec liste. Verif logs serveur (v5).";
 
       if (error instanceof HttpsError) {
         console.error(
-          `listPendingInvitations: Err (HttpsError ${error.code}) (v3):`,
+          `listPendingInvitations: Err (HttpsError ${error.code}) (v5):`,
           {message: error.message, details: error.details}
         );
         throw error;
       } else if (error instanceof Error) {
         console.error(
-          "listPendingInvitations: Err (Error) (v3):",
+          "listPendingInvitations: Err (Error) (v5):",
           {name: error.name, message: error.message, stack: error.stack}
         );
       } else {
         console.error(
-            "listPendingInvitations: Err (unknown) (v3):",
-            {errorObject: error}
+            "listPendingInvitations: Err (unknown) (v5):",
+            {errorObject: String(error).slice(0,200)}
         );
       }
       throw new HttpsError(code, message);
@@ -438,25 +464,25 @@ export const listPendingInvitations = onCall(
 export const setAdminRole = onCall(
   {region: "europe-west1"},
   async (request: SetAdminRoleInput) => {
-    console.info("setAdminRole: Tentative (v3).", {data: request.data});
+    console.info("setAdminRole: Tentative (v5).", {data: request.data});
     if (!db) {
-        console.error("setAdminRole: Firestore DB not available (v3).");
+        console.error("setAdminRole: Firestore DB not available (v5).");
         throw new HttpsError("internal", "Err. serveur critique.");
     }
     if (!request.auth || !request.auth.token.admin) {
-      console.error("setAdminRole: Acces non-autorise (v3).");
+      console.error("setAdminRole: Acces non-autorise (v5).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     const callingAdminUid = request.auth.uid;
     console.info(
-      `setAdminRole: Admin ${callingAdminUid} execute (v3).`
+      `setAdminRole: Admin ${callingAdminUid} execute (v5).`
     );
 
     try {
       const validResult = setAdminRoleDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        console.error("setAdminRole: Err validation (v3):", flatErrors);
+        console.error("setAdminRole: Err validation (v5):", flatErrors);
         throw new HttpsError("invalid-argument", "Err. donnees.");
       }
       const {email, uid: providedUid} = validResult.data;
@@ -467,8 +493,10 @@ export const setAdminRole = onCall(
           const userRecord = await admin.auth().getUserByEmail(email);
           targetUid = userRecord.uid;
         } catch (e: unknown) {
-          console.error(`setAdminRole: Err getUserByEmail ${email} (v3):`, e);
-          throw new HttpsError("not-found", "Err recup user.");
+          console.error(`setAdminRole: Err getUserByEmail ${email} (v5):`, e);
+          let errMsg = "Err recup user.";
+          if (e instanceof Error) errMsg = e.message.slice(0,100);
+          throw new HttpsError("not-found", errMsg);
         }
       }
 
@@ -477,7 +505,7 @@ export const setAdminRole = onCall(
       }
 
       await admin.auth().setCustomUserClaims(targetUid, {admin: true});
-      console.info(`setAdminRole: Role admin pour ${targetUid} (v3).`);
+      console.info(`setAdminRole: Role admin pour ${targetUid} (v5).`);
       const targetIdentifier = email || targetUid;
       return {
         success: true,
@@ -485,32 +513,35 @@ export const setAdminRole = onCall(
       };
     } catch (error: unknown) {
       let code: typeof HttpsError.prototype.code = "internal";
-      let message = "Echec role admin. Verif logs serveur (v3).";
+      let message = "Echec role admin. Verif logs serveur (v5).";
 
       if (error instanceof HttpsError) {
         console.error(
-          `setAdminRole: Err (HttpsError ${error.code}) (v3):`,
+          `setAdminRole: Err (HttpsError ${error.code}) (v5):`,
           {message: error.message, details: error.details, data: request.data}
         );
         throw error;
       } else if (error instanceof Error) {
         console.error(
-          "setAdminRole: Err (Error) (v3):",
+          "setAdminRole: Err (Error) (v5):",
           {name: error.name, message: error.message, stack: error.stack, data: request.data}
         );
         if (error.name === "ZodError") {
           code = "invalid-argument";
           message = "Donnees invalides.";
+        } else {
+          message = error.message.slice(0,100);
         }
       } else {
         console.error(
-            "setAdminRole: Err (unknown) (v3):",
-            {errorObject: error, data: request.data}
+            "setAdminRole: Err (unknown) (v5):",
+            {errorObject: String(error).slice(0,200), data: request.data}
         );
+        message = String(error).slice(0,100);
       }
       throw new HttpsError(code, message);
     }
   }
 );
 
-console.log("Top-level script execution completed in functions/src/index.ts (v3)");
+console.log("LOG_MARKER_J: Top-level script execution completed in functions/src/index.ts (v5)");
