@@ -3,7 +3,11 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {z} from "zod";
 // CallableRequest et HttpsError pour Firebase Functions v2
-import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
+import {
+  onCall,
+  HttpsError,
+  type CallableRequest,
+} from "firebase-functions/v2/https";
 
 // Initialiser Firebase Admin SDK
 try {
@@ -43,7 +47,7 @@ const setAdminRoleDataSchema = z.object({
   email: z.string().email("E-mail invalide.").optional(),
   uid: z.string().min(1, "UID requis.").optional(),
 }).refine((data) => data.email || data.uid, {
-  message: "E-mail ou UID requis.",
+  message: "E-mail ou UID requis.", // Message court
   path: ["email"],
 });
 type SetAdminRoleData = z.infer<typeof setAdminRoleDataSchema>;
@@ -64,8 +68,8 @@ export const requestInvitation = onCall(
         const flatErrors = validResult.error.flatten();
         const errMsg = "Data invalides: " +
           flatErrors.formErrors.join(", ");
-        functions.logger.error("Valid. échouée (req):", flatErrors);
-        throw new HttpsError("invalid-argument", errMsg.slice(0, 60));
+        functions.logger.error("Valid. échouée:", flatErrors);
+        throw new HttpsError("invalid-argument", errMsg.slice(0, 40));
       }
 
       const {email} = validResult.data;
@@ -99,7 +103,7 @@ export const requestInvitation = onCall(
             authUid: null,
           }, {merge: true});
 
-        functions.logger.info(`Demande MAJ attente: ${lowerEmail}`);
+        functions.logger.info(`Demande MAJ: ${lowerEmail}`);
         return {success: true, message: "Votre demande a été soumise."};
       }
 
@@ -119,7 +123,7 @@ export const requestInvitation = onCall(
         throw error;
       }
       let errMsg = "Echec demande.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 18);
+      if (error instanceof Error) errMsg = error.message.slice(0, 15);
       throw new HttpsError("internal", errMsg);
     }
   }
@@ -144,7 +148,7 @@ export const approveInvitation = onCall(
       const validResult = manageInvitationDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        functions.logger.error("Valid. échec(approve):", flatErrors);
+        functions.logger.error("Valid. échec:", flatErrors);
         throw new HttpsError("invalid-argument", "Données invalides.");
       }
 
@@ -159,7 +163,7 @@ export const approveInvitation = onCall(
 
       if (requestQuery.empty) {
         const msg = `Aucune demande: ${lowerEmail}.`;
-        throw new HttpsError("not-found", msg.slice(0, 50));
+        throw new HttpsError("not-found", msg.slice(0, 40));
       }
 
       const invitationDoc = requestQuery.docs[0];
@@ -172,7 +176,7 @@ export const approveInvitation = onCall(
           emailVerified: false,
           disabled: false,
         });
-        functions.logger.info(`User créé: ${userRecord.uid}, ${lowerEmail}`);
+        functions.logger.info(`User créé: ${userRecord.uid}`);
       } catch (authError: unknown) {
         let code = "unknown";
         if (
@@ -192,7 +196,7 @@ export const approveInvitation = onCall(
             let msg = "Err vérif user.";
             if (getUserError instanceof Error) msg = getUserError.message;
             functions.logger.error("Err getUser:", getUserError);
-            throw new HttpsError("internal", msg.slice(0, 13));
+            throw new HttpsError("internal", msg.slice(0, 10));
           }
 
           // Mise à jour statut Firestore pour utilisateur existant
@@ -210,10 +214,10 @@ export const approveInvitation = onCall(
           };
         }
         // Autre erreur Auth
-        functions.logger.error("Auth create e:", authError);
-        let errMsg = "Err creat user";
+        functions.logger.error("Auth create err:", authError); // Shortened
+        let errMsg = "Err create user"; // Shortened
         if (authError instanceof Error) errMsg = authError.message;
-        const finalErrMsg = errMsg.slice(0, 13); // Shortened
+        const finalErrMsg = errMsg.slice(0, 10); // Very Shortened
         throw new HttpsError("internal", finalErrMsg);
       }
 
@@ -232,12 +236,12 @@ export const approveInvitation = onCall(
         message: `Invit. ${lowerEmail} ok. MDP via 'Oublié?'.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Err approveInv:", error);
+      functions.logger.error("Err approveInv:", error); // Shortened
       if (error instanceof HttpsError) {
         throw error;
       }
-      let errMsg = "Echec approb.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 13);
+      let errMsg = "Echec approb."; // Shortened
+      if (error instanceof Error) errMsg = error.message.slice(0, 10);
       throw new HttpsError("internal", errMsg);
     }
   }
@@ -262,7 +266,7 @@ export const rejectInvitation = onCall(
       const validResult = rejectInvitationDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        functions.logger.error("Valid. échouée (reject):", flatErrors);
+        functions.logger.error("Valid. échouée:", flatErrors);
         throw new HttpsError("invalid-argument", "Données invalides.");
       }
 
@@ -277,7 +281,7 @@ export const rejectInvitation = onCall(
 
       if (requestQuery.empty) {
         const msg = `Aucune demande: ${lowerEmail}.`;
-        throw new HttpsError("not-found", msg.slice(0, 50));
+        throw new HttpsError("not-found", msg.slice(0, 40));
       }
 
       const invitationDoc = requestQuery.docs[0];
@@ -302,7 +306,7 @@ export const rejectInvitation = onCall(
         throw error;
       }
       let errMsg = "Echec rejet.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 18);
+      if (error instanceof Error) errMsg = error.message.slice(0, 15);
       throw new HttpsError("internal", errMsg);
     }
   }
@@ -352,8 +356,8 @@ export const listPendingInvitations = onCall(
       return {success: true, invitations};
     } catch (error: unknown) {
       functions.logger.error("Err listPending:", error);
-      let errMsg = "Echec liste invit.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 18);
+      let errMsg = "Echec liste.";
+      if (error instanceof Error) errMsg = error.message.slice(0, 15);
       throw new HttpsError("internal", errMsg);
     }
   }
@@ -391,7 +395,7 @@ export const setAdminRole = onCall(
           targetUid = userRecord.uid;
         } catch (e: unknown) {
           let msg = "Err récup user.";
-          if (e instanceof Error) msg = e.message.slice(0, 13);
+          if (e instanceof Error) msg = e.message.slice(0, 10);
           functions.logger.error(`Err getUserByEmail ${email}:`, e);
           throw new HttpsError("not-found", msg);
         }
@@ -414,7 +418,7 @@ export const setAdminRole = onCall(
         throw error;
       }
       let errMsg = "Echec rôle admin.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 18);
+      if (error instanceof Error) errMsg = error.message.slice(0, 15);
       throw new HttpsError("internal", errMsg);
     }
   }
