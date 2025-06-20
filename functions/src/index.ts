@@ -1,12 +1,15 @@
 
-import {onCall} from "firebase-functions/v2/https";
+'use strict';
+import {onCall, HttpsOptions} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
 // Log prefix for this version (V11)
 const LOG_PREFIX_V11 = "INIT_V11";
 
-logger.info(`${LOG_PREFIX_V11}: Script top. About to init admin.`);
+logger.info(
+  `${LOG_PREFIX_V11}: Script top. About to init admin.`
+);
 
 let db: admin.firestore.Firestore | null = null;
 let adminApp: admin.app.App | null = null;
@@ -74,7 +77,10 @@ export const ultraMinimalFunction = onCall(
 
 // RequestInvitation - SIMPLIFIED VERSION FOR DEPLOYMENT TEST
 export const requestInvitation = onCall(
-  {region: "europe-west1"},
+  {
+    region: "europe-west1",
+    invoker: "public", // Autoriser les appels non authentifiés
+  } as HttpsOptions,
   (request) => {
     const logMarker = "REQUEST_INVITATION_SIMPLIFIED_V11_LOG";
     logger.info(
