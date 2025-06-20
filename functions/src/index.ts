@@ -1,5 +1,5 @@
 
-'use strict';
+"use strict";
 import {onCall, HttpsOptions} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
