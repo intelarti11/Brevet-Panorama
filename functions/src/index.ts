@@ -1,7 +1,7 @@
 
 "use strict";
 import {onCall, HttpsOptions} from "firebase-functions/v2/https";
-import *import * as logger from "firebase-functions/logger";
+import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import type {UserRecord} from "firebase-admin/auth";
 import * as crypto from "crypto";
@@ -197,7 +197,7 @@ export const listPendingInvitations = onCall(
           const shortId = doc.id.substring(0, 10);
           const reqTsValStr = String(reqTimestamp);
           logger.warn(\`LST_INV: Bad reqAt ${shortId}\`, {
-            ts: reqTsValStr.slice(0, 10),
+            ts: reqTsValStr.slice(0, 15), 
           });
           requestedAtISO = new Date(0).toISOString();
         }
@@ -220,7 +220,7 @@ export const listPendingInvitations = onCall(
       logger.info(logMsg);
       return {
         success: true,
-        message: "Liste OK.", // Shortened
+        message: "Liste OK.", // Shortened for line length
         invitations: invitations, // Explicitly listing property
       };
     } catch (error: unknown) {
@@ -490,3 +490,5 @@ export const markInvitationAsNotified = onCall(
 logger.info(
   \`${LOG_PREFIX}: Script end. Admin SDK init done.\` // Shortened
 );
+
+    
