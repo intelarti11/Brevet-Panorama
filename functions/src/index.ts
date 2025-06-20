@@ -3,6 +3,8 @@
 import {onCall, HttpsOptions} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
+import { UserRecord } from "firebase-admin/auth"; // Ajout pour Auth
+import * as crypto from "crypto"; // Pour générer un mot de passe aléatoire
 
 const LOG_PREFIX_V13_1 = "INIT_V13_1";
 
@@ -162,7 +164,7 @@ export const requestInvitation = onCall(
 
 const listPendingInvitationsOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public", // Allows unauthenticated calls for now
+  invoker: "public",
 };
 
 export const listPendingInvitations = onCall(
@@ -183,7 +185,6 @@ export const listPendingInvitations = onCall(
     try {
       const query = db.collection("invitationRequests")
         .where("status", "==", "pending");
-        // .orderBy("requestedAt", "desc"); Temporarily removed for no-index
       const snapshot = await query.get();
 
       if (snapshot.empty) {
@@ -239,18 +240,18 @@ export const listPendingInvitations = onCall(
 
 const approveInvitationOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public", // Added to allow unauthenticated calls for now
+  invoker: "public",
 };
 export const approveInvitation = onCall(
   approveInvitationOptions,
   async (request) => {
-    const logMarker = "APPROVE_INVITE_V3_LOG";
+    const logMarker = "APPROVE_INVITE_V4_LOG";
     logger.info(`${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data});
 
-    if (!db) {
-      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
-      return {success: false, message: "Erreur serveur (DB)."};
+    if (!db || !adminApp) {
+      logger.warn(`${logMarker}: Firestore (db) or AdminApp not initialized.`);
+      return {success: false, message: "Erreur serveur (DB/Admin)."};
     }
 
     const invitationId = request.data.invitationId;
@@ -279,15 +280,44 @@ export const approveInvitation = onCall(
         };
       }
 
+      const emailToApprove = docData?.email;
+      if (!emailToApprove || typeof emailToApprove !== "string") {
+        logger.error(`${logMarker}: Email missing in invite ${invitationId}.`);
+        return {success: false, message: "Email manquant dans l'invitation."};
+      }
+
+      // Étape 1: Créer l'utilisateur dans Firebase Auth
+      let userCreationMessage = "";
+      try {
+        const tempPassword = crypto.randomBytes(16).toString("hex");
+        const userRecord: UserRecord = await admin.auth().createUser({
+          email: emailToApprove,
+          emailVerified: true, // Marquer comme vérifié car l'admin approuve
+          password: tempPassword, // Mot de passe fort et non communiqué
+          disabled: false,
+        });
+        logger.info(`${logMarker}: User ${userRecord.uid} created for ${emailToApprove}.`);
+        userCreationMessage = `Compte créé pour ${emailToApprove}. L'utilisateur doit utiliser "Mot de passe oublié" pour se connecter.`;
+      } catch (authError: any) {
+        if (authError.code === "auth/email-already-exists") {
+          logger.warn(`${logMarker}: User ${emailToApprove} already exists in Auth.`);
+          userCreationMessage = `Un compte existe déjà pour ${emailToApprove}.`;
+        } else {
+          logger.error(`${logMarker}: Auth user creation FAILED for ${emailToApprove}.`, {error: authError});
+          return { success: false, message: `Échec création utilisateur Auth: ${authError.message}` };
+        }
+      }
+
+      // Étape 2: Mettre à jour le statut de l'invitation dans Firestore
       await inviteRef.update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const emailLog = docData?.email || "[email N/A]";
-      const sucMsg = `${logMarker}: OK ${invitationId} for ${emailLog}.`;
-      logger.info(sucMsg);
-      return {success: true, message: `Invite ${emailLog} approuvée.`};
+      const finalSuccessMsg = `${logMarker}: OK ${invitationId} for ${emailToApprove}. ${userCreationMessage}`;
+      logger.info(finalSuccessMsg);
+      return { success: true, message: `Invite ${emailToApprove} approuvée. ${userCreationMessage}` };
+
     } catch (err: unknown) {
       let errorMsg = "Unknown error approving invitation.";
       if (err instanceof Error) {
@@ -302,7 +332,7 @@ export const approveInvitation = onCall(
 
 const rejectInvitationOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public", // Added to allow unauthenticated calls for now
+  invoker: "public",
 };
 export const rejectInvitation = onCall(
   rejectInvitationOptions,
@@ -354,7 +384,7 @@ export const rejectInvitation = onCall(
       };
 
       if (reason && typeof reason === "string" && reason.trim() !== "") {
-        updatePayload.rejectionReason = reason;
+        updatePayload.rejectionReason = reason.substring(0, 200); // Max length
       }
 
       const payloadLog = `${logMarker}: Payload for ${invitationId}:`;
