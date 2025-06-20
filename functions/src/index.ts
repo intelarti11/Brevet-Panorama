@@ -14,26 +14,26 @@ let db: admin.firestore.Firestore | null = null;
 let adminApp: admin.app.App | null = null;
 
 try {
-  logger.info(`${LOG_PREFIX_V13_1}: Attempting admin.initializeApp()...`);
+  logger.info(`${LOG_PREFIX_V13_1}: Admin.initializeApp()...`);
   adminApp = admin.initializeApp();
-  logger.info(`${LOG_PREFIX_V13_1}: admin.initializeApp() SUCCESS.`);
+  logger.info(`${LOG_PREFIX_V13_1}: admin.initializeApp() OK.`);
 
-  logger.info(`${LOG_PREFIX_V13_1}: Attempting admin.firestore()...`);
+  logger.info(`${LOG_PREFIX_V13_1}: Admin.firestore()...`);
   db = admin.firestore();
-  logger.info(`${LOG_PREFIX_V13_1}: admin.firestore() SUCCESS.`);
+  logger.info(`${LOG_PREFIX_V13_1}: admin.firestore() OK.`);
   logger.info(`${LOG_PREFIX_V13_1}: FB Admin SDK init OK.`);
 } catch (error: unknown) {
-  let errorMessage = "Unknown error during Firebase Admin init.";
-  let errorStack = "No stack trace for Firebase Admin init error.";
+  let errMsg = "Unknown error during Firebase Admin init.";
+  let errStack = "No stack trace for Firebase Admin init error.";
   if (error instanceof Error) {
-    errorMessage = error.message;
-    errorStack = error.stack || "No stack trace available";
+    errMsg = error.message;
+    errStack = error.stack || "No stack trace available";
   }
   logger.error(
-    `${LOG_PREFIX_V13_1}: CRIT_ERR_FIREBASE_ADMIN_INIT.`,
+    `${LOG_PREFIX_V13_1}: CRIT_ERR_FB_ADMIN_INIT.`,
     {
-      errorMessage: errorMessage,
-      errorStack: errorStack,
+      errorMessage: errMsg,
+      errorStack: errStack,
       errorObjectString: String(error),
     }
   );
@@ -86,7 +86,7 @@ export const requestInvitation = onCall(
       logger.warn(`${logMarker}: Firestore (db) not init.`);
       return {
         success: false,
-        message: "Erreur serveur (DB indisponible).",
+        message: "Err serveur (DB indispo).",
         receivedData: request.data,
       };
     }
@@ -96,7 +96,7 @@ export const requestInvitation = onCall(
       logger.error(`${logMarker}: Invalid/missing email.`, {email});
       return {
         success: false,
-        message: "Email invalide ou manquant.",
+        message: "Email invalide/manquant.",
         receivedData: request.data,
       };
     }
@@ -113,7 +113,7 @@ export const requestInvitation = onCall(
         logger.info(msg);
         return {
           success: false,
-          message: `Demande pour ${email} déjà en attente.`,
+          message: `Demande ${email} attente.`,
           receivedData: request.data,
         };
       }
@@ -125,7 +125,7 @@ export const requestInvitation = onCall(
         status: "pending",
       });
 
-      const successMsg = `Demande pour ${email} enregistrée.`;
+      const successMsg = `Demande ${email} OK.`;
       const logOk = `${logMarker}: Write OK ${email}. ID: ${newRequestRef.id}`;
       logger.info(logOk);
       return {
@@ -138,14 +138,14 @@ export const requestInvitation = onCall(
       if (writeError instanceof Error) {
         errorMsg = writeError.message;
       }
-      const logFail = `${logMarker}: Firestore write FAIL for ${email}.`;
+      const logFail = `${logMarker}: Firestore write FAIL ${email}.`;
       logger.error(
         logFail,
         {error: errorMsg, originalError: String(writeError)}
       );
       return {
         success: false,
-        message: `Échec enregistrement: ${errorMsg}`,
+        message: `Échec save: ${errorMsg}`,
         receivedData: request.data,
       };
     }
@@ -167,7 +167,7 @@ export const listPendingInvitations = onCall(
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
       return {
         success: false,
-        message: "Erreur serveur: DB indisponible pour lister.",
+        message: "Err serveur: DB indispo.",
         invitations: [],
       };
     }
@@ -181,7 +181,7 @@ export const listPendingInvitations = onCall(
         logger.info(`${logMarker}: No pending invites found.`);
         return {
           success: true,
-          message: "Aucune demande d'invitation en attente.",
+          message: "Aucune demande en attente.",
           invitations: [],
         };
       }
@@ -194,9 +194,9 @@ export const listPendingInvitations = onCall(
         if (reqTimestamp && typeof reqTimestamp.toDate === "function") {
           requestedAtISO = reqTimestamp.toDate().toISOString();
         } else {
-          const warnMsg = `${logMarker}: Invalid reqAt for ${doc.id}.`;
+          const warnMsg = `${logMarker}: Invalid reqAt ${doc.id}.`;
           logger.warn(warnMsg, {reqTsVal: String(reqTimestamp)});
-          requestedAtISO = new Date(0).toISOString(); // Default fallback
+          requestedAtISO = new Date(0).toISOString();
         }
         return {
           id: doc.id,
@@ -209,7 +209,7 @@ export const listPendingInvitations = onCall(
       logger.info(logMsg);
       return {
         success: true,
-        message: "Invitations en attente récupérées.",
+        message: "Invitations en attente OK.",
         invitations: invitations,
       };
     } catch (error: unknown) {
@@ -221,7 +221,7 @@ export const listPendingInvitations = onCall(
       logger.error(logErr, {error: errorMsg, originalError: String(error)});
       return {
         success: false,
-        message: `Erreur serveur (liste): ${errorMsg}`,
+        message: `Err serveur (liste): ${errorMsg}`,
         invitations: [],
       };
     }
@@ -235,7 +235,7 @@ const approveInvitationOptions: HttpsOptions = {
 export const approveInvitation = onCall(
   approveInvitationOptions,
   async (request) => {
-    const logMarker = "INV_APPR_V5";
+    const logMarker = "INV_APPR_V6";
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -267,7 +267,7 @@ export const approveInvitation = onCall(
         logger.warn(`${logMarker}: ${msg} Status: ${docData?.status}`);
         return {
           success: false,
-          message: `Inv. déjà traitée (${docData?.status}).`,
+          message: `Inv. traitée (${docData?.status}).`,
         };
       }
 
@@ -278,6 +278,8 @@ export const approveInvitation = onCall(
       }
 
       let userCreationMessage = "";
+      let userMessageShort = "";
+
       try {
         const tempPassword = crypto.randomBytes(16).toString("hex");
         const userRecord: UserRecord = await admin.auth().createUser({
@@ -289,13 +291,15 @@ export const approveInvitation = onCall(
         const logUMsg = `${logMarker}: User ${userRecord.uid} created.`;
         logger.info(logUMsg);
         userCreationMessage = "Cpt créé. Use 'Mdp oublié'.";
-      } catch (authError: unknown) {
-        const errorObject = authError as {code?: string; message?: string};
-        if (errorObject.code === "auth/email-already-exists") {
+        userMessageShort = "Cpt créé.";
+      } catch (authErrorUnknown: unknown) {
+        const authError = authErrorUnknown as {code?: string; message?: string};
+        if (authError.code === "auth/email-already-exists") {
           logger.warn(`${logMarker}: User ${emailToApprove} exists.`);
           userCreationMessage = "Cpt existant.";
+          userMessageShort = "Cpt existant.";
         } else {
-          const errMsg = errorObject.message || "Auth error";
+          const errMsg = authError.message || "Auth error";
           const logErr = `${logMarker}: Auth FAIL: ${emailToApprove}.`;
           logger.error(logErr, {error: errMsg});
           return {success: false, message: `Échec Auth: ${errMsg}`};
@@ -307,12 +311,11 @@ export const approveInvitation = onCall(
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const finalLogMsg = `${logMarker}: OK ${invitationId}. ${userCreationMessage}`;
+      const finalLogMsg = `${logMarker}: OK ${invitationId}. ${userMessageShort}`;
       logger.info(finalLogMsg);
-      // Shortened success message
       return {
         success: true,
-        message: `OK. ${userCreationMessage}`,
+        message: `Approuvé. ${userCreationMessage}`,
       };
     } catch (err: unknown) {
       let errorMsg = "Unknown error approving invitation.";
@@ -333,7 +336,7 @@ const rejectInvitationOptions: HttpsOptions = {
 export const rejectInvitation = onCall(
   rejectInvitationOptions,
   async (request) => {
-    const logMarker = "INV_REJ_V4";
+    const logMarker = "INV_REJ_V5";
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -367,7 +370,7 @@ export const rejectInvitation = onCall(
         logger.warn(`${logMarker}: ${msg} Status: ${docData?.status}`);
         return {
           success: false,
-          message: `Inv. déjà traitée (${docData?.status}).`,
+          message: `Inv. traitée (${docData?.status}).`,
         };
       }
 
