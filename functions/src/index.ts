@@ -1,6 +1,6 @@
 
 "use strict";
-import {onCall, type HttpsOptions} from "firebase-functions/v2/https";
+import type {onCall, HttpsOptions} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import type {UserRecord} from "firebase-admin/auth";
 import * as crypto from "crypto";
@@ -326,7 +326,7 @@ export const approveInvitation = onCall(
       }
       logger.error(
         `${logMarker}: Appr KO ${invIdShort}.`,
-        {e: errMsg.slice(0, 7), o: String(eCatch).slice(0, 7)}
+        {e: errMsg.slice(0, 6), o: String(eCatch).slice(0, 6)}
       );
       return {success: false, m: `App. KO: ${errMsg.slice(0, 8)}`};
     }
@@ -401,11 +401,11 @@ export const rejectInvitation = onCall(
       if (eCatch instanceof Error) {
         errMsg = eCatch.message;
       }
-      logger.error( // This is line 271 in the new structure
+      logger.error(
         `${logMarker}: Rej KO ${invIdShort}.`,
-        {e: errMsg.slice(0, 3), o: String(eCatch).slice(0, 3)}
+        {e: errMsg.slice(0, 2), o: String(eCatch).slice(0, 2)}
       );
-      return {success: false, m: `Rej. KO: ${errMsg.slice(0, 8)}`};
+      return {success: false, m: `RejKO:${errMsg.slice(0,7)}`};
     }
   }
 );
@@ -467,11 +467,11 @@ export const markInvitationAsNotified = onCall(
       if (eCatch instanceof Error) {
         errMsg = eCatch.message;
       }
-      logger.error( // This is line 307 in the new structure
+      logger.error(
         `${logMarker}: Ntf KO ${invIdShort}.`,
-        {e: errMsg.slice(0, 2), o: String(eCatch).slice(0, 2)}
+        {e: errMsg.slice(0, 1), o: String(eCatch).slice(0, 1)}
       );
-      return {success: false, m: `Ntf KO: ${errMsg.slice(0, 8)}`};
+      return {success: false, m: `NtfKO:${errMsg.slice(0,7)}`};
     }
   }
 );
@@ -479,3 +479,5 @@ export const markInvitationAsNotified = onCall(
 logger.info(
   `${LOG_PREFIX}: End. SDK OK.`
 );
+
+    
