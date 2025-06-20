@@ -336,7 +336,7 @@ export default function ImportPage() {
     if (header === null || header === undefined) return "";
     return header.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/gi, '');
   };
-  
+
   const parseAndImportStudentListCsvData = async () => {
     if (!studentListCsvFile) {
       setStudentListCsvError("Aucun fichier CSV (Liste Élèves) sélectionné.");
@@ -354,23 +354,23 @@ export default function ImportPage() {
 
           const lines = csvText.split(/\r\n|\n/);
           if (lines.length < 2) throw new Error("CSV (Liste Élèves) doit avoir des en-têtes et au moins une ligne de données.");
-          
+
           const rawHeaders = lines[0].split(';').map(h => h.trim());
           const normalizedFileHeaders = rawHeaders.map(normalizeCsvHeader);
 
-          const headerMapping: { [key: string]: string[] } = { 
-            INE: ["INE"], 
-            NOM: ["NOM"],
-            PRENOM: ["PRENOM", "PRÉNOM"], // Corrected: "PRANOM" removed
-            SEXE: ["SEXE"],
-            CLASSE: ["CLASSE"],
+          const headerMapping: { [key: string]: string[] } = {
+            INE: ["INE"],
+            NOM: ["Nom"],
+            PRENOM: ["Prénom"],
+            SEXE: ["Sexe"],
+            CLASSE: ["Classe"],
           };
 
           const schemaKeyToCsvIndex: { [key: string]: number } = {};
           const requestedSchemaKeys: (keyof StudentBaseData)[] = ["INE", "NOM", "PRENOM", "SEXE", "CLASSE"];
 
           for (const schemaKey of requestedSchemaKeys) {
-            const possibleOriginalHeaders = headerMapping[schemaKey];
+            const possibleOriginalHeaders = headerMapping[schemaKey as keyof typeof headerMapping];
             let foundIndex = -1;
             if (possibleOriginalHeaders) {
               for (const originalHeader of possibleOriginalHeaders) {
@@ -378,13 +378,13 @@ export default function ImportPage() {
                   const idx = normalizedFileHeaders.indexOf(normalizedPossibleHeader);
                   if (idx !== -1) {
                       foundIndex = idx;
-                      break; 
+                      break;
                   }
               }
             }
             if (foundIndex !== -1) {
                  schemaKeyToCsvIndex[schemaKey.toUpperCase() as keyof StudentBaseData] = foundIndex;
-            } else if (schemaKey === 'NOM' || schemaKey === 'PRENOM') { 
+            } else if (schemaKey === 'NOM' || schemaKey === 'PRENOM') {
                 throw new Error(`Colonne CSV requise manquante pour Liste Élèves: ${schemaKey}. En-têtes normalisés trouvés: ${normalizedFileHeaders.join(', ')}`);
             }
           }
@@ -396,15 +396,15 @@ export default function ImportPage() {
             if (lines[i].trim() === '') continue;
             const values = lines[i].split(';').map(v => v.trim());
             const rawRowForSchema: any = {};
-            
+
             for (const schemaKey of requestedSchemaKeys) {
                 const mappedKey = schemaKey.toUpperCase() as keyof StudentBaseData;
                 const index = schemaKeyToCsvIndex[mappedKey];
-                if (index !== undefined && values[index] !== undefined) { 
+                if (index !== undefined && values[index] !== undefined) {
                   rawRowForSchema[mappedKey] = values[index];
                 }
             }
-            
+
             const validationResult = studentBaseSchema.safeParse(rawRowForSchema);
             if (validationResult.success) {
               dataToImport.push(validationResult.data);
@@ -439,6 +439,7 @@ export default function ImportPage() {
             if (student.PRENOM) studentDataWithYear.PRENOM = student.PRENOM;
             if (student.SEXE) studentDataWithYear.SEXE = student.SEXE;
             if (student.CLASSE) studentDataWithYear.CLASSE = student.CLASSE;
+
 
             let docRef;
             if (student.INE && student.INE.trim() !== "") {
@@ -476,7 +477,7 @@ export default function ImportPage() {
         toast({ variant: "destructive", title: "Erreur CSV (Liste Élèves)", description: "Impossible de lire." });
         setIsStudentListCsvLoading(false);
       };
-      reader.readAsText(studentListCsvFile, 'ISO-8859-1'); 
+      reader.readAsText(studentListCsvFile, 'ISO-8859-1');
 
     } catch (e: any) {
       console.error("Erreur générale import CSV (Liste Élèves):", e);
@@ -585,7 +586,7 @@ export default function ImportPage() {
             Importer Liste Élèves (CSV)
           </CardTitle>
           <CardDescription>
-             Colonnes principales attendues: Nom;Prénom;Sexe;Classe. La colonne INE est optionnelle mais recommandée. Délimiteur: point-virgule ';'.
+            Colonnes attendues: Nom;Prénom;Sexe;Classe. La colonne INE est également supportée si présente. Délimiteur: point-virgule ';'.
             L'année scolaire sélectionnée ci-dessus sera utilisée pour cet import.
           </CardDescription>
         </CardHeader>
@@ -633,6 +634,7 @@ export default function ImportPage() {
     </div>
   );
 }
+    
 
     
 
