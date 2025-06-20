@@ -26,15 +26,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/logo';
-import { Mail, LockKeyhole, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Mail, LockKeyhole, Loader2, Eye, EyeOff, User } from 'lucide-react'; // Ajout de l'icône User
 
-// Règles de validation assouplies pour le développement
+// Validation assouplie : le champ 'usernameOrEmail' doit juste être non vide.
 const formSchema = z.object({
-  email: z.string()
-    .min(1, { message: "L'adresse e-mail est requise." })
-    .email({ message: "Veuillez entrer une adresse e-mail valide." }), // Format e-mail générique
-  password: z.string()
-    .min(1, { message: "Le mot de passe est requis." }), // Mot de passe non vide, sans contrainte de complexité ici
+  usernameOrEmail: z.string().min(1, { message: "Le nom d'utilisateur ou l'e-mail est requis." }),
+  password: z.string().min(1, { message: "Le mot de passe est requis." }),
 });
 
 export default function LoginPage() {
@@ -46,22 +43,20 @@ export default function LoginPage() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "",
+      usernameOrEmail: "",
       password: "",
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    // REMPLACEZ CECI PAR VOTRE LOGIQUE D'AUTHENTIFICATION BACKEND
-    // Cette logique est une maquette et n'est PAS sécurisée pour la production.
-    await new Promise(resolve => setTimeout(resolve, 1500)); 
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulation de délai réseau
     setIsLoading(false);
 
-    // Exemple de logique de connexion (à remplacer)
-    // IMPORTANT: Pour se connecter en admin, l'email doit commencer par "admin." 
-    // et le mot de passe doit être "SVeil2025!"
-    if (values.email.startsWith("admin.") && values.password === "SVeil2025!") {
+    const isAdminbrevetLogin = values.usernameOrEmail === "Adminbrevet" && values.password === "SVeil2025!";
+    const isAdminEmailLogin = values.usernameOrEmail.startsWith("admin.") && values.password === "SVeil2025!";
+
+    if (isAdminbrevetLogin || isAdminEmailLogin) {
       toast({
         title: "Connexion réussie",
         description: "Bienvenue !",
@@ -71,7 +66,7 @@ export default function LoginPage() {
       toast({
         variant: "destructive",
         title: "Échec de la connexion",
-        description: "Adresse e-mail ou mot de passe incorrect. Veuillez réessayer.",
+        description: "Nom d'utilisateur/e-mail ou mot de passe incorrect.",
       });
     }
   }
@@ -82,21 +77,21 @@ export default function LoginPage() {
         <CardHeader className="items-center text-center">
           <Logo className="mb-4" />
           <CardTitle className="font-headline text-2xl">Connectez-vous à Brevet Panorama</CardTitle>
-          <CardDescription>Entrez votre adresse e-mail et mot de passe.</CardDescription>
+          <CardDescription>Entrez vos identifiants de connexion.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
-                name="email"
+                name="usernameOrEmail"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Adresse e-mail</FormLabel>
+                    <FormLabel>Nom d'utilisateur ou e-mail</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="email" placeholder="Entrez votre e-mail" {...field} className="pl-10" />
+                        <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                        <Input type="text" placeholder="Adminbrevet ou prenom.nom@ac-montpellier.fr" {...field} className="pl-10" />
                       </div>
                     </FormControl>
                     <FormMessage />
