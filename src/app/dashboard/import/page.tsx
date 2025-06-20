@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import type { StudentData, StudentBaseData } from '@/lib/excel-types';
-import { studentDataSchema, studentBaseSchema } from '@/lib/excel-types';
+import type { StudentData, StudentBaseData, BrevetBlancEntry } from '@/lib/excel-types';
+import { studentDataSchema, studentBaseSchema, brevetBlancEntrySchema } from '@/lib/excel-types';
 import { Loader2, Import, AlertTriangle, CalendarDays, UploadCloud, FileText, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -334,8 +334,13 @@ export default function ImportPage() {
 
   const normalizeCsvHeader = (header: string): string => {
     if (header === null || header === undefined) return "";
-    return header.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/gi, '');
+    return header
+      .normalize("NFD") // Decompose accented characters (e.g., "é" -> "e" + "\u0301")
+      .replace(/[\u0300-\u036f]/g, "") // Remove the diacritics (e.g., "\u0301")
+      .toUpperCase() // Convert to uppercase
+      .trim(); // Trim whitespace from ends
   };
+
 
   const parseAndImportStudentListCsvData = async () => {
     if (!studentListCsvFile) {
@@ -357,25 +362,34 @@ export default function ImportPage() {
 
           const rawHeaders = lines[0].split(';').map(h => h.trim());
           const normalizedFileHeaders = rawHeaders.map(normalizeCsvHeader);
+          
+          console.log("Raw Headers from CSV:", rawHeaders);
+          console.log("Normalized Headers from CSV:", normalizedFileHeaders);
+
 
           const headerMapping: { [key: string]: string[] } = {
-            INE: ["INE"],
+            INE: ["INE"], // Optional
             NOM: ["Nom"],
-            PRENOM: ["Prénom"],
+            PRENOM: ["Prénom"], // This expects "Prénom" or "Prenom" in the CSV header
             SEXE: ["Sexe"],
             CLASSE: ["Classe"],
           };
 
           const schemaKeyToCsvIndex: { [key: string]: number } = {};
           const requestedSchemaKeys: (keyof StudentBaseData)[] = ["INE", "NOM", "PRENOM", "SEXE", "CLASSE"];
+          
+          console.log("Expected Schema Keys:", requestedSchemaKeys);
+          console.log("Header Mapping to use:", headerMapping);
+
 
           for (const schemaKey of requestedSchemaKeys) {
-            const possibleOriginalHeaders = headerMapping[schemaKey as keyof typeof headerMapping];
+            const possibleOriginalHeaders = headerMapping[schemaKey.toUpperCase() as keyof typeof headerMapping];
             let foundIndex = -1;
             if (possibleOriginalHeaders) {
               for (const originalHeader of possibleOriginalHeaders) {
-                  const normalizedPossibleHeader = normalizeCsvHeader(originalHeader);
-                  const idx = normalizedFileHeaders.indexOf(normalizedPossibleHeader);
+                  // We normalize the header from our mapping to compare with normalized headers from file
+                  const normalizedExpectedHeader = normalizeCsvHeader(originalHeader);
+                  const idx = normalizedFileHeaders.indexOf(normalizedExpectedHeader);
                   if (idx !== -1) {
                       foundIndex = idx;
                       break;
@@ -384,10 +398,13 @@ export default function ImportPage() {
             }
             if (foundIndex !== -1) {
                  schemaKeyToCsvIndex[schemaKey.toUpperCase() as keyof StudentBaseData] = foundIndex;
-            } else if (schemaKey === 'NOM' || schemaKey === 'PRENOM') {
+            } else if (schemaKey === 'NOM' || schemaKey === 'PRENOM') { // Only throw error for absolutely required fields if not found
                 throw new Error(`Colonne CSV requise manquante pour Liste Élèves: ${schemaKey}. En-têtes normalisés trouvés: ${normalizedFileHeaders.join(', ')}`);
             }
           }
+          
+          console.log("SchemaKey to CSV Index mapping:", schemaKeyToCsvIndex);
+
 
           const dataToImport: StudentBaseData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
@@ -397,14 +414,17 @@ export default function ImportPage() {
             const values = lines[i].split(';').map(v => v.trim());
             const rawRowForSchema: any = {};
 
+            // Populate rawRowForSchema using only the requestedSchemaKeys and their found indices
             for (const schemaKey of requestedSchemaKeys) {
                 const mappedKey = schemaKey.toUpperCase() as keyof StudentBaseData;
                 const index = schemaKeyToCsvIndex[mappedKey];
-                if (index !== undefined && values[index] !== undefined) {
+                // Only add if index was found (meaning header was present and mapped)
+                if (index !== undefined && values[index] !== undefined) { 
                   rawRowForSchema[mappedKey] = values[index];
                 }
             }
-
+            
+            // Validate against the schema which only expects INE, NOM, PRENOM, SEXE, CLASSE
             const validationResult = studentBaseSchema.safeParse(rawRowForSchema);
             if (validationResult.success) {
               dataToImport.push(validationResult.data);
@@ -430,6 +450,7 @@ export default function ImportPage() {
           const academicYearForImport = importYear || new Date().getFullYear().toString();
 
           dataToImport.forEach(student => {
+            // Construct object with only the fields defined in studentBaseSchema
             const studentDataWithYear: Partial<StudentBaseData> & { anneeScolaire: string; importedAt: any } = {
                 anneeScolaire: academicYearForImport,
                 importedAt: serverTimestamp()
@@ -445,7 +466,8 @@ export default function ImportPage() {
             if (student.INE && student.INE.trim() !== "") {
                 docRef = doc(collectionRef, `${student.INE}_${academicYearForImport}`);
             } else {
-                docRef = doc(collectionRef);
+                // If INE is not present, Firestore will auto-generate an ID
+                docRef = doc(collectionRef); 
                 console.warn(`Student data without INE, auto-generating ID: ${student.NOM} ${student.PRENOM}`);
             }
             batch.set(docRef, studentDataWithYear);
@@ -477,7 +499,7 @@ export default function ImportPage() {
         toast({ variant: "destructive", title: "Erreur CSV (Liste Élèves)", description: "Impossible de lire." });
         setIsStudentListCsvLoading(false);
       };
-      reader.readAsText(studentListCsvFile, 'ISO-8859-1');
+      reader.readAsText(studentListCsvFile, 'ISO-8859-1'); // Using ISO-8859-1 for broader compatibility with French CSVs
 
     } catch (e: any) {
       console.error("Erreur générale import CSV (Liste Élèves):", e);
@@ -634,6 +656,8 @@ export default function ImportPage() {
     </div>
   );
 }
+    
+
     
 
     
