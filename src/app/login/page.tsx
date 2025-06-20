@@ -57,15 +57,16 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      let emailToUse = values.usernameOrEmail.trim(); // Trim the input first
-      const enteredUsernameOrEmail = values.usernameOrEmail.trim();
+      let emailPourAuthentification: string;
+      const identifiantSaisi = values.usernameOrEmail.trim();
 
-      if (enteredUsernameOrEmail.toLowerCase() === ADMIN_USERNAME.toLowerCase()) {
-        emailToUse = ADMIN_EMAIL_FOR_LOGIN; // Use the mapped admin email
+      if (identifiantSaisi.toLowerCase() === ADMIN_USERNAME.toLowerCase()) {
+        emailPourAuthentification = ADMIN_EMAIL_FOR_LOGIN;
+      } else {
+        emailPourAuthentification = identifiantSaisi;
       }
-      // If not "Adminbrevet", emailToUse remains the trimmed input
 
-      await signInWithEmailAndPassword(auth, emailToUse, values.password);
+      await signInWithEmailAndPassword(auth, emailPourAuthentification, values.password);
       toast({
         title: "Connexion réussie",
         description: "Bienvenue !",
