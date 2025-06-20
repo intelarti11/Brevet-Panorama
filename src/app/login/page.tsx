@@ -31,7 +31,9 @@ import { getAuth, signInWithEmailAndPassword, type AuthError } from 'firebase/au
 import { app } from '@/lib/firebase';
 
 const formSchema = z.object({
-  usernameOrEmail: z.string().min(1, { message: "Le nom d'utilisateur ou l'e-mail est requis." }),
+  usernameOrEmail: z.string()
+    .min(1, { message: "L'adresse e-mail est requise." })
+    .email({ message: "Veuillez entrer une adresse e-mail valide." }),
   password: z.string().min(1, { message: "Le mot de passe est requis." }),
 });
 
