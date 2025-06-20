@@ -49,7 +49,7 @@ type SetAdminRoleData = z.infer<typeof setAdminRoleDataSchema>;
  * App Check est appliqué.
  */
 export const requestInvitation = onCall(
-  { region: "europe-west1", enforceAppCheck: true },
+  {region: "europe-west1", enforceAppCheck: true},
   async (request: CallableRequest<InvitationRequestData>) => {
     functions.logger.info("Nouv. demande invit:", request.data);
 
@@ -79,6 +79,7 @@ export const requestInvitation = onCall(
         if (existingRequest.status === "pending") {
           throw new HttpsError("already-exists", "Demande en cours.");
         }
+        // Réutilise une demande rejetée
         await db.collection("invitationRequests")
           .doc(existReqQuery.docs[0].id).set({
             email: lowerEmail,
@@ -94,9 +95,10 @@ export const requestInvitation = onCall(
           }, {merge: true});
 
         functions.logger.info(`Demande MAJ attente: ${lowerEmail}`);
-        return { success: true, message: "Votre demande a été soumise." };
+        return {success: true, message: "Votre demande a été soumise."};
       }
 
+      // Nouvelle demande
       await db.collection("invitationRequests").add({
         email: lowerEmail,
         status: "pending",
@@ -105,7 +107,7 @@ export const requestInvitation = onCall(
       });
 
       functions.logger.info(`Demande enregistrée: ${lowerEmail}`);
-      return { success: true, message: "Demande d'invitation soumise." };
+      return {success: true, message: "Demande d'invitation soumise."};
     } catch (error: unknown) {
       functions.logger.error("Err requestInv:", error);
       if (error instanceof HttpsError) {
@@ -122,7 +124,7 @@ export const requestInvitation = onCall(
  * Approuve une demande et crée un user Firebase Auth. Admin requis.
  */
 export const approveInvitation = onCall(
-  { region: "europe-west1" },
+  {region: "europe-west1"},
   async (request: CallableRequest<ManageInvitationData>) => {
     functions.logger.info("Approbation invit:", request.data);
 
@@ -158,6 +160,7 @@ export const approveInvitation = onCall(
       const invitationDoc = requestQuery.docs[0];
       let userRecord;
 
+      // Création de l'utilisateur dans Firebase Authentication
       try {
         userRecord = await admin.auth().createUser({
           email: lowerEmail,
@@ -187,6 +190,7 @@ export const approveInvitation = onCall(
             throw new HttpsError("internal", msg.slice(0, 15));
           }
 
+          // Mise à jour statut Firestore pour utilisateur existant
           await db.collection("invitationRequests")
             .doc(invitationDoc.id).update({
               status: "approved",
@@ -200,13 +204,15 @@ export const approveInvitation = onCall(
             message: `User ${lowerEmail} existe. Demande ok.`,
           };
         }
-        functions.logger.error("Auth create e:", authError); // msg court
+        // Autre erreur Auth
+        functions.logger.error("Auth create e:", authError);
         let errMsg = "Err creat user";
         if (authError instanceof Error) errMsg = authError.message;
-        const finalErrMsg = errMsg.slice(0, 15);
+        const finalErrMsg = errMsg.slice(0, 15); // Shortened
         throw new HttpsError("internal", finalErrMsg);
       }
 
+      // Mise à jour statut Firestore
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -221,11 +227,11 @@ export const approveInvitation = onCall(
         message: `Invit. ${lowerEmail} ok. MDP via 'Oublié?'.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Err approveInv:", error); // msg court
+      functions.logger.error("Err approveInv:", error);
       if (error instanceof HttpsError) {
         throw error;
       }
-      let errMsg = "Echec approb."; // msg court
+      let errMsg = "Echec approb.";
       if (error instanceof Error) errMsg = error.message.slice(0, 15);
       throw new HttpsError("internal", errMsg);
     }
@@ -236,7 +242,7 @@ export const approveInvitation = onCall(
  * Rejette une demande d'invitation. Admin requis.
  */
 export const rejectInvitation = onCall(
-  { region: "europe-west1" },
+  {region: "europe-west1"},
   async (request: CallableRequest<RejectInvitationData>) => {
     functions.logger.info("Rejet invit:", request.data);
 
@@ -271,6 +277,7 @@ export const rejectInvitation = onCall(
 
       const invitationDoc = requestQuery.docs[0];
 
+      // Mise à jour statut Firestore
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "rejected",
         rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -300,8 +307,8 @@ export const rejectInvitation = onCall(
  * Liste invitations en attente. Admin requis.
  */
 export const listPendingInvitations = onCall(
-  { region: "europe-west1" },
-  async (request: CallableRequest<void>) => { // _data est void car non utilisé
+  {region: "europe-west1"},
+  async (request: CallableRequest<void>) => {
     functions.logger.info("Listage invitations en attente.");
 
     if (!request.auth || !request.auth.token.admin) {
@@ -351,7 +358,7 @@ export const listPendingInvitations = onCall(
  * Attribue le rôle d'admin. Nécessite que l'appelant soit admin.
  */
 export const setAdminRole = onCall(
-  { region: "europe-west1" },
+  {region: "europe-west1"},
   async (request: CallableRequest<SetAdminRoleData>) => {
     if (!request.auth || !request.auth.token.admin) {
       functions.logger.error("Accès non-autorisé (setAdminRole).");
