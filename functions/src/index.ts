@@ -36,7 +36,7 @@ const rejectInvitationSchema = manageInvitationSchema.extend({
  */
 export const requestInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
-    functions.logger.info("Nouvelle demande d'invitation:", data);
+    functions.logger.info("Nouv. demande invit:", data);
 
     if (context.app === undefined) {
       throw new functions.https.HttpsError(
@@ -51,7 +51,7 @@ export const requestInvitation = functions.region("europe-west1")
         const flatErrors = validationResult.error.flatten();
         const errorMsg = "Données invalides: " +
           flatErrors.formErrors.join(", ");
-        functions.logger.error("Validation échouée (request):", flatErrors);
+        functions.logger.error("Valid. échouée (req):", flatErrors);
         throw new functions.https.HttpsError("invalid-argument", errorMsg);
       }
 
@@ -109,13 +109,13 @@ export const requestInvitation = functions.region("europe-west1")
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(`Demande enregistrée pour ${lowerEmail}`);
+      functions.logger.info(`Demande enregistrée: ${lowerEmail}`);
       return {
         success: true,
         message: "Demande d'invitation soumise.",
       };
     } catch (error: unknown) {
-      functions.logger.error("Erreur dans requestInvitation:", error);
+      functions.logger.error("Err requestInvitation:", error);
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
@@ -123,8 +123,8 @@ export const requestInvitation = functions.region("europe-west1")
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      const finalErrorMsg = errorMessage.length > 70 ?
-        errorMessage.substring(0, 67) + "..." : errorMessage;
+      const finalErrorMsg = errorMessage.length > 60 ?
+        errorMessage.substring(0, 57) + "..." : errorMessage;
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
@@ -135,7 +135,7 @@ export const requestInvitation = functions.region("europe-west1")
  */
 export const approveInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
-    functions.logger.info("Approbation d'invitation:", data);
+    functions.logger.info("Approbation invit:", data);
 
     // Vérification des droits d'administrateur
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
@@ -148,17 +148,17 @@ export const approveInvitation = functions.region("europe-west1")
       );
     }
     functions.logger.info(
-      "approveInvitation: admin OK. UID:", context.auth.uid
+      "Approve: admin OK. UID:", context.auth.uid
     );
 
     try {
       const validationResult = manageInvitationSchema.safeParse(data);
       if (!validationResult.success) {
         const flatErrors = validationResult.error.flatten();
-        functions.logger.error("Validation échouée (approve):", flatErrors);
+        functions.logger.error("Valid. échouée (approve):", flatErrors);
         throw new functions.https.HttpsError(
           "invalid-argument",
-          "Données invalides pour approbation."
+          "Données invalides."
         );
       }
 
@@ -175,7 +175,7 @@ export const approveInvitation = functions.region("europe-west1")
       if (requestQuery.empty) {
         throw new functions.https.HttpsError(
           "not-found",
-          `Aucune demande en attente: ${lowerEmail}.`
+          `Aucune demande: ${lowerEmail}.`
         );
       }
 
@@ -190,13 +190,14 @@ export const approveInvitation = functions.region("europe-west1")
           disabled: false,
         });
         functions.logger.info(
-          "Utilisateur créé:", userRecord.uid, "pour:", lowerEmail
+          "User créé:", userRecord.uid, "pour:", lowerEmail
         );
       } catch (authError: unknown) {
         let code = "unknown";
-        if (typeof authError === "object" &&
-            authError !== null &&
-            "code" in authError
+        if (
+          typeof authError === "object" &&
+          authError !== null &&
+          "code" in authError
         ) {
           code = (authError as {code: string}).code;
         }
@@ -208,12 +209,12 @@ export const approveInvitation = functions.region("europe-west1")
           try {
             existingUser = await admin.auth().getUserByEmail(lowerEmail);
           } catch (getUserError: unknown) {
-            let msg = "Erreur vérif. user existant.";
+            let msg = "Err vérif. user.";
             if (getUserError instanceof Error) {
               msg = getUserError.message;
             }
             functions.logger.error("Err getUser:", {email: lowerEmail, getUserError});
-            const finalMsg = msg.length > 60 ? msg.substring(0, 57) + "..." : msg;
+            const finalMsg = msg.length > 50 ? msg.substring(0, 47) + "..." : msg;
             throw new functions.https.HttpsError("internal", finalMsg, getUserError);
           }
 
@@ -227,18 +228,18 @@ export const approveInvitation = functions.region("europe-west1")
             });
           return {
             success: true,
-            message: `User ${lowerEmail} existe. Demande approuvée.`,
+            message: `User ${lowerEmail} existe. Demande ok.`,
           };
         }
         // Autre erreur lors de la création Auth
-        functions.logger.error("Erreur création user Auth:", authError);
-        let errorMessage = "Erreur création user.";
-        if (authError instanceof Error) {
-          errorMessage = authError.message;
+        functions.logger.error("Auth create err:", authError); // Ligne 215 cible
+        let errMsg = "Err creat. user";                       // Ligne 216 cible
+        if (authError instanceof Error) {                     // Ligne 217 cible
+          errMsg = authError.message;
         }
-        const finalErrorMsg = errorMessage.length > 60 ?
-          errorMessage.substring(0, 57) + "..." : errorMessage;
-        throw new functions.https.HttpsError("internal", finalErrorMsg, authError);
+        const finalErrMsg = errMsg.length > 50 ?
+          errMsg.substring(0, 47) + "..." : errMsg;
+        throw new functions.https.HttpsError("internal", finalErrMsg, authError);
       }
 
       // Mise à jour du statut de la demande dans Firestore
@@ -251,15 +252,14 @@ export const approveInvitation = functions.region("europe-west1")
       });
 
       functions.logger.info(
-        `Invit. approuvée, user créé pour ${lowerEmail}`
+        `Invit. approuvée, user créé: ${lowerEmail}`
       );
       return {
         success: true,
-        // eslint-disable-next-line max-len
-        message: `Invit. ${lowerEmail} approuvée. MDP via 'Oublié?'.`,
+        message: `Invit. ${lowerEmail} ok. MDP via 'Oublié?'.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Erreur dans approveInvitation:", error);
+      functions.logger.error("Err approveInv:", error); // Ligne 241 cible
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
@@ -267,8 +267,8 @@ export const approveInvitation = functions.region("europe-west1")
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      const finalErrorMsg = errorMessage.length > 60 ?
-        errorMessage.substring(0, 57) + "..." : errorMessage;
+      const finalErrorMsg = errorMessage.length > 50 ?
+        errorMessage.substring(0, 47) + "..." : errorMessage;
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
@@ -279,7 +279,7 @@ export const approveInvitation = functions.region("europe-west1")
  */
 export const rejectInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
-    functions.logger.info("Rejet d'invitation:", data);
+    functions.logger.info("Rejet invit:", data);
 
     // Vérification des droits d'administrateur
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
@@ -292,17 +292,17 @@ export const rejectInvitation = functions.region("europe-west1")
       );
     }
     functions.logger.info(
-      "rejectInvitation: admin OK. UID:", context.auth.uid
+      "Reject: admin OK. UID:", context.auth.uid
     );
 
     try {
       const validationResult = rejectInvitationSchema.safeParse(data);
       if (!validationResult.success) {
         const flatErrors = validationResult.error.flatten();
-        functions.logger.error("Validation échouée (reject):", flatErrors);
+        functions.logger.error("Valid. échouée (reject):", flatErrors);
         throw new functions.https.HttpsError(
           "invalid-argument",
-          "Données invalides pour rejet."
+          "Données invalides."
         );
       }
 
@@ -319,7 +319,7 @@ export const rejectInvitation = functions.region("europe-west1")
       if (requestQuery.empty) {
         throw new functions.https.HttpsError(
           "not-found",
-          `Aucune demande en attente: ${lowerEmail}.`
+          `Aucune demande: ${lowerEmail}.`
         );
       }
 
@@ -334,13 +334,13 @@ export const rejectInvitation = functions.region("europe-west1")
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(`Invitation rejetée pour ${lowerEmail}`);
+      functions.logger.info(`Invitation rejetée: ${lowerEmail}`);
       return {
         success: true,
         message: `Invitation pour ${lowerEmail} rejetée.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Erreur dans rejectInvitation:", error);
+      functions.logger.error("Err rejectInvitation:", error);
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
@@ -348,19 +348,18 @@ export const rejectInvitation = functions.region("europe-west1")
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      const finalErrorMsg = errorMessage.length > 60 ?
-        errorMessage.substring(0, 57) + "..." : errorMessage;
+      const finalErrorMsg = errorMessage.length > 50 ?
+        errorMessage.substring(0, 47) + "..." : errorMessage;
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
 
 /**
- * Liste invitations en attente.
- * Statut "pending". Admin requis.
+ * Liste invitations en attente. Statut "pending". Admin requis.
  */
 export const listPendingInvitations = functions.region("europe-west1")
   .https.onCall(async (_data, context) => {
-    functions.logger.info("Listage des invitations en attente demandé.");
+    functions.logger.info("Listage des invitations en attente.");
 
     // Vérification des droits d'administrateur
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
@@ -373,7 +372,7 @@ export const listPendingInvitations = functions.region("europe-west1")
         "Droits admin requis."
       );
     }
-    functions.logger.info("listPending: admin OK");
+    functions.logger.info("ListPending: admin OK.");
     if (context.auth?.uid) {
       functions.logger.info("Admin UID:", context.auth.uid);
     }
@@ -407,13 +406,13 @@ export const listPendingInvitations = functions.region("europe-west1")
 
       return {success: true, invitations};
     } catch (error: unknown) {
-      functions.logger.error("Erreur listPendingInvitations:", error);
+      functions.logger.error("Err listPendingInvitations:", error);
       let errorMessage = "Echec liste invit.";
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      const finalErrorMsg = errorMessage.length > 60 ?
-        errorMessage.substring(0, 57) + "..." : errorMessage;
+      const finalErrorMsg = errorMessage.length > 50 ?
+        errorMessage.substring(0, 47) + "..." : errorMessage;
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
@@ -422,94 +421,85 @@ export const listPendingInvitations = functions.region("europe-west1")
 const setAdminRoleSchema = z.object({
   email: z.string().email({message: "E-mail invalide."}).optional(),
   uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
-  // Au moins un des deux doit être fourni
 }).refine((inputData) => inputData.email || inputData.uid, {
-  message: "E-mail ou UID requis.",
-  path: ["email"], // S'applique à `email` si les deux sont absents
+  message: "E-mail ou UID requis.", // Message court
+  path: ["email"],
 });
 type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
 
 /**
- * Attribue le rôle d'admin.
- * Nécessite que l'appelant soit admin.
+ * Attribue le rôle d'admin. Nécessite que l'appelant soit admin.
  */
 export const setAdminRole = functions.region("europe-west1")
   .https.onCall(async (data: SetAdminRoleInput, context) => {
-    // Vérifie que l'appelant est un admin
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non-autorisé (setAdminRole):", context.auth
       );
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Droits admin requis pour attribuer rôle."
+        "Droits admin requis."
       );
     }
     const callingAdminUid = context.auth.uid;
     functions.logger.info(
-      `Attribution rôle admin par: ${callingAdminUid}`, {data}
+      `Attrib. rôle admin par: ${callingAdminUid}`, {data}
     );
 
     try {
-      // Validation des données d'entrée
       const validationResult = setAdminRoleSchema.safeParse(data);
       if (!validationResult.success) {
         const errors = validationResult.error.flatten();
         const errorMsg = "Données invalides: " +
           errors.formErrors.join(", ");
-        functions.logger.error("Validation échouée (setAdmin):", errors);
+        functions.logger.error("Valid. échouée (setAdmin):", errors);
         throw new functions.https.HttpsError("invalid-argument", errorMsg);
       }
       const {email, uid: providedUid} = validationResult.data;
       let targetUid = providedUid;
 
-      // Si l'e-mail est fourni mais pas l'UID, récupérer l'UID via l'e-mail
       if (email && !targetUid) {
         try {
           const userRecord = await admin.auth().getUserByEmail(email);
           targetUid = userRecord.uid;
         } catch (e: unknown) {
-          let msg = "Erreur récup. user par e-mail.";
+          let msg = "Err récup. user.";
           if (e instanceof Error) {
             msg = e.message;
           }
           functions.logger.error(
-            `Erreur getUserByEmail pour ${email}:`, e
+            `Err getUserByEmail ${email}:`, e
           );
-          const finalMsg = msg.length > 60 ? msg.substring(0, 57) + "..." : msg;
+          const finalMsg = msg.length > 50 ? msg.substring(0, 47) + "..." : msg;
           throw new functions.https.HttpsError("internal", finalMsg, e);
         }
       }
 
       if (!targetUid) {
-        // Si aucun UID n'a pu être déterminé
         throw new functions.https.HttpsError(
           "not-found",
-          "User non trouvé avec infos fournies."
+          "User non trouvé."
         );
       }
 
-      // Attribuer le custom claim "admin"
       await admin.auth().setCustomUserClaims(targetUid, {admin: true});
-      functions.logger.info(`Rôle admin attribué à: ${targetUid}`);
+      functions.logger.info(`Rôle admin pour: ${targetUid}`);
       const targetIdentifier = email || targetUid;
       return {
         success: true,
-        message: `Rôle admin attribué à ${targetIdentifier}.`,
+        message: `Rôle admin pour ${targetIdentifier}.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Erreur dans setAdminRole:", error);
+      functions.logger.error("Err setAdminRole:", error);
       if (error instanceof functions.https.HttpsError) {
-        throw error; // Relance l'erreur HttpsError existante
+        throw error;
       }
-      // Gère les autres types d'erreurs
       let errorMessage = "Echec rôle admin.";
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      const finalErrorMsg = errorMessage.length > 60 ?
-        errorMessage.substring(0, 57) + "..." : errorMessage;
+      const finalErrorMsg = errorMessage.length > 50 ?
+        errorMessage.substring(0, 47) + "..." : errorMessage;
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
-
