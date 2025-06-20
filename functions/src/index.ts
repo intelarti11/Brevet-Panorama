@@ -1,5 +1,4 @@
 
-import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {z} from "zod";
 import {
@@ -11,11 +10,18 @@ import {
 // Initialiser Firebase Admin SDK
 try {
   admin.initializeApp();
+  console.log("Firebase Admin SDK initialized successfully.");
 } catch (e: unknown) {
-  functions.logger.error("Admin init err", e);
+  // Utiliser console.error pour une journalisation plus standard
+  console.error("Firebase Admin SDK initialization error:", e);
+  // Il pourrait être judicieux de relancer l'erreur ou de gérer cet état critique
+  // si l'application ne peut pas fonctionner sans admin SDK.
 }
 
 const db = admin.firestore();
+if (!db) {
+  console.error("Firestore database instance is undefined after admin.initializeApp(). This is critical.");
+}
 
 // --- Schémas Zod pour la validation des données d'entrée ---
 
@@ -51,13 +57,13 @@ type SetAdminRoleData = z.infer<typeof setAdminRoleDataSchema>;
 export const requestInvitation = onCall(
   {region: "europe-west1", enforceAppCheck: true},
   async (request: CallableRequest<InvitationRequestData>) => {
-    functions.logger.info("Nouv. demande invit:", request.data);
+    console.info("Nouv. demande invit:", request.data);
 
     try {
       const validResult = invitationRequestDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        functions.logger.error("Valid. échouée (requestInv):", flatErrors);
+        console.error("Valid. échouée (requestInv):", flatErrors);
         throw new HttpsError("invalid-argument", "Donnees invalides.");
       }
 
@@ -91,7 +97,7 @@ export const requestInvitation = onCall(
             authUid: null,
           }, {merge: true});
 
-        functions.logger.info(`Demande MAJ: ${lowerEmail}`);
+        console.info(`Demande MAJ: ${lowerEmail}`);
         return {success: true, message: "Votre demande a été soumise."};
       }
 
@@ -102,21 +108,21 @@ export const requestInvitation = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(`Demande enregistrée: ${lowerEmail}`);
+      console.info(`Demande enregistrée: ${lowerEmail}`);
       return {success: true, message: "Demande d'invitation soumise."};
     } catch (error: unknown) {
-      let code: functions.https.FunctionsErrorCode = "internal";
+      let code: typeof HttpsError.prototype.code = "internal";
       let message = "Echec demande. Verif logs.";
 
       if (error instanceof HttpsError) {
-        functions.logger.error(
-          `Err requestInv (HttpsError ${error.code}):`,
+        console.error(
+          `Err reqInv (HttpsError ${error.code}):`,
           {message: error.message, details: error.details, data: request.data}
         );
         throw error;
       } else if (error instanceof Error) {
-        functions.logger.error(
-          "Err requestInv (Error instance):",
+        console.error(
+          "Err reqInv (Error):",
           {name: error.name, message: error.message, stack: error.stack, data: request.data}
         );
         if (error.name === "ZodError") {
@@ -124,8 +130,8 @@ export const requestInvitation = onCall(
           message = "Donnees invalides.";
         }
       } else {
-        functions.logger.error(
-            "Err requestInv (type inconnu):",
+        console.error(
+            "Err reqInv (unknown):",
             {errorObject: error, data: request.data}
         );
       }
@@ -137,20 +143,20 @@ export const requestInvitation = onCall(
 export const approveInvitation = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<ManageInvitationData>) => {
-    functions.logger.info("Approbation invit:", request.data);
+    console.info("Approbation invit:", request.data);
 
     if (!request.auth || !request.auth.token.admin) {
-      functions.logger.error("Acces non-autorise (approve).");
+      console.error("Acces non-autorise (approve).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     const adminUid = request.auth.uid;
-    functions.logger.info(`Approve: admin OK. UID: ${adminUid}`);
+    console.info(`Approve: admin OK. UID: ${adminUid}`);
 
     try {
       const validResult = manageInvitationDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        functions.logger.error("Valid. échouée (approveInv):", flatErrors);
+        console.error("Valid. échouée (approveInv):", flatErrors);
         throw new HttpsError("invalid-argument", "Donnees invalides.");
       }
 
@@ -176,7 +182,7 @@ export const approveInvitation = onCall(
           emailVerified: false,
           disabled: false,
         });
-        functions.logger.info(`User cree: ${userRecord.uid}`);
+        console.info(`User cree: ${userRecord.uid}`);
       } catch (authError: unknown) {
         let code = "unknown";
         if (
@@ -188,12 +194,12 @@ export const approveInvitation = onCall(
         }
 
         if (code === "auth/email-already-exists") {
-          functions.logger.warn("Approb. e-mail existant:", lowerEmail);
+          console.warn("Approb. e-mail existant:", lowerEmail);
           let existingUser;
           try {
             existingUser = await admin.auth().getUserByEmail(lowerEmail);
           } catch (getUserError: unknown) {
-            functions.logger.error("Err getUser (approveInv):", getUserError);
+            console.error("Err getUser (approveInv):", getUserError);
             throw new HttpsError("internal", "Err verif user.");
           }
 
@@ -210,7 +216,7 @@ export const approveInvitation = onCall(
             message: `User ${lowerEmail} existe. Demande ok.`,
           };
         }
-        functions.logger.error("Auth create err (approveInv):", authError);
+        console.error("Auth create err (approveInv):", authError);
         throw new HttpsError("internal", "Err create user.");
       }
 
@@ -222,24 +228,24 @@ export const approveInvitation = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(`Invit. ok, user cree: ${lowerEmail}`);
+      console.info(`Invit. ok, user cree: ${lowerEmail}`);
       return {
         success: true,
         message: `Invit. ${lowerEmail} ok. MDP via 'Oublie?'.`,
       };
     } catch (error: unknown) {
-      let code: functions.https.FunctionsErrorCode = "internal";
+      let code: typeof HttpsError.prototype.code = "internal";
       let message = "Echec approbation. Verif logs.";
 
       if (error instanceof HttpsError) {
-        functions.logger.error(
-          `Err approveInv (HttpsError ${error.code}):`,
+        console.error(
+          `Err apprInv (HttpsError ${error.code}):`,
           {message: error.message, details: error.details, data: request.data}
         );
         throw error;
       } else if (error instanceof Error) {
-        functions.logger.error(
-          "Err approveInv (Error instance):",
+        console.error(
+          "Err apprInv (Error):",
           {name: error.name, message: error.message, stack: error.stack, data: request.data}
         );
         if (error.name === "ZodError") {
@@ -247,8 +253,8 @@ export const approveInvitation = onCall(
           message = "Donnees invalides.";
         }
       } else {
-        functions.logger.error(
-            "Err approveInv (type inconnu):",
+        console.error(
+            "Err apprInv (unknown):",
             {errorObject: error, data: request.data}
         );
       }
@@ -260,20 +266,20 @@ export const approveInvitation = onCall(
 export const rejectInvitation = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<RejectInvitationData>) => {
-    functions.logger.info("Rejet invit:", request.data);
+    console.info("Rejet invit:", request.data);
 
     if (!request.auth || !request.auth.token.admin) {
-      functions.logger.error("Acces non-autorise (reject).");
+      console.error("Acces non-autorise (reject).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     const adminUid = request.auth.uid;
-    functions.logger.info(`Reject: admin OK. UID: ${adminUid}`);
+    console.info(`Reject: admin OK. UID: ${adminUid}`);
 
     try {
       const validResult = rejectInvitationDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        functions.logger.error("Valid. échouée (rejectInv):", flatErrors);
+        console.error("Valid. échouée (rejectInv):", flatErrors);
         throw new HttpsError("invalid-argument", "Donnees invalides.");
       }
 
@@ -300,24 +306,24 @@ export const rejectInvitation = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(`Invitation rejetee: ${lowerEmail}`);
+      console.info(`Invitation rejetee: ${lowerEmail}`);
       return {
         success: true,
         message: `Invitation pour ${lowerEmail} rejetee.`,
       };
     } catch (error: unknown) {
-      let code: functions.https.FunctionsErrorCode = "internal";
+      let code: typeof HttpsError.prototype.code = "internal";
       let message = "Echec rejet. Verif logs.";
 
       if (error instanceof HttpsError) {
-        functions.logger.error(
-          `Err rejectInv (HttpsError ${error.code}):`,
+        console.error(
+          `Err rejInv (HttpsError ${error.code}):`,
           {message: error.message, details: error.details, data: request.data}
         );
         throw error;
       } else if (error instanceof Error) {
-        functions.logger.error(
-          "Err rejectInv (Error instance):",
+        console.error(
+          "Err rejInv (Error):",
           {name: error.name, message: error.message, stack: error.stack, data: request.data}
         );
         if (error.name === "ZodError") {
@@ -325,8 +331,8 @@ export const rejectInvitation = onCall(
           message = "Donnees invalides.";
         }
       } else {
-        functions.logger.error(
-            "Err rejectInv (type inconnu):",
+        console.error(
+            "Err rejInv (unknown):",
             {errorObject: error, data: request.data}
         );
       }
@@ -338,15 +344,15 @@ export const rejectInvitation = onCall(
 export const listPendingInvitations = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<void>) => {
-    functions.logger.info("Listage invitations en attente.");
+    console.info("Listage invitations en attente.");
 
     if (!request.auth || !request.auth.token.admin) {
-      functions.logger.error("Acces non-autorise (listPending).");
+      console.error("Acces non-autorise (listPending).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
-    functions.logger.info("ListPending: admin OK.");
+    console.info("ListPending: admin OK.");
     if (request.auth?.uid) {
-      functions.logger.info("Admin UID:", request.auth.uid);
+      console.info("Admin UID:", request.auth.uid);
     }
 
     try {
@@ -374,23 +380,23 @@ export const listPendingInvitations = onCall(
 
       return {success: true, invitations};
     } catch (error: unknown) {
-      let code: functions.https.FunctionsErrorCode = "internal";
+      let code: typeof HttpsError.prototype.code = "internal";
       const message = "Echec liste. Verif logs.";
 
       if (error instanceof HttpsError) {
-        functions.logger.error(
+        console.error(
           `Err listPend (HttpsError ${error.code}):`,
           {message: error.message, details: error.details}
         );
         throw error;
       } else if (error instanceof Error) {
-        functions.logger.error(
-          "Err listPend (Error instance):",
+        console.error(
+          "Err listPend (Error):",
           {name: error.name, message: error.message, stack: error.stack}
         );
       } else {
-        functions.logger.error(
-            "Err listPend (type inconnu):",
+        console.error(
+            "Err listPend (unknown):",
             {errorObject: error}
         );
       }
@@ -404,11 +410,11 @@ export const setAdminRole = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<SetAdminRoleData>) => {
     if (!request.auth || !request.auth.token.admin) {
-      functions.logger.error("Acces non-autorise (setAdminRole).");
+      console.error("Acces non-autorise (setAdminRole).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     const callingAdminUid = request.auth.uid;
-    functions.logger.info(
+    console.info(
       `SetAdmin par: ${callingAdminUid}`, {data: request.data}
     );
 
@@ -416,7 +422,7 @@ export const setAdminRole = onCall(
       const validResult = setAdminRoleDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        functions.logger.error("Err setAdmin valid:", flatErrors);
+        console.error("Err setAdmin valid:", flatErrors);
         throw new HttpsError("invalid-argument", "Err. donnees.");
       }
       const {email, uid: providedUid} = validResult.data;
@@ -427,7 +433,7 @@ export const setAdminRole = onCall(
           const userRecord = await admin.auth().getUserByEmail(email);
           targetUid = userRecord.uid;
         } catch (e: unknown) {
-          functions.logger.error(`Err getUserByEmail ${email}:`, e);
+          console.error(`Err getUserByEmail ${email}:`, e);
           throw new HttpsError("not-found", "Err recup user.");
         }
       }
@@ -437,25 +443,25 @@ export const setAdminRole = onCall(
       }
 
       await admin.auth().setCustomUserClaims(targetUid, {admin: true});
-      functions.logger.info(`Role admin pour: ${targetUid}`);
+      console.info(`Role admin pour: ${targetUid}`);
       const targetIdentifier = email || targetUid;
       return {
         success: true,
         message: `Role admin pour ${targetIdentifier}.`,
       };
     } catch (error: unknown) {
-      let code: functions.https.FunctionsErrorCode = "internal";
+      let code: typeof HttpsError.prototype.code = "internal";
       let message = "Echec role admin. Verif logs.";
 
       if (error instanceof HttpsError) {
-        functions.logger.error(
+        console.error(
           `Err setAdmin (HttpsError ${error.code}):`,
           {message: error.message, details: error.details, data: request.data}
         );
         throw error;
       } else if (error instanceof Error) {
-        functions.logger.error(
-          "Err setAdmin (Error instance):",
+        console.error(
+          "Err setAdmin (Error):",
           {name: error.name, message: error.message, stack: error.stack, data: request.data}
         );
         if (error.name === "ZodError") {
@@ -463,8 +469,8 @@ export const setAdminRole = onCall(
           message = "Donnees invalides.";
         }
       } else {
-        functions.logger.error(
-            "Err setAdmin (type inconnu):",
+        console.error(
+            "Err setAdmin (unknown):",
             {errorObject: error, data: request.data}
         );
       }
@@ -472,3 +478,5 @@ export const setAdminRole = onCall(
     }
   }
 );
+
+console.log("Top-level script execution completed in functions/src/index.ts");
