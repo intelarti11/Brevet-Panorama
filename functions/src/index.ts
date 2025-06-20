@@ -30,8 +30,7 @@ try {
     errStack = eCatch.stack || "No stack";
   }
   logger.error(
-    `${LOG_PREFIX}: FB_INIT_KO.`,
-    {m: errMsg.slice(0, 6), s: errStack.slice(0, 6), o: String(eCatch).slice(0, 7)}
+    `${LOG_PREFIX}:INIT_KO ${String(eCatch).slice(0,30)}` // Line 34
   );
   db = null;
   adminApp = null;
@@ -122,20 +121,20 @@ export const requestInvitation = onCall(
         notifiedAt: null,
       });
 
-      logger.info(`${logMarker}: OK ${emailShort}. ID: ${newRef.id.slice(0, 5)}`);
+      logger.info(`${logMarker}:OK ${emailShort} ID:${newRef.id.slice(0,3)}`); // Line 92
       return {
         success: true,
         m: `Req ${emailShort} OK.`,
         d: req.data,
       };
-    } catch (wErr: unknown) {
+    } catch (eCatch: unknown) {
       let errMsg = "Unk FS write err.";
-      if (wErr instanceof Error) {
-        errMsg = wErr.message;
+      if (eCatch instanceof Error) {
+        errMsg = eCatch.message;
       }
       logger.error(
-        `${logMarker}: FS Wrt KO ${emailShort}.`,
-        {e: errMsg.slice(0, 6), o: String(wErr).slice(0, 6)}
+        `${logMarker}:FS Wrt KO ${emailShort}`,
+        {e: errMsg.slice(0, 2), o: String(eCatch).slice(0, 2)}
       );
       return {
         success: false,
@@ -187,9 +186,7 @@ export const listPendingInvitations = onCall(
         if (reqTs && typeof reqTs.toDate === "function") {
           reqAtISO = reqTs.toDate().toISOString();
         } else {
-          logger.warn(`${logMarker}: Bad reqAt ${doc.id.slice(0, 5)}`, {
-            ts: String(reqTs).slice(0, 8),
-          });
+          logger.warn(`${logMarker}:BadRA ${doc.id.sl(0,3)} TS:${String(reqTs).sl(0,3)}`); // Line 125, comma checked
           reqAtISO = new Date(0).toISOString();
         }
 
@@ -219,8 +216,8 @@ export const listPendingInvitations = onCall(
         errMsg = eCatch.message;
       }
       logger.error(
-        `${logMarker}: Lst KO. ${errMsg.slice(0, 6)}`,
-        {o: String(eCatch).slice(0, 6)}
+        `${logMarker}:Lst KO ${errMsg.slice(0, 3)}`,
+        {o: String(eCatch).slice(0, 3)}
       );
       return {
         success: false,
@@ -268,7 +265,7 @@ export const approveInvitation = onCall(
 
       const dData = invDoc.data();
       if (dData?.status !== "pending") {
-        logger.warn(`${logMarker}: Inv ${invIdShort} not pend. St: ${dData?.status}`);
+        logger.warn(`${logMarker}:Inv ${invIdShort} !pend St:${dData?.status}`); // Line 255
         return {
           success: false,
           m: `Inv done (${dData?.status}).`,
@@ -293,7 +290,7 @@ export const approveInvitation = onCall(
           password: tmpPwd,
           disabled: false,
         });
-        logger.info(`${logMarker}: Usr ${userRec.uid.slice(0, 5)} créé.`);
+        logger.info(`${logMarker}:Usr ${userRec.uid.slice(0,3)} OK`); // Line 271
         userCrMsg = "Cpt créé. Mdp via 'Oublié'.";
         userMsgShort = "Usr ok.";
       } catch (authErrorUnknown: unknown) {
@@ -304,7 +301,7 @@ export const approveInvitation = onCall(
           userMsgShort = "Usr exist.";
         } else {
           const errMsg = authErr.message || "Auth err";
-          logger.error(`${logMarker}: Auth KO: ${emailShort}.`, {e: errMsg.slice(0, 8)});
+          logger.error(`${logMarker}:Auth KO ${emailShort}`, {e: errMsg.slice(0,3)});
           return {success: false, m: `Auth KO: ${errMsg.slice(0, 8)}`};
         }
       }
@@ -314,7 +311,7 @@ export const approveInvitation = onCall(
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      logger.info(`${logMarker}: OK ${invIdShort}. ${userMsgShort}`);
+      logger.info(`${logMarker}:OK ${invIdShort} ${userMsgShort}`); // Line 307
       return {
         success: true,
         m: `Approuvé. ${userCrMsg}`,
@@ -325,8 +322,8 @@ export const approveInvitation = onCall(
         errMsg = eCatch.message;
       }
       logger.error(
-        `${logMarker}: Appr KO ${invIdShort}.`,
-        {e: errMsg.slice(0, 6), o: String(eCatch).slice(0, 6)}
+        `${logMarker}:Appr KO ${invIdShort}`,
+        {e: errMsg.slice(0, 2), o: String(eCatch).slice(0, 2)}
       );
       return {success: false, m: `App. KO: ${errMsg.slice(0, 8)}`};
     }
@@ -371,7 +368,7 @@ export const rejectInvitation = onCall(
 
       const dData = invDoc.data();
       if (dData?.status !== "pending") {
-        logger.warn(`${logMarker}: Inv ${invIdShort} not pend. St: ${dData?.status}`);
+        logger.warn(`${logMarker}:Inv ${invIdShort} !pend St:${dData?.status}`); // Line 374
         return {
           success: false,
           m: `Inv done (${dData?.status}).`,
@@ -402,8 +399,8 @@ export const rejectInvitation = onCall(
         errMsg = eCatch.message;
       }
       logger.error(
-        `${logMarker}: Rej KO ${invIdShort}.`,
-        {e: errMsg.slice(0, 2), o: String(eCatch).slice(0, 2)}
+        `${logMarker}:Rej KO ${invIdShort}`,
+        {e: errMsg.slice(0, 1), o: String(eCatch).slice(0, 1)}
       );
       return {success: false, m: `RejKO:${errMsg.slice(0,7)}`};
     }
@@ -447,7 +444,7 @@ export const markInvitationAsNotified = onCall(
       const dData = invDoc.data();
       if (dData?.status !== "approved") {
         const currSt = dData?.status ?? "unk";
-        logger.warn(`${logMarker}: Inv ${invIdShort} not OK (St: ${currSt})`);
+        logger.warn(`${logMarker}:Inv ${invIdShort} !OK St:${currSt}`);
         return {success: false, m: "Inv !appr."};
       }
       if (dData?.notifiedAt) {
@@ -460,7 +457,7 @@ export const markInvitationAsNotified = onCall(
       });
 
       const emailLog = (dData?.email || "[no_mail]").slice(0, 8);
-      logger.info(`${logMarker}: Inv ${invIdShort} for ${emailLog} notif.`);
+      logger.info(`${logMarker}:Inv ${invIdShort} for ${emailLog} notif.`);
       return {success: true, m: `Notif marquée ${emailLog}.`};
     } catch (eCatch: unknown) {
       let errMsg = "Err mark notif.";
@@ -468,7 +465,7 @@ export const markInvitationAsNotified = onCall(
         errMsg = eCatch.message;
       }
       logger.error(
-        `${logMarker}: Ntf KO ${invIdShort}.`,
+        `${logMarker}:Ntf KO ${invIdShort}`,
         {e: errMsg.slice(0, 1), o: String(eCatch).slice(0, 1)}
       );
       return {success: false, m: `NtfKO:${errMsg.slice(0,7)}`};
@@ -479,5 +476,3 @@ export const markInvitationAsNotified = onCall(
 logger.info(
   `${LOG_PREFIX}: End. SDK OK.`
 );
-
-    
