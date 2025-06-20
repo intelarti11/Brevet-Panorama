@@ -74,12 +74,16 @@ export default function AdminInvitationsPage() {
       }
     } catch (err: any) {
       console.error("Erreur fetchPendingInvitations:", err);
-      setError(err.message || "Impossible de charger les invitations.");
-      toast({ variant: "destructive", title: "Erreur", description: err.message || "Une erreur inconnue est survenue." });
+      const errorMessage = err.message || "Impossible de charger les invitations.";
+      setError(errorMessage);
+      // Show toast only if it's a new error or different from the current one to avoid spamming
+      if (errorMessage !== error) {
+        toast({ variant: "destructive", title: "Erreur de chargement", description: errorMessage, duration: 7000 });
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [toast, callListPendingInvitations]);
+  }, [toast, callListPendingInvitations, error]); // Added error to dependency array
 
   useEffect(() => {
     fetchPendingInvitations();
@@ -92,26 +96,35 @@ export default function AdminInvitationsPage() {
       if (action === 'approve') {
         result = await callApproveInvitation({ invitationId });
       } else {
-        // For now, reject without a specific reason.
-        // TODO: Implement a dialog to ask for a reason if needed.
-        result = await callRejectInvitation({ invitationId });
+        result = await callRejectInvitation({ invitationId }); // No reason passed for now
       }
 
       if (result.data.success) {
         toast({ title: "Succès", description: result.data.message });
-        fetchPendingInvitations(); // Refresh list after action
+        fetchPendingInvitations(); 
       } else {
-        throw new Error(result.data.message || `Échec de l'action: ${action}`);
+        // Error from backend (e.g. {success: false, message: "..."})
+        throw new Error(result.data.message || `Échec de l'action : ${action}`);
       }
-    } catch (err: any) {
+    } catch (err: any) { // Catches errors from the call itself (network, internal function error) or thrown above
       console.error(`Erreur ${action}Invitation:`, err);
-      toast({ variant: "destructive", title: "Erreur", description: err.message });
+      // If err.message is already "internal", no need to make it more generic.
+      // The backend function should return a meaningful message if it's a handled error.
+      // If it's truly "internal", it means the function crashed.
+      let description = "Une erreur est survenue.";
+      if (err.message) {
+        description = err.message.toLowerCase().includes("internal") || err.message.toLowerCase().includes("interna") // Firebase sometimes truncates
+          ? "Une erreur interne est survenue sur le serveur. Veuillez consulter les logs de la fonction."
+          : err.message;
+      }
+      
+      toast({ variant: "destructive", title: "Erreur d'Action", description: description, duration: 7000 });
     } finally {
       setActionLoading(prev => ({ ...prev, [invitationId]: false }));
     }
   };
 
-  if (isLoading && invitations.length === 0) { // Show initial loading only if no data yet
+  if (isLoading && invitations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -120,7 +133,8 @@ export default function AdminInvitationsPage() {
     );
   }
 
-  if (error && invitations.length === 0) { // Show error only if no data is displayed
+  // Display error prominently if it's the initial load and it failed
+  if (error && invitations.length === 0 && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] p-4 text-center">
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
@@ -149,19 +163,21 @@ export default function AdminInvitationsPage() {
             <div>
               <CardTitle className="text-xl">Demandes en Attente</CardTitle>
               <CardDescription>
-                {invitations.length === 0
+                {invitations.length === 0 && !isLoading
                   ? "Aucune demande d'invitation en attente."
                   : `Liste des demandes d'invitation avec le statut "en attente".`}
               </CardDescription>
             </div>
-            <Button onClick={fetchPendingInvitations} variant="outline" size="sm" disabled={isLoading}>
-                <RefreshCw className={`mr-2 h-4 w-4 ${isLoading && !actionLoading[Object.keys(actionLoading)[0]] ? 'animate-spin' : ''}`} />
+            <Button onClick={fetchPendingInvitations} variant="outline" size="sm" disabled={isLoading && !Object.values(actionLoading).some(Boolean) }>
+                <RefreshCw className={`mr-2 h-4 w-4 ${isLoading && !Object.values(actionLoading).some(Boolean) ? 'animate-spin' : ''}`} />
                 Actualiser
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          {error && <p className="text-destructive mb-4">Erreur lors du chargement: {error}</p>}
+          {/* Display non-critical error here if data is already shown */}
+          {error && invitations.length > 0 && <p className="text-destructive mb-4 text-sm">Erreur lors de la dernière actualisation: {error}</p>}
+          
           {invitations.length > 0 ? (
             <div className="overflow-x-auto rounded-md border">
               <Table>
@@ -190,7 +206,7 @@ export default function AdminInvitationsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleAction('approve', invite.id)}
-                          disabled={actionLoading[invite.id] || isLoading}
+                          disabled={actionLoading[invite.id] || (isLoading && !Object.values(actionLoading).some(Boolean))}
                           className="text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
                         >
                           {actionLoading[invite.id] ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
@@ -200,7 +216,7 @@ export default function AdminInvitationsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleAction('reject', invite.id)}
-                          disabled={actionLoading[invite.id] || isLoading}
+                          disabled={actionLoading[invite.id] || (isLoading && !Object.values(actionLoading).some(Boolean))}
                           className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
                         >
                           {actionLoading[invite.id] ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
@@ -220,3 +236,5 @@ export default function AdminInvitationsPage() {
     </div>
   );
 }
+
+    
