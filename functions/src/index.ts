@@ -1,4 +1,5 @@
 
+'use server';
 import * as admin from "firebase-admin";
 import {z} from "zod";
 import {
@@ -8,19 +9,43 @@ import {
 } from "firebase-functions/v2/https";
 
 // Initialiser Firebase Admin SDK
+let adminAppInitialized = false;
 try {
   admin.initializeApp();
   console.log("Firebase Admin SDK initialized successfully.");
+  adminAppInitialized = true;
 } catch (e: unknown) {
-  // Utiliser console.error pour une journalisation plus standard
-  console.error("Firebase Admin SDK initialization error:", e);
-  // Il pourrait être judicieux de relancer l'erreur ou de gérer cet état critique
-  // si l'application ne peut pas fonctionner sans admin SDK.
+  console.error("CRITICAL: Firebase Admin SDK initialization FAILED:", e);
+  // Consider exiting if this is truly fatal and subsequent code relies on it
+  // process.exit(1); // Or handle more gracefully
 }
 
-const db = admin.firestore();
+let db: admin.firestore.Firestore | undefined = undefined;
+if (adminAppInitialized) {
+  try {
+    db = admin.firestore();
+    if (!db) {
+      console.error(
+        "CRITICAL: Firestore DB instance is UNDEFINED after admin.firestore() call."
+      );
+    } else {
+      console.log("Firestore DB instance obtained successfully.");
+    }
+  } catch(e: unknown) {
+    console.error("CRITICAL: Error obtaining Firestore DB instance:", e);
+  }
+} else {
+  console.error(
+    "CRITICAL: Firebase Admin SDK was NOT initialized. Cannot get Firestore instance."
+  );
+}
+
 if (!db) {
-  console.error("Firestore database instance is undefined after admin.initializeApp(). This is critical.");
+  console.error(
+    "CRITICAL_STOP: Firestore DB (db) is not available. Functions cannot operate."
+  );
+  // This state indicates a severe problem.
+  // Subsequent function calls attempting to use 'db' will fail.
 }
 
 // --- Schémas Zod pour la validation des données d'entrée ---
@@ -52,12 +77,17 @@ const setAdminRoleDataSchema = z.object({
   path: ["email"],
 });
 type SetAdminRoleData = z.infer<typeof setAdminRoleDataSchema>;
+type SetAdminRoleInput = CallableRequest<SetAdminRoleData>;
 
 
 export const requestInvitation = onCall(
   {region: "europe-west1", enforceAppCheck: true},
   async (request: CallableRequest<InvitationRequestData>) => {
     console.info("Nouv. demande invit:", request.data);
+    if (!db) { // Early check for db availability
+        console.error("requestInvitation: Firestore DB not available.");
+        throw new HttpsError("internal", "Err. serveur init.");
+    }
 
     try {
       const validResult = invitationRequestDataSchema.safeParse(request.data);
@@ -144,6 +174,10 @@ export const approveInvitation = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<ManageInvitationData>) => {
     console.info("Approbation invit:", request.data);
+     if (!db) {
+        console.error("approveInvitation: Firestore DB not available.");
+        throw new HttpsError("internal", "Err. serveur init.");
+    }
 
     if (!request.auth || !request.auth.token.admin) {
       console.error("Acces non-autorise (approve).");
@@ -267,6 +301,10 @@ export const rejectInvitation = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<RejectInvitationData>) => {
     console.info("Rejet invit:", request.data);
+    if (!db) {
+        console.error("rejectInvitation: Firestore DB not available.");
+        throw new HttpsError("internal", "Err. serveur init.");
+    }
 
     if (!request.auth || !request.auth.token.admin) {
       console.error("Acces non-autorise (reject).");
@@ -345,6 +383,10 @@ export const listPendingInvitations = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<void>) => {
     console.info("Listage invitations en attente.");
+    if (!db) {
+        console.error("listPendingInvitations: Firestore DB not available.");
+        throw new HttpsError("internal", "Err. serveur init.");
+    }
 
     if (!request.auth || !request.auth.token.admin) {
       console.error("Acces non-autorise (listPending).");
@@ -408,7 +450,11 @@ export const listPendingInvitations = onCall(
 
 export const setAdminRole = onCall(
   {region: "europe-west1"},
-  async (request: CallableRequest<SetAdminRoleData>) => {
+  async (request: SetAdminRoleInput) => {
+    if (!db) {
+        console.error("setAdminRole: Firestore DB not available.");
+        throw new HttpsError("internal", "Err. serveur init.");
+    }
     if (!request.auth || !request.auth.token.admin) {
       console.error("Acces non-autorise (setAdminRole).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
