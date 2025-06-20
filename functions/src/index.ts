@@ -79,7 +79,7 @@ export const ultraMinimalFunction = onCall(
 export const requestInvitation = onCall(
   {
     region: "europe-west1",
-    invoker: "public", // Autoriser les appels non authentifiés
+    invoker: "public",
   } as HttpsOptions,
   (request) => {
     const logMarker = "REQUEST_INVITATION_SIMPLIFIED_V11_LOG";
