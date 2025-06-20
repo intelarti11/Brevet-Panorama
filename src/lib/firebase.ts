@@ -17,40 +17,24 @@ const firebaseConfig: FirebaseOptions = {
 };
 
 // Initialize Firebase
-let app;
-if (!getApps().length) {
-  try {
-    app = initializeApp(firebaseConfig);
-  } catch (e) {
-    console.error("Erreur d'initialisation Firebase:", e);
-  }
-} else {
-  app = getApp();
-}
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-let db;
-let auth;
-let functions;
+const auth = getAuth(app);
+const db = getFirestore(app);
+const functions = getFunctions(app, 'europe-west1');
 
-if (app) {
-  try {
-    auth = getAuth(app);
-    db = getFirestore(app);
-    functions = getFunctions(app, 'europe-west1');
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log("Development mode: attempting to connect to Firebase emulators...");
+// Connect to emulators in development mode. This should only run on the client.
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log("Development mode: Connecting to Firebase emulators...");
+    try {
       // Use 127.0.0.1 instead of localhost to avoid potential IPv6 issues
       connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
       connectFirestoreEmulator(db, '127.0.0.1', 8080);
       connectFunctionsEmulator(functions, '127.0.0.1', 5001);
       console.log("Successfully configured to use Firebase emulators.");
+    } catch (error) {
+        console.error("Error connecting to emulators:", error);
     }
-  } catch (e) {
-    console.error("Erreur d'initialisation des services Firebase:", e);
-  }
-} else {
-  console.error("L'application Firebase n'est pas initialisée. Les services Firebase sont inaccessibles.");
 }
 
 export { app, db, auth, functions };
