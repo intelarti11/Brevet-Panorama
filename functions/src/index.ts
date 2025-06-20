@@ -25,16 +25,22 @@ try {
   logger.info(
     `${LOG_PREFIX_V11}: Firebase Admin SDK initialized successfully.`
   );
-} catch (error: any) {
+} catch (error: unknown) {
+  let errorMessage = "Unknown error during Firebase Admin init.";
+  let errorStack = "No stack trace for Firebase Admin init error.";
+  if (error instanceof Error) {
+    errorMessage = error.message;
+    errorStack = error.stack || "No stack trace available";
+  }
   logger.error(
     `${LOG_PREFIX_V11}: CRITICAL_ERROR_DURING_FIREBASE_ADMIN_INIT.`,
     {
-      errorMessage: error.message,
-      errorStack: error.stack,
-      errorObject: JSON.stringify(error),
+      errorMessage: errorMessage,
+      errorStack: errorStack,
+      errorObjectString: String(error),
     }
   );
-  db = null; 
+  db = null;
   adminApp = null;
 }
 
@@ -76,8 +82,8 @@ export const requestInvitation = onCall(
     );
 
     if (!adminApp) {
-        logger.error(`${logMarker}: Firebase Admin App (adminApp) is not initialized!`);
-        // Ne pas retourner ici pour voir si la fonction peut au moins se terminer
+      logger.error(`${logMarker}: AdminApp not initialized!`);
+      // Ne pas retourner ici, test de fin de fonction
     }
     if (!db) {
       logger.warn(
@@ -85,18 +91,18 @@ export const requestInvitation = onCall(
       );
       return {
         success: false,
-        message: "Simplified v11: Firestore not available for requestInvitation.",
+        message: "Simplified v11: Firestore unavailable for requestInvite.",
         receivedData: request.data,
       };
     }
 
     // Pas d'écriture Firestore, juste un log et un retour
     logger.info(
-        `${logMarker}: Email received (not processed): ${request.data.email}`
+      `${logMarker}: Email rcvd (not processed): ${request.data.email}`
     );
     return {
       success: true,
-      message: "Simplified v11: Request logged. Firestore not written to in this version.",
+      message: "Simplified v11: Req logged. No Firestore write in this ver.",
       receivedData: request.data,
     };
   }
