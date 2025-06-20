@@ -4,13 +4,16 @@
 
 @layer base {
   :root {
-    /* New color palette definition (HSL) */
-    --color-primary-hsl: 222 69% 40%; /* #1E40AF */
-    --color-secondary-hsl: 201 92% 60%; /* #38BDF8 */
+    /* New color palette definition (HSL) based on PRD */
+    --color-primary-hsl: 157 50% 48%; /* #3EB489 - "Deep sky blue" (actually a sea green) */
+    --color-bg-hsl: 190 83% 93%; /* #E0F7FA - "Very light blue" */
+    --color-accent-hsl: 180 100% 25%; /* #008080 - "Dark cyan" */
+
+    /* Retained from previous for completeness, adjust if needed */
+    --color-secondary-hsl: 201 92% 60%; /* #38BDF8 - Existing light blue, can be adjusted */
     --color-success-hsl: 160 82% 40%; /* #10B981 */
     --color-warning-hsl: 38 92% 51%; /* #F59E0B */
     --color-error-hsl: 0 84% 60%; /* #EF4444 */
-    --color-bg-hsl: 210 17% 98%; /* #F9FAFB */
     --color-surface-hsl: 0 0% 100%; /* #FFFFFF */
     --color-text-primary-hsl: 215 39% 11%; /* #111827 */
     --color-text-secondary-hsl: 212 10% 46%; /* #6B7280 */
@@ -28,14 +31,14 @@
     --primary: var(--color-primary-hsl);
     --primary-foreground: var(--color-surface-hsl); /* White text on primary */
 
-    --secondary: var(--color-secondary-hsl);
+    --secondary: var(--color-secondary-hsl); /* Retained existing, can be PRD's accent or other */
     --secondary-foreground: var(--color-text-primary-hsl); /* Dark text on light blue secondary */
 
     --muted: 210 14% 93%; /* #E5E7EB - Tailwind gray-200 */
     --muted-foreground: var(--color-text-secondary-hsl);
 
-    --accent: var(--color-secondary-hsl); /* Using secondary as accent for hovers */
-    --accent-foreground: var(--color-text-primary-hsl); /* Dark text on accent */
+    --accent: var(--color-accent-hsl); /* Using PRD's accent color */
+    --accent-foreground: var(--color-surface-hsl); /* White text on dark cyan accent */
 
     --destructive: var(--color-error-hsl);
     --destructive-foreground: var(--color-surface-hsl); /* White text on error */
@@ -55,22 +58,28 @@
     /* For "Refusés", use --destructive */
 
     /* Sidebar specific colors */
+    /* Using PRD primary for sidebar background and accent for active items */
     --sidebar-background: var(--color-primary-hsl);
-    --sidebar-foreground: var(--color-surface-hsl); /* White text */
-    --sidebar-accent: var(--color-secondary-hsl); /* Active/hover background */
+    --sidebar-foreground: var(--color-surface-hsl); /* White text on PRD primary */
+    --sidebar-accent: var(--color-accent-hsl); /* Active/hover background with PRD accent */
     --sidebar-accent-foreground: var(--color-surface-hsl); /* White text on active/hover */
-    --sidebar-border: 222 69% 50%; /* Lighter primary for internal borders */
-    --sidebar-ring: var(--color-secondary-hsl);
+    --sidebar-border: 157 50% 58%; /* Lighter PRD primary for internal borders */
+    --sidebar-ring: var(--color-accent-hsl);
   }
 
   .dark {
     /* Dark theme (basic adaptation, can be further refined) */
-    --color-primary-hsl: 222 69% 55%;
+    /* Primary color slightly lighter for better contrast in dark mode */
+    --color-primary-hsl: 157 50% 55%; /* #57C79D - Lighter PRD Primary */
+    /* Background much darker */
+    --color-bg-hsl: 220 13% 10%; /* #1A1D23 - Dark background */
+    /* Accent color can remain dark or be slightly adjusted if needed */
+    --color-accent-hsl: 180 100% 30%; /* #009999 - Slightly lighter Dark Cyan */
+
     --color-secondary-hsl: 201 92% 50%;
     --color-success-hsl: 160 82% 35%;
     --color-warning-hsl: 38 92% 45%;
     --color-error-hsl: 0 84% 50%;
-    --color-bg-hsl: 220 13% 10%; /* Dark background */
     --color-surface-hsl: 220 13% 18%; /* Dark surface for cards */
     --color-text-primary-hsl: 210 17% 95%; /* Light text */
     --color-text-secondary-hsl: 212 10% 65%;
@@ -85,7 +94,7 @@
     --popover-foreground: var(--color-text-primary-hsl);
 
     --primary: var(--color-primary-hsl);
-    --primary-foreground: var(--color-text-primary-hsl);
+    --primary-foreground: var(--color-text-primary-hsl); /* Dark text could work on this lighter primary */
 
     --secondary: var(--color-secondary-hsl);
     --secondary-foreground: var(--color-text-primary-hsl);
@@ -93,7 +102,7 @@
     --muted: 220 13% 25%;
     --muted-foreground: var(--color-text-secondary-hsl);
 
-    --accent: var(--color-secondary-hsl);
+    --accent: var(--color-accent-hsl);
     --accent-foreground: var(--color-text-primary-hsl);
 
     --destructive: var(--color-error-hsl);
@@ -113,10 +122,10 @@
     /* Sidebar specific colors for dark theme */
     --sidebar-background: 220 13% 14%; /* Darker primary for sidebar */
     --sidebar-foreground: var(--color-text-primary-hsl);
-    --sidebar-accent: var(--color-secondary-hsl);
+    --sidebar-accent: var(--color-accent-hsl);
     --sidebar-accent-foreground: var(--color-text-primary-hsl);
     --sidebar-border: 220 13% 25%;
-    --sidebar-ring: var(--color-secondary-hsl);
+    --sidebar-ring: var(--color-accent-hsl);
   }
 }
 
