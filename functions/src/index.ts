@@ -3,33 +3,25 @@
 import {onCall, HttpsOptions} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import {UserRecord} from "firebase-admin/auth";
+import type {UserRecord} from "firebase-admin/auth";
 import * as crypto from "crypto";
 
 const LOG_PREFIX_V13_1 = "INIT_V13_1";
 
-logger.info(
-  `${LOG_PREFIX_V13_1}: Script top. Admin init.`
-);
+logger.info(`${LOG_PREFIX_V13_1}: Script top. Admin init.`);
 
 let db: admin.firestore.Firestore | null = null;
 let adminApp: admin.app.App | null = null;
 
 try {
-  logger.info(
-    `${LOG_PREFIX_V13_1}: Attempting admin.initializeApp()...`
-  );
+  logger.info(`${LOG_PREFIX_V13_1}: Attempting admin.initializeApp()...`);
   adminApp = admin.initializeApp();
-  logger.info(
-    `${LOG_PREFIX_V13_1}: admin.initializeApp() SUCCESS.`
-  );
+  logger.info(`${LOG_PREFIX_V13_1}: admin.initializeApp() SUCCESS.`);
 
   logger.info(`${LOG_PREFIX_V13_1}: Attempting admin.firestore()...`);
   db = admin.firestore();
   logger.info(`${LOG_PREFIX_V13_1}: admin.firestore() SUCCESS.`);
-  logger.info(
-    `${LOG_PREFIX_V13_1}: FB Admin SDK init OK.`
-  );
+  logger.info(`${LOG_PREFIX_V13_1}: FB Admin SDK init OK.`);
 } catch (error: unknown) {
   let errorMessage = "Unknown error during Firebase Admin init.";
   let errorStack = "No stack trace for Firebase Admin init error.";
@@ -58,9 +50,7 @@ export const ultraMinimalFunction = onCall(
       {structuredData: true, data: request.data}
     );
     if (!db) {
-      logger.warn(
-        `${logMarker}: Firestore (db) not initialized.`
-      );
+      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
       return {
         success: false,
         message: "Firestore not available for ultraMinimalFunction.",
@@ -240,18 +230,20 @@ export const listPendingInvitations = onCall(
 
 const approveInvitationOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public", // Permettre appels non authentifiés
+  invoker: "public",
 };
 export const approveInvitation = onCall(
   approveInvitationOptions,
   async (request) => {
     const logMarker = "APPROVE_INVITE_V4_LOG";
-    logger.info(`${logMarker}: Called. Data:`,
-      {structuredData: true, data: request.data});
+    logger.info(
+      `${logMarker}: Called. Data:`,
+      {structuredData: true, data: request.data}
+    );
 
     if (!db || !adminApp) {
       logger.warn(`${logMarker}: DB or AdminApp not init.`);
-      return {success: false, message: "Erreur serveur (DB/Admin)."};
+      return {success: false, message: "Err serveur (DB/Admin)."};
     }
 
     const invitationId = request.data.invitationId;
@@ -297,17 +289,16 @@ export const approveInvitation = onCall(
         const logUMsg = `${logMarker}: User ${userRecord.uid} created.`;
         logger.info(logUMsg);
         userCreationMessage = `Compte créé pour ${emailToApprove}. ` +
-          "L'utilisateur doit utiliser 'Mot de passe oublié'.";
+          "Utiliser 'Mdp oublié'.";
       } catch (authError: unknown) {
-        // Check if authError is an object with a 'code' property
         const errorObject = authError as {code?: string; message?: string};
         if (errorObject.code === "auth/email-already-exists") {
           logger.warn(`${logMarker}: User ${emailToApprove} exists.`);
-          userCreationMessage = `Compte existant pour ${emailToApprove}.`;
+          userCreationMessage = `Compte existant: ${emailToApprove}.`;
         } else {
           const errMsg = errorObject.message || "Auth error";
-          logger.error(`${logMarker}: Auth create FAIL: ${emailToApprove}.`,
-            {error: errMsg});
+          const logErr = `${logMarker}: Auth create FAIL: ${emailToApprove}.`;
+          logger.error(logErr, {error: errMsg});
           return {success: false, message: `Échec Auth: ${errMsg}`};
         }
       }
@@ -323,7 +314,6 @@ export const approveInvitation = onCall(
         success: true,
         message: `Invite ${emailToApprove} OK. ${userCreationMessage}`,
       };
-
     } catch (err: unknown) {
       let errorMsg = "Unknown error approving invitation.";
       if (err instanceof Error) {
@@ -338,14 +328,16 @@ export const approveInvitation = onCall(
 
 const rejectInvitationOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public", // Permettre appels non authentifiés
+  invoker: "public",
 };
 export const rejectInvitation = onCall(
   rejectInvitationOptions,
   async (request) => {
     const logMarker = "REJECT_INVITE_V3_LOG";
-    logger.info(`${logMarker}: Called. Data:`,
-      {structuredData: true, data: request.data});
+    logger.info(
+      `${logMarker}: Called. Data:`,
+      {structuredData: true, data: request.data}
+    );
 
     if (!db) {
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
