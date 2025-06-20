@@ -3,6 +3,7 @@ import {onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
+// Log prefix for this version (V11)
 const LOG_PREFIX_V11 = "INIT_V11";
 
 logger.info(`${LOG_PREFIX_V11}: Script top. About to init admin.`);
@@ -109,5 +110,5 @@ export const requestInvitation = onCall(
 );
 
 logger.info(
-  `${LOG_PREFIX_V11}: Script bottom. Functions defined. Admin SDK init attempted.`
+  `${LOG_PREFIX_V11}: Script end. Admin SDK init attempt done.`
 );
