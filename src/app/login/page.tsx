@@ -52,8 +52,7 @@ export default function LoginPage() {
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulation de délai réseau
     setIsLoading(false);
 
-    // Correction ici: mot de passe attendu est "SVeil2025" (sans '!')
-    const expectedPassword = "SVeil2025"; 
+    const expectedPassword = "test"; // Mot de passe simplifié
 
     const isAdminbrevetLogin = values.usernameOrEmail === "Adminbrevet" && values.password === expectedPassword;
     const isAdminEmailLogin = values.usernameOrEmail.startsWith("admin.") && values.password === expectedPassword;
