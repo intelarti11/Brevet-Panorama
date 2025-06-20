@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -33,11 +33,17 @@ export default function AdminInvitationsPage() {
   // const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({}); // Temporarily unused
 
   const { toast } = useToast();
-  const functions = getFunctions(app, 'europe-west1');
 
-  const callListPendingInvitations = httpsCallable<void, CloudFunctionResponse>(functions, 'listPendingInvitations');
-  // const callApproveInvitation = httpsCallable<{ email: string }, CloudFunctionResponse>(functions, 'approveInvitation'); // Temporarily commented
-  // const callRejectInvitation = httpsCallable<{ email: string, reason?: string }, CloudFunctionResponse>(functions, 'rejectInvitation'); // Temporarily commented
+  // Memoize the functions instance
+  const functionsInstance = useMemo(() => getFunctions(app, 'europe-west1'), []); // app is stable
+
+  // Memoize the callable function reference
+  const callListPendingInvitations = useMemo(() =>
+    httpsCallable<void, CloudFunctionResponse>(functionsInstance, 'listPendingInvitations'),
+    [functionsInstance] // Dependency is the memoized functions instance
+  );
+  // const callApproveInvitation = useMemo(() => httpsCallable<{ email: string }, CloudFunctionResponse>(functionsInstance, 'approveInvitation'),[functionsInstance]);
+  // const callRejectInvitation = useMemo(() => httpsCallable<{ email: string, reason?: string }, CloudFunctionResponse>(functionsInstance, 'rejectInvitation'), [functionsInstance]);
 
   const fetchPendingInvitations = useCallback(async () => {
     setIsLoading(true);
@@ -63,7 +69,7 @@ export default function AdminInvitationsPage() {
   }, [fetchPendingInvitations]);
 
   // const handleAction = async (action: 'approve' | 'reject', email: string, invitationId: string) => {
-  //   setActionLoading(prev => ({ ...prev, [invitationId]: true }));
+  //   // setActionLoading(prev => ({ ...prev, [invitationId]: true }));
   //   try {
   //     let result: HttpsCallableResult<CloudFunctionResponse>;
   //     if (action === 'approve') {
