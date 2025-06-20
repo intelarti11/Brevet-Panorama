@@ -71,16 +71,25 @@ export const studentDataSchema = z.object({
 export type StudentData = z.infer<typeof studentDataSchema>;
 
 // Schema for basic student data from CSV
+// The parsing logic converts CSV headers to UPPERCASE. So schema keys are UPPERCASE.
 export const studentBaseSchema = z.object({
   INE: z.preprocess(preprocessToStringOptional, z.string().min(1, "L'INE est requis")),
-  NOM: z.preprocess(preprocessToStringOptional, z.string().min(1, "Le nom est requis")),
-  PRENOM: z.preprocess(preprocessToStringOptional, z.string().min(1, "Le prénom est requis")),
+  NOM: z.preprocess(preprocessToStringOptional, z.string().min(1, "Le nom est requis")), // Corresponds to "Nom" in CSV
+  PRENOM: z.preprocess(preprocessToStringOptional, z.string().min(1, "Le prénom est requis")), // Corresponds to "Prénom" in CSV
+  // For "Né(e) le" from CSV, map to DATE_NAISSANCE.
+  // The CSV parsing should ensure the header "Né(e) le" becomes "DATE_NAISSANCE" or the schema key for validation.
+  // Or, more simply, if CSV header is "Né(e) le", it becomes "NÉ(E) LE" in rawRow, then schema needs "NÉ(E) LE".
+  // To keep schema keys simple and standard, it's better to map "Né(e) le" to "DATE_NAISSANCE" during parsing.
+  // However, current parsing makes header uppercase. "Né(e) le" -> "NÉ(E) LE".
+  // Let's assume the CSV header will be "DATE_NAISSANCE" for simplicity in schema, or handle mapping in parse fn.
+  // For now, keeping DATE_NAISSANCE as the key, assuming CSV header will be "DATE_NAISSANCE" or mapped.
   DATE_NAISSANCE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // Expecting format like DD/MM/YYYY
+  SEXE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // Corresponds to "Sexe" in CSV
+  CLASSE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // Corresponds to "Classe" in CSV
+  
   CODE_ETABLISSEMENT: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
   LIBELLE_ETABLISSEMENT: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
   CODE_DIVISION: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
-  // Add other base fields as needed, e.g., sexe, etc.
-  // Ensure the CSV headers match these keys (or map them during parsing)
 });
 
 export type StudentBaseData = z.infer<typeof studentBaseSchema>;

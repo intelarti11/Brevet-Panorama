@@ -323,52 +323,77 @@ export default function ImportPage() {
       return;
     }
     setIsCsvLoading(true); setCsvError(null);
-
-    // TODO: Implement CSV parsing (e.g., using a library like Papaparse or custom logic)
-    // TODO: Implement validation against studentBaseSchema
-    // TODO: Implement Firestore import logic for CSV data (potentially to a 'baseEleves' collection)
     
     try {
-      // Placeholder for CSV reading and parsing
       const reader = new FileReader();
       reader.onload = async (event) => {
         try {
           const csvText = event.target?.result as string;
           if (!csvText) throw new Error("Fichier CSV vide ou illisible.");
-
-          // --- START OF VERY BASIC CSV PARSING PLACEHOLDER ---
+          
           const lines = csvText.split(/\r\n|\n/);
           if (lines.length < 2) throw new Error("CSV doit avoir des en-têtes et au moins une ligne de données.");
           
-          const headers = lines[0].split(',').map(h => h.trim().toUpperCase()); // Normalize headers
-          const ineIndex = headers.indexOf('INE');
-          const nomIndex = headers.indexOf('NOM');
-          const prenomIndex = headers.indexOf('PRENOM');
-          // Add more indices as needed from studentBaseSchema
+          // Get headers and normalize them (uppercase, trim)
+          const rawHeaders = lines[0].split(',').map(h => h.trim());
+          const normalizedHeaders = rawHeaders.map(h => h.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 
-          if (ineIndex === -1 || nomIndex === -1 || prenomIndex === -1) {
-            throw new Error("Colonnes CSV requises manquantes (INE, NOM, PRENOM). Vérifiez les en-têtes.");
+          // Define expected schema keys and their corresponding CSV header variants
+          const headerMapping: { [key: string]: string[] } = {
+            INE: ["INE"],
+            NOM: ["NOM"],
+            PRENOM: ["PRENOM", "PRÉNOM"],
+            DATE_NAISSANCE: ["DATE_NAISSANCE", "NE(E) LE", "NÉ(E) LE"],
+            SEXE: ["SEXE"],
+            CLASSE: ["CLASSE"],
+            CODE_ETABLISSEMENT: ["CODE_ETABLISSEMENT"],
+            LIBELLE_ETABLISSEMENT: ["LIBELLE_ETABLISSEMENT"],
+            CODE_DIVISION: ["CODE_DIVISION"],
+          };
+          
+          // Create a mapping from schema key to its index in the CSV
+          const schemaKeyToIndex: { [key: string]: number } = {};
+          for (const schemaKey in headerMapping) {
+            const possibleHeaders = headerMapping[schemaKey];
+            let foundIndex = -1;
+            for (const pHeader of possibleHeaders) {
+                const normPHeader = pHeader.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const idx = normalizedHeaders.indexOf(normPHeader);
+                if (idx !== -1) {
+                    foundIndex = idx;
+                    break;
+                }
+            }
+            if (foundIndex !== -1) {
+                 schemaKeyToIndex[schemaKey] = foundIndex;
+            }
+          }
+          
+          // Check for mandatory headers
+          if (schemaKeyToIndex.INE === undefined || schemaKeyToIndex.NOM === undefined || schemaKeyToIndex.PRENOM === undefined) {
+            throw new Error("Colonnes CSV requises manquantes (INE, Nom, Prénom). Vérifiez les en-têtes. En-têtes trouvés: " + rawHeaders.join(', '));
           }
           
           const dataToImport: StudentBaseData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
 
           for (let i = 1; i < lines.length; i++) {
-            if (lines[i].trim() === '') continue; // Skip empty lines
+            if (lines[i].trim() === '') continue; 
             const values = lines[i].split(',');
-            const rawRow: any = {};
-            headers.forEach((header, idx) => {
-                rawRow[header] = values[idx]?.trim();
-            });
+            const rawRowForSchema: any = {};
 
-            const validationResult = studentBaseSchema.safeParse(rawRow);
+            for (const schemaKey in schemaKeyToIndex) {
+                const index = schemaKeyToIndex[schemaKey];
+                rawRowForSchema[schemaKey] = values[index]?.trim();
+            }
+            
+            const validationResult = studentBaseSchema.safeParse(rawRowForSchema);
             if (validationResult.success) {
               dataToImport.push(validationResult.data);
             } else {
               validationErrors.push({ row: i + 1, errors: validationResult.error.flatten() });
             }
           }
-          // --- END OF VERY BASIC CSV PARSING PLACEHOLDER ---
 
           if (validationErrors.length > 0) {
             const firstError = validationErrors[0];
@@ -378,30 +403,27 @@ export default function ImportPage() {
 
           if (dataToImport.length === 0) throw new Error("Aucune donnée CSV valide à importer après parsing.");
 
-          // Placeholder for Firestore import
           setIsCsvImporting(true);
           const db = getFirestore(app);
           const batch = writeBatch(db);
-          const collectionRef = collection(db, 'baseEleves'); // Example collection name
+          const collectionRef = collection(db, 'baseEleves'); 
           let csvDocsAdded = 0;
 
           dataToImport.forEach(student => {
-            const docId = student.INE;
-            if (docId) {
-              const studentRef = doc(collectionRef, docId);
-              batch.set(studentRef, { ...student, anneeImport: new Date().getFullYear() }); // Add import year
-              csvDocsAdded++;
-            }
+            const docId = student.INE; // INE is guaranteed by schema and earlier check
+            const studentRef = doc(collectionRef, docId);
+            batch.set(studentRef, { ...student, anneeImport: new Date().getFullYear() }); 
+            csvDocsAdded++;
           });
           
-          if (csvDocsAdded === 0) {
-            setCsvError("CSV: Aucun élève avec INE valide trouvé. Vérifiez le fichier.");
-            toast({ variant: "destructive", title: "Importation CSV Annulée", description: "Aucun élève avec INE valide.", duration: 7000 });
+          if (csvDocsAdded === 0) { // Should not happen if dataToImport was not empty and INE is always present
+            setCsvError("CSV: Aucun élève avec INE valide trouvé, ou erreur interne.");
+            toast({ variant: "destructive", title: "Importation CSV Annulée", description: "Aucun élève avec INE valide, ou erreur interne.", duration: 7000 });
             setIsCsvImporting(false); setIsCsvLoading(false); return;
           }
 
           await batch.commit();
-          toast({ title: "Importation CSV Réussie (Placeholder)", description: `${csvDocsAdded} enregistrements CSV importés (simulation).` });
+          toast({ title: "Importation CSV Réussie", description: `${csvDocsAdded} enregistrements de la base élèves ont été importés.` });
           setCsvFile(null); setCsvFileName(null);
           if (csvFileInputRef.current) csvFileInputRef.current.value = '';
           
@@ -419,7 +441,7 @@ export default function ImportPage() {
         toast({ variant: "destructive", title: "Erreur CSV", description: "Impossible de lire." });
         setIsCsvLoading(false);
       };
-      reader.readAsText(csvFile); // Read as text for CSV
+      reader.readAsText(csvFile, 'ISO-8859-1'); // Or 'UTF-8' if that's the encoding of your CSV
 
     } catch (e: any) {
       console.error("Erreur générale import CSV:", e);
@@ -528,8 +550,8 @@ export default function ImportPage() {
             Importer la Base Élèves (CSV)
           </CardTitle>
           <CardDescription>
-            Téléversez un fichier CSV (.csv) contenant la liste des élèves.
-            Les en-têtes attendus sont: INE, NOM, PRENOM, DATE_NAISSANCE, CODE_ETABLISSEMENT, etc.
+            Téléversez un fichier CSV (.csv) contenant la liste des élèves. Les en-têtes attendus sont: INE, Nom, Prénom, Né(e) le, Sexe, Classe.
+            Optionnellement: CODE_ETABLISSEMENT, LIBELLE_ETABLISSEMENT, CODE_DIVISION.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
