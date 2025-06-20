@@ -8,12 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import type { StudentData, StudentBaseData } from '@/lib/excel-types';
-import { studentDataSchema, studentBaseSchema } from '@/lib/excel-types';
-import { Loader2, Import, AlertTriangle, CalendarDays, UploadCloud, FileText } from 'lucide-react';
+import type { StudentData, BrevetBlancEntry } from '@/lib/excel-types';
+import { studentDataSchema, brevetBlancEntrySchema } from '@/lib/excel-types';
+import { Loader2, Import, AlertTriangle, CalendarDays, UploadCloud, FileText, BookOpenCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
+import { getFirestore, collection, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { YearPicker } from '@/components/ui/year-picker';
@@ -22,15 +22,15 @@ import { Separator } from '@/components/ui/separator';
 
 
 export default function ImportPage() {
-  // States for Excel Import
+  // States for Excel Import (Official Brevet Results)
   const [excelFile, setExcelFile] = useState<File | null>(null);
-  const [isExcelLoading, setIsExcelLoading] = useState(false); // For parsing/validation
-  const [isExcelImporting, setIsExcelImporting] = useState(false); // For Firestore write
+  const [isExcelLoading, setIsExcelLoading] = useState(false);
+  const [isExcelImporting, setIsExcelImporting] = useState(false);
   const [excelError, setExcelError] = useState<string | null>(null);
   const [excelFileName, setExcelFileName] = useState<string | null>(null);
-  
-  const [importYear, setImportYear] = useState<string>(''); 
-  const [selectedStartYear, setSelectedStartYear] = useState<number | null>(null); 
+
+  const [importYear, setImportYear] = useState<string>('');
+  const [selectedStartYear, setSelectedStartYear] = useState<number | null>(null);
   const [initialPickerYear, setInitialPickerYear] = useState<number>(new Date().getFullYear());
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
@@ -38,28 +38,28 @@ export default function ImportPage() {
   const excelDragCounter = useRef(0);
   const [isExcelDraggingOver, setIsExcelDraggingOver] = useState(false);
 
-  // States for CSV Import
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [isCsvLoading, setIsCsvLoading] = useState(false); // For parsing/validation
-  const [isCsvImporting, setIsCsvImporting] = useState(false); // For Firestore write
-  const [csvError, setCsvError] = useState<string | null>(null);
-  const [csvFileName, setCsvFileName] = useState<string | null>(null);
-  
-  const csvFileInputRef = useRef<HTMLInputElement>(null);
-  const csvDragCounter = useRef(0);
-  const [isCsvDraggingOver, setIsCsvDraggingOver] = useState(false);
+  // States for CSV Import (Brevet Blanc Results)
+  const [brevetBlancCsvFile, setBrevetBlancCsvFile] = useState<File | null>(null);
+  const [isBrevetBlancCsvLoading, setIsBrevetBlancCsvLoading] = useState(false);
+  const [isBrevetBlancCsvImporting, setIsBrevetBlancCsvImporting] = useState(false);
+  const [brevetBlancCsvError, setBrevetBlancCsvError] = useState<string | null>(null);
+  const [brevetBlancCsvFileName, setBrevetBlancCsvFileName] = useState<string | null>(null);
+
+  const brevetBlancCsvFileInputRef = useRef<HTMLInputElement>(null);
+  const brevetBlancCsvDragCounter = useRef(0);
+  const [isBrevetBlancCsvDraggingOver, setIsBrevetBlancCsvDraggingOver] = useState(false);
 
   const { toast } = useToast();
 
   useEffect(() => {
     const currentCalYear = new Date().getFullYear();
     const academicStartYear = currentCalYear;
-    setInitialPickerYear(academicStartYear); 
-    setSelectedStartYear(academicStartYear); 
-    setImportYear(String(academicStartYear)); 
+    setInitialPickerYear(academicStartYear);
+    setSelectedStartYear(academicStartYear);
+    setImportYear(String(academicStartYear));
   }, []);
 
-  // --- Excel File Handling ---
+  // --- Excel File Handling (Official Brevet Results) ---
   const processExcelFile = (selectedFile: File | null | undefined) => {
     if (selectedFile) {
       const fileType = selectedFile.type;
@@ -89,7 +89,7 @@ export default function ImportPage() {
       processExcelFile(null);
     }
     if (excelFileInputRef.current) {
-      excelFileInputRef.current.value = ''; 
+      excelFileInputRef.current.value = '';
     }
   };
 
@@ -105,7 +105,7 @@ export default function ImportPage() {
   };
   const handleExcelDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'copy';
-    if (!isExcelDraggingOver) setIsExcelDraggingOver(true); 
+    if (!isExcelDraggingOver) setIsExcelDraggingOver(true);
   };
   const handleExcelDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault(); event.stopPropagation();
@@ -113,7 +113,7 @@ export default function ImportPage() {
     const droppedFiles = event.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
       processExcelFile(droppedFiles[0]);
-      if (excelFileInputRef.current) excelFileInputRef.current.value = ''; 
+      if (excelFileInputRef.current) excelFileInputRef.current.value = '';
     }
   };
 
@@ -128,8 +128,8 @@ export default function ImportPage() {
     let documentsAddedToBatch = 0;
 
     dataToImport.forEach(student => {
-      const docId = student['INE']; 
-      if (docId) { 
+      const docId = student['INE'];
+      if (docId) {
         const studentRef = doc(collectionRef, docId);
         batch.set(studentRef, student); documentsAddedToBatch++;
       }
@@ -145,11 +145,11 @@ export default function ImportPage() {
       await batch.commit();
       toast({ title: "Importation Excel Réussie", description: `${documentsAddedToBatch} enregistrements Excel importés pour ${yearToImportForToast}.` });
       setExcelFile(null); setExcelFileName(null);
-      if (excelFileInputRef.current) excelFileInputRef.current.value = ''; 
+      if (excelFileInputRef.current) excelFileInputRef.current.value = '';
     } catch (importError: any) {
       console.error("Erreur d'importation Excel Firestore:", importError);
       let userMessage = `Échec de l'importation Excel: ${importError.message}.`;
-      setError(userMessage); // Generic error state for now, can be split if needed
+      setExcelError(userMessage);
       toast({ variant: "destructive", title: "Erreur d'Importation Excel Firestore", description: userMessage, duration: 10000 });
     } finally {
       setIsExcelImporting(false);
@@ -178,7 +178,7 @@ export default function ImportPage() {
           const data = new Uint8Array(arrayBuffer as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           if (!workbook.SheetNames.length) throw new Error("Classeur Excel sans feuilles.");
-          
+
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
           const rawDataObjects = XLSX.utils.sheet_to_json<any>(worksheet, { raw: false, defval: undefined });
@@ -186,12 +186,28 @@ export default function ImportPage() {
 
           const transformedData: StudentData[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
-          const explicitlyMappedHeaders = new Set([ /* ... headers as before ... */ ]);
+          const explicitlyMappedHeaders = new Set<string>([
+            'anneeScolaireImportee', 'Série', 'Code Etablissement', 'Libellé Etablissement',
+            'Commune Etablissement', 'Division de classe', 'Catégorie candidat', 'Numéro Candidat',
+            'INE', 'Nom candidat', 'Prénom candidat', 'Date de naissance', 'Résultat',
+            'TOTAL GENERAL', 'Moyenne sur 20',
+            '001 - 1 - Français - Ponctuel',
+            '002 - 1 - Mathématiques - Ponctuel',
+            '003 - 1 - Histoire, géographie, enseignement moral et civique - Ponctuel',
+            '004 - 1 - Sciences - Ponctuel',
+            '005 - 1 - Soutenance orale de projet - Evaluation en cours d\'année',
+            '007AB - 1 - Langues étrangères ou régionales - Contrôle continu',
+            '007AD - 1 - Langages des arts et du corps - Contrôle continu',
+            'Edu Mus01A /50',
+            'EPS CCF01A /100',
+            'Phy Chi01A /50',
+            'Sci Vie01A /50',
+          ]);
 
 
           rawDataObjects.forEach((rawRow, index) => {
             const studentInput: any = {
-              'anneeScolaireImportee': importYear, 
+              'anneeScolaireImportee': importYear,
               'Série': rawRow['Série'],
               'Code Etablissement': rawRow['Code Etablissement'],
               'Libellé Etablissement': rawRow['Libellé Etablissement'],
@@ -217,7 +233,7 @@ export default function ImportPage() {
               scoreEPS: rawRow['EPS CCF01A /100'],
               scorePhysiqueChimie: rawRow['Phy Chi01A /50'],
               scoreSciencesVie: rawRow['Sci Vie01A /50'],
-              rawRowData: rawRow, options: {} 
+              rawRowData: rawRow, options: {}
             };
             const currentOptions: Record<string, string> = {};
             for (const excelHeader in rawRow) {
@@ -265,129 +281,121 @@ export default function ImportPage() {
     }
   };
 
-  // --- CSV File Handling ---
-  const processCsvFile = (selectedFile: File | null | undefined) => {
+  // --- CSV File Handling (Brevet Blanc Results) ---
+  const processBrevetBlancCsvFile = (selectedFile: File | null | undefined) => {
     if (selectedFile) {
       if (selectedFile.type === 'text/csv' || selectedFile.name.endsWith('.csv')) {
-        setCsvFile(selectedFile);
-        setCsvFileName(selectedFile.name);
-        setCsvError(null);
+        setBrevetBlancCsvFile(selectedFile);
+        setBrevetBlancCsvFileName(selectedFile.name);
+        setBrevetBlancCsvError(null);
       } else {
-        const errorMsg = "Format de fichier invalide pour CSV. Veuillez sélectionner un fichier .csv.";
-        setCsvError(errorMsg);
-        setCsvFile(null);
-        setCsvFileName(null);
-        toast({ variant: "destructive", title: "Erreur de Fichier CSV", description: errorMsg });
+        const errorMsg = "Format de fichier invalide pour CSV (Brevet Blanc). Veuillez sélectionner un fichier .csv.";
+        setBrevetBlancCsvError(errorMsg);
+        setBrevetBlancCsvFile(null);
+        setBrevetBlancCsvFileName(null);
+        toast({ variant: "destructive", title: "Erreur Fichier CSV (Brevet Blanc)", description: errorMsg });
       }
     } else {
-      setCsvFile(null);
-      setCsvFileName(null);
+      setBrevetBlancCsvFile(null);
+      setBrevetBlancCsvFileName(null);
     }
   };
 
-  const handleCsvFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleBrevetBlancCsvFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) processCsvFile(files[0]);
-    else processCsvFile(null);
-    if (csvFileInputRef.current) csvFileInputRef.current.value = '';
+    if (files && files.length > 0) processBrevetBlancCsvFile(files[0]);
+    else processBrevetBlancCsvFile(null);
+    if (brevetBlancCsvFileInputRef.current) brevetBlancCsvFileInputRef.current.value = '';
   };
-  
-  const handleCsvDragEnter = (event: DragEvent<HTMLDivElement>) => {
+
+  const handleBrevetBlancCsvDragEnter = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault(); event.stopPropagation();
-    csvDragCounter.current++;
-    if (event.dataTransfer.items && event.dataTransfer.items.length > 0) setIsCsvDraggingOver(true);
+    brevetBlancCsvDragCounter.current++;
+    if (event.dataTransfer.items && event.dataTransfer.items.length > 0) setIsBrevetBlancCsvDraggingOver(true);
   };
-  const handleCsvDragLeave = (event: DragEvent<HTMLDivElement>) => {
+  const handleBrevetBlancCsvDragLeave = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault(); event.stopPropagation();
-    csvDragCounter.current--;
-    if (csvDragCounter.current === 0) setIsCsvDraggingOver(false);
+    brevetBlancCsvDragCounter.current--;
+    if (brevetBlancCsvDragCounter.current === 0) setIsBrevetBlancCsvDraggingOver(false);
   };
-  const handleCsvDragOver = (event: DragEvent<HTMLDivElement>) => {
+  const handleBrevetBlancCsvDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'copy';
-    if (!isCsvDraggingOver) setIsCsvDraggingOver(true);
+    if (!isBrevetBlancCsvDraggingOver) setIsBrevetBlancCsvDraggingOver(true);
   };
-  const handleCsvDrop = (event: DragEvent<HTMLDivElement>) => {
+  const handleBrevetBlancCsvDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault(); event.stopPropagation();
-    setIsCsvDraggingOver(false); csvDragCounter.current = 0;
+    setIsBrevetBlancCsvDraggingOver(false); brevetBlancCsvDragCounter.current = 0;
     const droppedFiles = event.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
-      processCsvFile(droppedFiles[0]);
-      if (csvFileInputRef.current) csvFileInputRef.current.value = '';
+      processBrevetBlancCsvFile(droppedFiles[0]);
+      if (brevetBlancCsvFileInputRef.current) brevetBlancCsvFileInputRef.current.value = '';
     }
   };
 
-  const parseAndImportCsvData = async () => {
-    if (!csvFile) {
-      setCsvError("Aucun fichier CSV sélectionné.");
-      toast({ variant: "destructive", title: "Erreur CSV", description: "Aucun fichier CSV." });
+  const parseAndImportBrevetBlancCsvData = async () => {
+    if (!brevetBlancCsvFile) {
+      setBrevetBlancCsvError("Aucun fichier CSV (Brevet Blanc) sélectionné.");
+      toast({ variant: "destructive", title: "Erreur CSV (Brevet Blanc)", description: "Aucun fichier CSV." });
       return;
     }
-    setIsCsvLoading(true); setCsvError(null);
-    
+    setIsBrevetBlancCsvLoading(true); setBrevetBlancCsvError(null);
+
     try {
       const reader = new FileReader();
       reader.onload = async (event) => {
         try {
           const csvText = event.target?.result as string;
-          if (!csvText) throw new Error("Fichier CSV vide ou illisible.");
-          
+          if (!csvText) throw new Error("Fichier CSV (Brevet Blanc) vide ou illisible.");
+
           const lines = csvText.split(/\r\n|\n/);
-          if (lines.length < 2) throw new Error("CSV doit avoir des en-têtes et au moins une ligne de données.");
-          
-          // Get headers and normalize them (uppercase, trim)
+          if (lines.length < 2) throw new Error("CSV (Brevet Blanc) doit avoir des en-têtes et au moins une ligne de données.");
+
           const rawHeaders = lines[0].split(',').map(h => h.trim());
           const normalizedHeaders = rawHeaders.map(h => h.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 
-          // Define expected schema keys and their corresponding CSV header variants
-          const headerMapping: { [key: string]: string[] } = {
-            INE: ["INE"],
-            NOM: ["NOM"],
-            PRENOM: ["PRENOM", "PRÉNOM"],
-            DATE_NAISSANCE: ["DATE_NAISSANCE", "NE(E) LE", "NÉ(E) LE"],
-            SEXE: ["SEXE"],
-            CLASSE: ["CLASSE"],
-            CODE_ETABLISSEMENT: ["CODE_ETABLISSEMENT"],
-            LIBELLE_ETABLISSEMENT: ["LIBELLE_ETABLISSEMENT"],
-            CODE_DIVISION: ["CODE_DIVISION"],
+          const headerMapping: { [key in keyof BrevetBlancEntry]?: string[] } = {
+            INE: ["INE", "ID_ELEVE", "IDENTIFIANT"],
+            MATIERE: ["MATIERE", "EPREUVE", "SUBJECT"],
+            NOTE: ["NOTE", "SCORE", "POINTS"],
           };
-          
-          // Create a mapping from schema key to its index in the CSV
+
           const schemaKeyToIndex: { [key: string]: number } = {};
           for (const schemaKey in headerMapping) {
-            const possibleHeaders = headerMapping[schemaKey];
+            const possibleHeaders = headerMapping[schemaKey as keyof BrevetBlancEntry];
             let foundIndex = -1;
-            for (const pHeader of possibleHeaders) {
-                const normPHeader = pHeader.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                const idx = normalizedHeaders.indexOf(normPHeader);
-                if (idx !== -1) {
-                    foundIndex = idx;
-                    break;
-                }
+            if (possibleHeaders) {
+              for (const pHeader of possibleHeaders) {
+                  const normPHeader = pHeader.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                  const idx = normalizedHeaders.indexOf(normPHeader);
+                  if (idx !== -1) {
+                      foundIndex = idx;
+                      break;
+                  }
+              }
             }
             if (foundIndex !== -1) {
                  schemaKeyToIndex[schemaKey] = foundIndex;
             }
           }
-          
-          // Check for mandatory headers
-          if (schemaKeyToIndex.INE === undefined || schemaKeyToIndex.NOM === undefined || schemaKeyToIndex.PRENOM === undefined) {
-            throw new Error("Colonnes CSV requises manquantes (INE, Nom, Prénom). Vérifiez les en-têtes. En-têtes trouvés: " + rawHeaders.join(', '));
+
+          if (schemaKeyToIndex.INE === undefined || schemaKeyToIndex.MATIERE === undefined || schemaKeyToIndex.NOTE === undefined) {
+            throw new Error("Colonnes CSV requises manquantes pour Brevet Blanc (INE, Matiere, Note). En-têtes trouvés: " + rawHeaders.join(', '));
           }
-          
-          const dataToImport: StudentBaseData[] = [];
+
+          const dataToImport: BrevetBlancEntry[] = [];
           const validationErrors: { row: number; errors: any }[] = [];
 
           for (let i = 1; i < lines.length; i++) {
-            if (lines[i].trim() === '') continue; 
-            const values = lines[i].split(',');
+            if (lines[i].trim() === '') continue;
+            const values = lines[i].split(',').map(v => v.trim());
             const rawRowForSchema: any = {};
 
             for (const schemaKey in schemaKeyToIndex) {
                 const index = schemaKeyToIndex[schemaKey];
-                rawRowForSchema[schemaKey] = values[index]?.trim();
+                rawRowForSchema[schemaKey.toUpperCase()] = values[index]; // Schema keys are uppercase
             }
-            
-            const validationResult = studentBaseSchema.safeParse(rawRowForSchema);
+
+            const validationResult = brevetBlancEntrySchema.safeParse(rawRowForSchema);
             if (validationResult.success) {
               dataToImport.push(validationResult.data);
             } else {
@@ -398,56 +406,64 @@ export default function ImportPage() {
           if (validationErrors.length > 0) {
             const firstError = validationErrors[0];
             const errorMessages = Object.entries(firstError.errors.fieldErrors).map(([field, messages]) => messages && messages.length > 0 ? `${field}: ${messages[0]}` : `${field}: Erreur`).join('; ');
-            throw new Error(`CSV: Validation échouée. Ex: Ligne ${firstError.row}: ${errorMessages}`);
+            throw new Error(`CSV (Brevet Blanc): Validation échouée. Ex: Ligne ${firstError.row}: ${errorMessages}`);
           }
 
-          if (dataToImport.length === 0) throw new Error("Aucune donnée CSV valide à importer après parsing.");
+          if (dataToImport.length === 0) throw new Error("Aucune donnée CSV (Brevet Blanc) valide à importer après parsing.");
 
-          setIsCsvImporting(true);
+          setIsBrevetBlancCsvImporting(true);
           const db = getFirestore(app);
           const batch = writeBatch(db);
-          const collectionRef = collection(db, 'baseEleves'); 
+          const collectionRef = collection(db, 'brevetBlancNotes');
           let csvDocsAdded = 0;
 
-          dataToImport.forEach(student => {
-            const docId = student.INE; // INE is guaranteed by schema and earlier check
-            const studentRef = doc(collectionRef, docId);
-            batch.set(studentRef, { ...student, anneeImport: new Date().getFullYear() }); 
+          const academicYearForImport = importYear || new Date().getFullYear().toString();
+
+          dataToImport.forEach(entry => {
+            // Sanitize matiere for use in document ID
+            const sanitizedMatiere = entry.MATIERE.replace(/[^a-zA-Z0-9]/g, '_');
+            const docId = `${entry.INE}_${academicYearForImport}_${sanitizedMatiere}`;
+            const entryRef = doc(collectionRef, docId);
+            batch.set(entryRef, {
+              ...entry,
+              anneeScolaire: academicYearForImport,
+              importedAt: serverTimestamp()
+            });
             csvDocsAdded++;
           });
-          
-          if (csvDocsAdded === 0) { // Should not happen if dataToImport was not empty and INE is always present
-            setCsvError("CSV: Aucun élève avec INE valide trouvé, ou erreur interne.");
-            toast({ variant: "destructive", title: "Importation CSV Annulée", description: "Aucun élève avec INE valide, ou erreur interne.", duration: 7000 });
-            setIsCsvImporting(false); setIsCsvLoading(false); return;
+
+          if (csvDocsAdded === 0) {
+            setBrevetBlancCsvError("CSV (Brevet Blanc): Aucun enregistrement valide à importer.");
+            toast({ variant: "destructive", title: "Importation CSV (Brevet Blanc) Annulée", description: "Aucun enregistrement valide.", duration: 7000 });
+            setIsBrevetBlancCsvImporting(false); setIsBrevetBlancCsvLoading(false); return;
           }
 
           await batch.commit();
-          toast({ title: "Importation CSV Réussie", description: `${csvDocsAdded} enregistrements de la base élèves ont été importés.` });
-          setCsvFile(null); setCsvFileName(null);
-          if (csvFileInputRef.current) csvFileInputRef.current.value = '';
-          
+          toast({ title: "Importation CSV (Brevet Blanc) Réussie", description: `${csvDocsAdded} notes de Brevet Blanc importées pour l'année ${academicYearForImport}.` });
+          setBrevetBlancCsvFile(null); setBrevetBlancCsvFileName(null);
+          if (brevetBlancCsvFileInputRef.current) brevetBlancCsvFileInputRef.current.value = '';
+
         } catch (parseError: any) {
-          console.error("Erreur parsing/import CSV:", parseError);
-          setCsvError(`Erreur CSV: ${parseError.message}`);
-          toast({ variant: "destructive", title: "Erreur Fichier CSV", description: parseError.message, duration: 7000 });
+          console.error("Erreur parsing/import CSV (Brevet Blanc):", parseError);
+          setBrevetBlancCsvError(`Erreur CSV (Brevet Blanc): ${parseError.message}`);
+          toast({ variant: "destructive", title: "Erreur Fichier CSV (Brevet Blanc)", description: parseError.message, duration: 7000 });
         } finally {
-          setIsCsvLoading(false);
-          setIsCsvImporting(false);
+          setIsBrevetBlancCsvLoading(false);
+          setIsBrevetBlancCsvImporting(false);
         }
       };
       reader.onerror = () => {
-        setCsvError("Impossible de lire le fichier CSV.");
-        toast({ variant: "destructive", title: "Erreur CSV", description: "Impossible de lire." });
-        setIsCsvLoading(false);
+        setBrevetBlancCsvError("Impossible de lire le fichier CSV (Brevet Blanc).");
+        toast({ variant: "destructive", title: "Erreur CSV (Brevet Blanc)", description: "Impossible de lire." });
+        setIsBrevetBlancCsvLoading(false);
       };
-      reader.readAsText(csvFile, 'ISO-8859-1'); // Or 'UTF-8' if that's the encoding of your CSV
+      reader.readAsText(brevetBlancCsvFile, 'ISO-8859-1');
 
     } catch (e: any) {
-      console.error("Erreur générale import CSV:", e);
-      setCsvError(e.message);
-      toast({ variant: "destructive", title: "Erreur CSV Inconnue", description: e.message });
-      setIsCsvLoading(false);
+      console.error("Erreur générale import CSV (Brevet Blanc):", e);
+      setBrevetBlancCsvError(e.message);
+      toast({ variant: "destructive", title: "Erreur CSV (Brevet Blanc) Inconnue", description: e.message });
+      setIsBrevetBlancCsvLoading(false);
     }
   };
 
@@ -457,24 +473,24 @@ export default function ImportPage() {
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-foreground tracking-tight">Importer des Données</h1>
         <p className="text-muted-foreground mt-1">
-          Téléversez des fichiers pour mettre à jour les résultats des élèves ou la base élèves.
+          Téléversez des fichiers pour les résultats officiels du brevet ou les notes du brevet blanc.
         </p>
       </header>
 
-      {/* Excel Import Card */}
+      {/* Excel Import Card (Official Brevet Results) */}
       <Card className="shadow-lg rounded-lg">
         <CardHeader>
           <CardTitle className="text-xl flex items-center">
             <Import className="mr-2 h-5 w-5 text-primary" />
-            Importer Résultats Brevet (Excel)
+            Importer Résultats Brevet Officiels (Excel)
             </CardTitle>
           <CardDescription>
-            Sélectionnez votre fichier Excel (.xlsx, .xls) et l'année scolaire correspondante.
+            Sélectionnez votre fichier Excel (.xlsx, .xls) et l'année scolaire correspondante pour les résultats officiels.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="importYear-trigger" className="text-sm font-medium">Année Scolaire des Résultats</Label>
+            <Label htmlFor="importYear-trigger" className="text-sm font-medium">Année Scolaire des Résultats Officiels</Label>
             <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -497,7 +513,7 @@ export default function ImportPage() {
                 />
               </PopoverContent>
             </Popover>
-            <p className="text-xs text-muted-foreground">Obligatoire pour l'import Excel des résultats.</p>
+            <p className="text-xs text-muted-foreground">Obligatoire pour l'import Excel des résultats officiels.</p>
           </div>
 
           <div
@@ -521,15 +537,15 @@ export default function ImportPage() {
             />
             {excelFileName && (<p className="mt-3 text-sm text-muted-foreground">Fichier Excel : {excelFileName}</p>)}
           </div>
-          
+
           <div className="flex justify-end mt-4">
-            <Button 
-              onClick={parseAndImportExcelData} 
-              disabled={!excelFile || isExcelLoading || isExcelImporting || !importYear.trim()} 
+            <Button
+              onClick={parseAndImportExcelData}
+              disabled={!excelFile || isExcelLoading || isExcelImporting || !importYear.trim()}
               className="w-full sm:w-auto"
             >
               {(isExcelLoading || isExcelImporting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />}
-              {isExcelLoading ? "Lecture Excel..." : (isExcelImporting ? "Import Excel..." : "Importer Résultats (Excel)")}
+              {isExcelLoading ? "Lecture Excel..." : (isExcelImporting ? "Import Excel..." : "Importer Résultats Officiels (Excel)")}
             </Button>
           </div>
           {excelError && (
@@ -542,55 +558,56 @@ export default function ImportPage() {
 
       <Separator className="my-8" />
 
-      {/* CSV Import Card */}
+      {/* CSV Import Card (Brevet Blanc Results) */}
       <Card className="shadow-lg rounded-lg">
         <CardHeader>
           <CardTitle className="text-xl flex items-center">
-            <FileText className="mr-2 h-5 w-5 text-primary" />
-            Importer la Base Élèves (CSV)
+            <BookOpenCheck className="mr-2 h-5 w-5 text-primary" />
+            Importer Résultats Brevet Blanc (CSV)
           </CardTitle>
           <CardDescription>
-            Téléversez un fichier CSV (.csv) contenant la liste des élèves. Les en-têtes attendus sont: INE, Nom, Prénom, Né(e) le, Sexe, Classe.
-            Optionnellement: CODE_ETABLISSEMENT, LIBELLE_ETABLISSEMENT, CODE_DIVISION.
+            Téléversez un fichier CSV (.csv) pour les notes du Brevet Blanc.
+            Les en-têtes attendus sont: INE, Matiere, Note.
+            L'année scolaire sélectionnée ci-dessus sera utilisée pour cet import.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
            <div
-            onDragEnter={handleCsvDragEnter} onDragLeave={handleCsvDragLeave}
-            onDragOver={handleCsvDragOver} onDrop={handleCsvDrop}
+            onDragEnter={handleBrevetBlancCsvDragEnter} onDragLeave={handleBrevetBlancCsvDragLeave}
+            onDragOver={handleBrevetBlancCsvDragOver} onDrop={handleBrevetBlancCsvDrop}
             className={cn(
               "relative flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/70 transition-colors",
-              isCsvDraggingOver ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"
+              isBrevetBlancCsvDraggingOver ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"
             )}
           >
-            <UploadCloud className={cn("w-10 h-10 mb-4", isCsvDraggingOver ? "text-primary" : "text-muted-foreground")} />
-            <Label htmlFor="csv-file-upload-input" className="text-sm font-medium text-center">
-              Glissez-déposez votre fichier CSV ici ou <span className="font-semibold text-primary hover:underline">cliquez pour sélectionner</span>
+            <UploadCloud className={cn("w-10 h-10 mb-4", isBrevetBlancCsvDraggingOver ? "text-primary" : "text-muted-foreground")} />
+            <Label htmlFor="brevetblanc-csv-file-upload-input" className="text-sm font-medium text-center">
+              Glissez-déposez votre fichier CSV (Brevet Blanc) ou <span className="font-semibold text-primary hover:underline">cliquez</span>
             </Label>
             <Input
-              id="csv-file-upload-input" ref={csvFileInputRef} type="file"
+              id="brevetblanc-csv-file-upload-input" ref={brevetBlancCsvFileInputRef} type="file"
               accept=".csv, text/csv"
-              onChange={handleCsvFileChange}
+              onChange={handleBrevetBlancCsvFileChange}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              disabled={isCsvLoading || isCsvImporting}
+              disabled={isBrevetBlancCsvLoading || isBrevetBlancCsvImporting}
             />
-            {csvFileName && (<p className="mt-3 text-sm text-muted-foreground">Fichier CSV : {csvFileName}</p>)}
+            {brevetBlancCsvFileName && (<p className="mt-3 text-sm text-muted-foreground">Fichier CSV (Brevet Blanc) : {brevetBlancCsvFileName}</p>)}
           </div>
 
           <div className="flex justify-end mt-4">
-            <Button 
-              onClick={parseAndImportCsvData} 
-              disabled={!csvFile || isCsvLoading || isCsvImporting}
+            <Button
+              onClick={parseAndImportBrevetBlancCsvData}
+              disabled={!brevetBlancCsvFile || isBrevetBlancCsvLoading || isBrevetBlancCsvImporting || !importYear.trim()}
               className="w-full sm:w-auto"
             >
-              {(isCsvLoading || isCsvImporting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />}
-              {isCsvLoading ? "Lecture CSV..." : (isCsvImporting ? "Import CSV..." : "Importer Élèves (CSV)")}
+              {(isBrevetBlancCsvLoading || isBrevetBlancCsvImporting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />}
+              {isBrevetBlancCsvLoading ? "Lecture CSV..." : (isBrevetBlancCsvImporting ? "Import CSV..." : "Importer Brevet Blanc (CSV)")}
             </Button>
           </div>
 
-          {csvError && (
+          {brevetBlancCsvError && (
             <div className="flex items-center text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-              <AlertTriangle className="mr-2 h-4 w-4" /> {csvError}
+              <AlertTriangle className="mr-2 h-4 w-4" /> {brevetBlancCsvError}
             </div>
           )}
         </CardContent>
@@ -598,4 +615,3 @@ export default function ImportPage() {
     </div>
   );
 }
-    
