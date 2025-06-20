@@ -4,7 +4,8 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle, LogOut, CalendarRange, ShieldCheck } from 'lucide-react';
+import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle, LogOut, CalendarRange, ShieldCheck, ClipboardEdit, Edit3, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import * as React from 'react'; // Import React for useState
 
 import Logo from '@/components/logo';
 import {
@@ -18,7 +19,10 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarGroup,
-  SidebarGroupLabel
+  SidebarGroupLabel,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -150,6 +154,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { isAdmin } = useAuth(); // Simulation du statut admin
+  const [brevetBlancOpen, setBrevetBlancOpen] = React.useState(false);
 
   const handleLogout = () => {
     // TODO: Implémenter la déconnexion Firebase
@@ -160,6 +165,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     });
     router.push('/login');
   };
+
+  React.useEffect(() => {
+    // Open Brevet Blanc submenu if a child route is active on initial load or navigation
+    if (pathname.startsWith('/dashboard/brevet-blanc') && !brevetBlancOpen) {
+      setBrevetBlancOpen(true);
+    }
+  }, [pathname, brevetBlancOpen]);
+
 
   return (
     <FilterProvider>
@@ -229,6 +242,44 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setBrevetBlancOpen(!brevetBlancOpen)}
+                  isActive={pathname.startsWith('/dashboard/brevet-blanc')}
+                  tooltip={{ children: "Brevet Blanc", side: "right", align: "center" }}
+                  className="flex w-full justify-between items-center"
+                >
+                  <div className="flex items-center gap-2">
+                    <ClipboardEdit />
+                    <span>Brevet Blanc</span>
+                  </div>
+                  {brevetBlancOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </SidebarMenuButton>
+                {brevetBlancOpen && (
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        href="/dashboard/brevet-blanc/saisie-notes"
+                        isActive={pathname === '/dashboard/brevet-blanc/saisie-notes'}
+                      >
+                        <Edit3 />
+                        <span>Saisir notes</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        href="/dashboard/brevet-blanc/voir-notes"
+                        isActive={pathname === '/dashboard/brevet-blanc/voir-notes'}
+                      >
+                        <Eye />
+                        <span>Voir notes</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                )}
+              </SidebarMenuItem>
+
               {isAdmin && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -266,6 +317,4 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     </FilterProvider>
   );
 }
-
-
     
