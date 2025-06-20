@@ -155,13 +155,13 @@ export const requestInvitation = onCall(
 
 const listPendingInvitationsOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public", // Changed to public for direct call from client
+  invoker: "public",
 };
 
 export const listPendingInvitations = onCall(
   listPendingInvitationsOptions,
   async () => {
-    const logMarker = "LIST_INV_V14_LOG"; // Updated log marker
+    const logMarker = "LIST_INV_V14_LOG";
     logger.info(`${logMarker}: Func start. Listing all invites.`);
 
     if (!db) {
@@ -174,9 +174,8 @@ export const listPendingInvitations = onCall(
     }
 
     try {
-      // No longer filtering by status === "pending" to get all for admin view
       const query = db.collection("invitationRequests")
-          .orderBy("requestedAt", "desc"); // Order by most recent
+        .orderBy("requestedAt", "desc");
       const snapshot = await query.get();
 
       if (snapshot.empty) {
@@ -195,7 +194,10 @@ export const listPendingInvitations = onCall(
         if (reqTimestamp && typeof reqTimestamp.toDate === "function") {
           requestedAtISO = reqTimestamp.toDate().toISOString();
         } else {
-          logger.warn(`${logMarker}: Invalid reqAt ${doc.id}.`, {reqTsVal: String(reqTimestamp)});
+          const shortId = doc.id.substring(0, 10);
+          logger.warn(`LST_INV: Bad reqAt ${shortId}...`, {
+            ts: String(reqTimestamp).slice(0,15),
+          });
           requestedAtISO = new Date(0).toISOString();
         }
 
@@ -210,7 +212,7 @@ export const listPendingInvitations = onCall(
           email: data.email,
           requestedAt: requestedAtISO,
           status: data.status,
-          notifiedAt: notifiedAtISO, // Include notifiedAt
+          notifiedAt: notifiedAtISO,
         };
       });
       const logMsg = `${logMarker}: Found ${invitations.length} invites.`;
@@ -225,8 +227,10 @@ export const listPendingInvitations = onCall(
       if (error instanceof Error) {
         errorMsg = error.message;
       }
-      const logErr = `${logMarker}: List invites failed.`;
-      logger.error(logErr, {error: errorMsg, originalError: String(error)});
+      const shortError = String(error).slice(0,20);
+      logger.error(`LST_INV: List fail. ${errorMsg.slice(0,25)}`, {
+        orig: shortError,
+      });
       return {
         success: false,
         message: `Err serveur (liste): ${errorMsg}`,
@@ -244,7 +248,7 @@ const approveInvitationOptions: HttpsOptions = {
 export const approveInvitation = onCall(
   approveInvitationOptions,
   async (request) => {
-    const logMarker = "INV_APPR_V7"; // V7
+    const logMarker = "INV_APPR_V7";
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -335,8 +339,8 @@ export const approveInvitation = onCall(
       }
       const logErr = `${logMarker}: Approve FAIL ${invitationId}.`;
       logger.error(logErr, {error: errorMsg, originalError: String(err)});
-      const displayErrMsg = errorMsg.substring(0, 40);
-      return {success: false, message: `Approb. échec: ${displayErrMsg}`};
+      const displayErrMsg = errorMsg.substring(0, 25);
+      return {success: false, message: `App. KO: ${displayErrMsg}`};
     }
   }
 );
@@ -348,7 +352,7 @@ const rejectInvitationOptions: HttpsOptions = {
 export const rejectInvitation = onCall(
   rejectInvitationOptions,
   async (request) => {
-    const logMarker = "INV_REJ_V6"; // V6
+    const logMarker = "INV_REJ_V6";
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -425,14 +429,14 @@ const markInvitationAsNotifiedOptions: HttpsOptions = {
 export const markInvitationAsNotified = onCall(
   markInvitationAsNotifiedOptions,
   async (request) => {
-    const logMarker = "INV_NOTIFY_V1";
+    const logMarker = "NTFY_V1"; // Shorter marker for this function
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
     );
 
     if (!db) {
-      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
+      logger.warn(`${logMarker}: DB not init.`);
       return {success: false, message: "Erreur serveur (DB)."};
     }
 
@@ -446,19 +450,20 @@ export const markInvitationAsNotified = onCall(
       const inviteRef = db.collection("invitationRequests").doc(invitationId);
       const inviteDoc = await inviteRef.get();
 
-      if (!inviteDoc.exists) {
-        logger.warn(`${logMarker}: Invite ${invitationId} not found.`);
+      if (!inviteDoc.exists){
+        logger.warn(`${logMarker}: Inv ${invitationId} not found.`);
         return {success: false, message: "Invitation non trouvée."};
       }
       
       const docData = inviteDoc.data();
       if (docData?.status !== "approved") {
-        logger.warn(`${logMarker}: Invite ${invitationId} not in 'approved' status. Current: ${docData?.status}`);
-        return {success: false, message: "L'invitation doit être approuvée pour être marquée comme notifiée."};
+        const currSt = docData?.status ?? "unknown";
+        logger.warn(`${logMarker}: Inv ${invitationId} not appr. Stat: ${currSt}`);
+        return {success: false, message: "Inv. doit être 'approved' pour notif."};
       }
       if (docData?.notifiedAt) {
-        logger.info(`${logMarker}: Invite ${invitationId} already marked as notified.`);
-        return {success: true, message: "L'invitation était déjà marquée comme notifiée."};
+        logger.info(`${logMarker}: Inv ${invitationId} already notified.`);
+        return {success: true, message: "Inv. déjà notifiée."};
       }
 
       await inviteRef.update({
@@ -466,7 +471,7 @@ export const markInvitationAsNotified = onCall(
       });
 
       const emailLog = docData?.email || "[no_email]";
-      logger.info(`${logMarker}: Invite ${invitationId} for ${emailLog} marked as notified.`);
+      logger.info(`${logMarker}: Inv ${invitationId} for ${emailLog} notified.`);
       return {success: true, message: `Notification marquée pour ${emailLog}.`};
     } catch (err: unknown) {
       let errorMsg = "Erreur lors du marquage de la notification.";
@@ -475,14 +480,12 @@ export const markInvitationAsNotified = onCall(
       }
       const logErr = `${logMarker}: Mark notified FAIL ${invitationId}.`;
       logger.error(logErr, {error: errorMsg, originalError: String(err)});
-      const displayErrMsg = errorMsg.substring(0, 40);
-      return {success: false, message: `Échec marquage notif.: ${displayErrMsg}`};
+      const displayErrMsg = errorMsg.substring(0, 25);
+      return {success: false, message: `Notif KO: ${displayErrMsg}`};
     }
   }
 );
 
-
 logger.info(
   `${LOG_PREFIX_V13_1}: Script end. Admin SDK init done (v13.1).`
 );
-
