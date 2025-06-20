@@ -92,13 +92,12 @@ export const requestInvitation = onCall(
 
     if (!adminApp) {
       logger.error(`${logMarker}: AdminApp not initialized! Critical.`);
-      // This error might not be catchable by the client if it prevents func init
     }
     if (!db) {
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
       return {
         success: false,
-        message: "V11: Erreur interne du serveur (Firestore indisponible).",
+        message: "Erreur interne du serveur (Firestore indisponible).",
         receivedData: request.data,
       };
     }
@@ -108,7 +107,7 @@ export const requestInvitation = onCall(
       logger.error(`${logMarker}: Invalid/missing email.`, {email});
       return {
         success: false,
-        message: "V11: Email invalide ou manquant.",
+        message: "Email invalide ou manquant.",
         receivedData: request.data,
       };
     }
@@ -127,10 +126,9 @@ export const requestInvitation = onCall(
       );
       return {
         success: true,
-        // This message will be shown in the toast
-        message: `Demande d'invitation pour ${email} enregistrée avec succès.`,
+        message: `Votre demande d'invitation pour ${email} a bien été enregistrée. Vous serez contacté une fois votre demande examinée.`,
         receivedData: request.data,
-        requestId: newRequestRef.id,
+        // requestId: newRequestRef.id, // ID is not sent to client anymore
       };
     } catch (writeError: unknown) {
       let errorMsg = "Unknown Firestore write error.";
@@ -143,8 +141,7 @@ export const requestInvitation = onCall(
       );
       return {
         success: false,
-        // This message will be shown in the toast
-        message: `V11: Échec de l'enregistrement: ${errorMsg}`,
+        message: `Échec de l'enregistrement de votre demande: ${errorMsg}`,
         receivedData: request.data,
       };
     }

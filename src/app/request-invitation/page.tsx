@@ -23,11 +23,19 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/logo';
-import { Mail, Loader2, ArrowLeft } from 'lucide-react';
+import { Mail, Loader2, ArrowLeft, CheckCircle, AlertTriangle as AlertTriangleIcon } from 'lucide-react';
 import { getFunctions, httpsCallable, type HttpsCallableResult } from 'firebase/functions';
 import { app } from '@/lib/firebase';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 const emailRegex = /^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/;
 
@@ -40,12 +48,12 @@ const formSchema = z.object({
 interface RequestInvitationResponse {
     success: boolean;
     message: string;
-    // requestId?: string; // Optionally, if you want to use it in the toast
 }
 
 export default function RequestInvitationPage() {
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ title: "", message: "", variant: "success" as "success" | "error" });
   const functions = getFunctions(app, 'europe-west1');
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -64,77 +72,104 @@ export default function RequestInvitationPage() {
       const result: HttpsCallableResult<RequestInvitationResponse> = await callRequestInvitation({ email: values.email });
       
       if (result.data.success) {
-        toast({
-          title: "Demande Envoyée",
-          description: result.data.message, // Display success message from function
+        setModalConfig({ 
+            title: "Demande Envoyée", 
+            message: result.data.message,
+            variant: "success" 
         });
         form.reset();
       } else {
-        // This case handles business logic errors returned by the function (success: false)
-        throw new Error(result.data.message || "Une erreur est survenue lors de la demande.");
+        setModalConfig({ 
+            title: "Échec de la Demande", 
+            message: result.data.message || "Une erreur est survenue lors de la demande.",
+            variant: "error"
+        });
       }
     } catch (error: any) {
       console.error("Erreur lors de la demande d'invitation:", error);
       let errorMessage = "Une erreur technique est survenue lors de l'envoi de votre demande.";
       
-      // Check if it's an HttpsError from Firebase with code and message
       if (error.code && error.message) { 
           errorMessage = `Erreur (${error.code}): ${error.message}`;
-      } else if (error.message) { // Standard Error
+      } else if (error.message) {
           errorMessage = error.message;
       }
-      
-      toast({
-        variant: "destructive",
-        title: "Échec de la Demande",
-        description: errorMessage,
+      setModalConfig({ 
+          title: "Échec de la Demande", 
+          message: errorMessage,
+          variant: "error"
       });
     } finally {
       setIsLoading(false);
+      setIsModalOpen(true);
     }
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="items-center text-center">
-          <Logo className="mb-4" />
-          <CardTitle className="font-headline text-2xl">Demander une Invitation</CardTitle>
-          <CardDescription>Entrez votre adresse e-mail académique pour demander l'accès.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Adresse e-mail académique</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="email" placeholder="prénom.nom@ac-montpellier.fr" {...field} className="pl-10" />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isLoading ? 'Envoi en cours...' : 'Envoyer la demande'}
-              </Button>
-            </form>
-          </Form>
-          <div className="mt-6 text-center">
-            <Link href="/login" className="inline-flex items-center text-sm font-medium text-primary hover:underline">
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Retour à la connexion
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md shadow-xl">
+          <CardHeader className="items-center text-center">
+            <Logo className="mb-4" />
+            <CardTitle className="font-headline text-2xl">Demander une Invitation</CardTitle>
+            <CardDescription>Entrez votre adresse e-mail académique pour demander l'accès.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Adresse e-mail académique</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                          <Input type="email" placeholder="prénom.nom@ac-montpellier.fr" {...field} className="pl-10" />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isLoading ? 'Envoi en cours...' : 'Envoyer la demande'}
+                </Button>
+              </form>
+            </Form>
+            <div className="mt-6 text-center">
+              <Link href="/login" className="inline-flex items-center text-sm font-medium text-primary hover:underline">
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Retour à la connexion
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className={`flex items-center ${modalConfig.variant === 'success' ? 'text-green-600' : 'text-destructive'}`}>
+              {modalConfig.variant === 'success' ? 
+                <CheckCircle className="mr-2 h-5 w-5" /> : 
+                <AlertTriangleIcon className="mr-2 h-5 w-5" />
+              }
+              {modalConfig.title}
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              {modalConfig.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Fermer</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
