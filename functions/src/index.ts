@@ -17,7 +17,8 @@ const invitationRequestSchema = z.object({
   email: z.string().email({message: "Adresse e-mail invalide."})
     .regex(
       /^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/,
-      {message: "L'adresse e-mail doit être au format prénom.nom@ac-montpellier.fr"}
+      // E-mail: prénom.nom@ac-montpellier.fr (Académie Montpellier)
+      {message: "L'e-mail doit être au format prénom.nom@ac-montpellier.fr"}
     ),
 });
 
@@ -30,14 +31,14 @@ const rejectInvitationSchema = manageInvitationSchema.extend({
   reason: z.string().optional().describe("Raison optionnelle du rejet."),
 });
 
-
 /**
  * Enregistre une nouvelle demande d'invitation.
- * Appelée par le frontend lorsqu'un utilisateur soumet le formulaire de demande.
+ * Appelée par frontend lors de la soumission du formulaire.
  */
 export const requestInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
     functions.logger.info("Nouvelle demande d'invitation reçue:", data);
+    // Vérification App Check (si activé et requis)
     if (context.app === undefined) {
       throw new functions.https.HttpsError(
         "failed-precondition",
@@ -62,6 +63,7 @@ export const requestInvitation = functions.region("europe-west1")
       const {email} = validationResult.data;
       const lowerEmail = email.toLowerCase();
 
+      // Vérifier si une demande existe déjà
       const existingRequestQuery = await db.collection("invitationRequests")
         .where("email", "==", lowerEmail)
         .limit(1)
@@ -81,20 +83,24 @@ export const requestInvitation = functions.region("europe-west1")
             "Une demande d'invitation est déjà en cours pour cet e-mail."
           );
         }
-        // If rejected, allow re-request by updating existing one to pending
+        // Si rejetée, permettre une nouvelle demande en la remettant en attente
         await db.collection("invitationRequests")
           .doc(existingRequestQuery.docs[0].id).set({
             email: lowerEmail,
-            status: "pending",
+            status: "pending", // Remettre en attente
             requestedAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            // Réinitialiser les champs de rejet/approbation
             rejectedAt: null,
             rejectedBy: null,
             rejectionReason: null,
+            approvedAt: null,
+            approvedBy: null,
+            authUid: null,
           }, {merge: true});
 
         functions.logger.info(
-          `Demande d'invitation mise à jour pour ${lowerEmail}`
+          `Demande d'invitation MAJ et remise en attente pour ${lowerEmail}`
         );
         return {
           success: true,
@@ -102,6 +108,7 @@ export const requestInvitation = functions.region("europe-west1")
         };
       }
 
+      // Nouvelle demande
       await db.collection("invitationRequests").add({
         email: lowerEmail,
         status: "pending",
@@ -123,16 +130,15 @@ export const requestInvitation = functions.region("europe-west1")
       }
       throw new functions.https.HttpsError(
         "internal",
-        "Une erreur est survenue lors du traitement de votre demande.",
-        error.message
+        "Erreur lors du traitement de votre demande.",
+        (error as Error).message
       );
     }
   });
 
-
 /**
- * Approuve une demande d'invitation et crée un utilisateur dans Firebase Auth.
- * DOIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
+ * Approuve une demande d'invitation et crée un utilisateur Firebase Auth.
+ * APPEL ADMIN SEULEMENT via interface sécurisée.
  */
 export const approveInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
@@ -145,8 +151,7 @@ export const approveInvitation = functions.region("europe-west1")
       );
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Vous n'avez pas les droits pour effectuer cette action. " +
-        "Seuls les administrateurs peuvent approuver les invitations."
+        "Droits insuffisants pour approuver les invitations."
       );
     }
     functions.logger.info(
@@ -179,7 +184,7 @@ export const approveInvitation = functions.region("europe-west1")
       if (requestQuery.empty) {
         throw new functions.https.HttpsError(
           "not-found",
-          `Aucune demande d'invitation en attente trouvée pour ${lowerEmail}.`
+          `Aucune demande en attente pour ${lowerEmail}.`
         );
       }
 
@@ -189,11 +194,11 @@ export const approveInvitation = functions.region("europe-west1")
       try {
         userRecord = await admin.auth().createUser({
           email: lowerEmail,
-          emailVerified: false, // Ou true si vous le souhaitez
+          emailVerified: false, // L'utilisateur devra vérifier son e-mail
           disabled: false,
         });
         functions.logger.info(
-          "Utilisateur créé avec succès:",
+          "Utilisateur créé:",
           userRecord.uid,
           "pour email:",
           lowerEmail
@@ -201,7 +206,7 @@ export const approveInvitation = functions.region("europe-west1")
       } catch (authError: any) {
         if (authError.code === "auth/email-already-exists") {
           functions.logger.warn(
-            "Tentative d'approbation pour un e-mail déjà existant dans Auth:",
+            "Tentative d'approbation pour un e-mail existant:",
             lowerEmail
           );
           let existingUser;
@@ -209,16 +214,17 @@ export const approveInvitation = functions.region("europe-west1")
             existingUser = await admin.auth().getUserByEmail(lowerEmail);
           } catch (getUserError) {
             functions.logger.error(
-              `Erreur en récupérant l'utilisateur ${lowerEmail} par e-mail:`,
+              `Erreur récupération utilisateur ${lowerEmail}:`,
               getUserError
             );
             throw new functions.https.HttpsError(
               "internal",
-              "Erreur lors de la vérification de l'utilisateur existant.",
+              "Erreur vérification utilisateur existant.",
               (getUserError as Error).message
             );
           }
 
+          // Mettre à jour la demande comme approuvée même si l'utilisateur existait
           await db.collection("invitationRequests")
             .doc(invitationDoc.id).update({
               status: "approved",
@@ -229,26 +235,27 @@ export const approveInvitation = functions.region("europe-west1")
             });
           return {
             success: true,
-            message: `L'utilisateur ${lowerEmail} existe déjà. ` +
-                     "La demande a été marquée comme approuvée.",
+            message: `Utilisateur ${lowerEmail} existe déjà. ` +
+                     "Demande marquée comme approuvée.",
           };
         }
         functions.logger.error(
-          "Erreur lors de la création de l'utilisateur dans Firebase Auth:",
+          "Erreur création utilisateur Firebase Auth:",
           authError
         );
         throw new functions.https.HttpsError(
           "internal",
-          "Erreur lors de la création de l'utilisateur.",
+          "Erreur création utilisateur.",
           authError.message
         );
       }
 
+      // Mettre à jour la demande d'invitation
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
         approvedBy: context.auth.uid,
-        authUid: userRecord.uid,
+        authUid: userRecord.uid, // Lier à l'UID de Firebase Auth
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -257,7 +264,7 @@ export const approveInvitation = functions.region("europe-west1")
       );
       return {
         success: true,
-        message: `L'invitation pour ${lowerEmail} a été approuvée. ` +
+        message: `Invitation pour ${lowerEmail} approuvée. ` +
                  "L'utilisateur peut définir son mot de passe via 'Oublié?'.",
       };
     } catch (error: any) {
@@ -267,16 +274,15 @@ export const approveInvitation = functions.region("europe-west1")
       }
       throw new functions.https.HttpsError(
         "internal",
-        "Une erreur est survenue lors de l'approbation.",
-        error.message
+        "Erreur lors de l'approbation.",
+        (error as Error).message
       );
     }
   });
 
-
 /**
  * Rejette une demande d'invitation.
- * DOIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
+ * APPEL ADMIN SEULEMENT via interface sécurisée.
  */
 export const rejectInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
@@ -289,8 +295,7 @@ export const rejectInvitation = functions.region("europe-west1")
       );
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Vous n'avez pas les droits pour effectuer cette action. " +
-        "Seuls les administrateurs peuvent rejeter les invitations."
+        "Droits insuffisants pour rejeter les invitations."
       );
     }
     functions.logger.info(
@@ -323,7 +328,7 @@ export const rejectInvitation = functions.region("europe-west1")
       if (requestQuery.empty) {
         throw new functions.https.HttpsError(
           "not-found",
-          `Aucune demande d'invitation en attente trouvée pour ${lowerEmail}.`
+          `Aucune demande en attente trouvée pour ${lowerEmail}.`
         );
       }
 
@@ -349,18 +354,18 @@ export const rejectInvitation = functions.region("europe-west1")
       }
       throw new functions.https.HttpsError(
         "internal",
-        "Une erreur est survenue lors du rejet.",
-        error.message
+        "Erreur lors du rejet.",
+        (error as Error).message
       );
     }
   });
 
 /**
  * Liste les demandes d'invitation en attente.
- * DOIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
+ * APPEL ADMIN SEULEMENT via interface sécurisée.
  */
 export const listPendingInvitations = functions.region("europe-west1")
-  .https.onCall(async (data, context) => {
+  .https.onCall(async (_data, context) => { // data param removed as unused
     functions.logger.info("Demande de listage des invitations en attente.");
 
     if (!context.auth || !context.auth.token.admin) {
@@ -370,8 +375,7 @@ export const listPendingInvitations = functions.region("europe-west1")
       );
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Vous n'avez pas les droits pour effectuer cette action. " +
-        "Seuls les administrateurs peuvent lister les invitations."
+        "Droits insuffisants pour lister les invitations."
       );
     }
     functions.logger.info(
@@ -394,7 +398,8 @@ export const listPendingInvitations = functions.region("europe-west1")
         return {
           id: doc.id,
           email: docData.email,
-          requestedAt: docData.requestedAt.toDate().toISOString(),
+          requestedAt: docData.requestedAt?.toDate?.()?.toISOString() ||
+                       new Date(0).toISOString(),
           status: docData.status,
         };
       });
@@ -404,10 +409,79 @@ export const listPendingInvitations = functions.region("europe-west1")
       functions.logger.error("Erreur dans listPendingInvitations:", error);
       throw new functions.https.HttpsError(
         "internal",
-        "Une erreur est survenue lors de la récupération des invitations.",
-        error.message
+        "Erreur récupération des invitations.",
+        (error as Error).message
       );
     }
   });
 
-    
+// TODO: Cette fonction exemple doit être sécurisée/adaptée.
+const setAdminRoleSchema = z.object({
+  email: z.string().email({message: "Adresse e-mail invalide."}).optional(),
+  uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
+}).refine((inputData) => inputData.email || inputData.uid, {
+  message: "L'e-mail ou l'UID de l'utilisateur est requis.",
+  path: ["email"],
+});
+type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
+
+export const setAdminRole = functions.region("europe-west1")
+  .https.onCall(async (data: SetAdminRoleInput, context) => {
+    if (!context.auth || !context.auth.token.admin) {
+      functions.logger.error("Accès non autorisé à setAdminRole:", context.auth);
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Droits insuffisants pour attribuer des rôles admin."
+      );
+    }
+    const callingAdminUid = context.auth.uid;
+    functions.logger.info(
+      `Tentative d'attribution de rôle admin par: ${callingAdminUid}`,
+      "pour data:",
+      data
+    );
+
+    try {
+      const validationResult = setAdminRoleSchema.safeParse(data);
+      if (!validationResult.success) {
+        const errors = validationResult.error.flatten();
+        const errorMsg = "Données invalides: " +
+          errors.formErrors.join(", ") +
+          Object.values(errors.fieldErrors).join(", ");
+        functions.logger.error("Validation échouée setAdminRole:", errors);
+        throw new functions.https.HttpsError("invalid-argument", errorMsg);
+      }
+      const { email, uid: providedUid } = validationResult.data;
+      let targetUid = providedUid;
+
+      if (email && !targetUid) {
+        const userRecord = await admin.auth().getUserByEmail(email);
+        targetUid = userRecord.uid;
+      }
+
+      if (!targetUid) {
+        throw new functions.https.HttpsError(
+          "not-found",
+          "Utilisateur non trouvé avec les infos fournies."
+        );
+      }
+
+      await admin.auth().setCustomUserClaims(targetUid, { admin: true });
+      functions.logger.info(`Rôle admin attribué à: ${targetUid}`);
+      const targetIdentifier = email || targetUid;
+      return {
+        success: true,
+        message: `Rôle admin attribué à ${targetIdentifier}.`,
+      };
+    } catch (error: any) {
+      functions.logger.error("Erreur dans setAdminRole:", error);
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      throw new functions.https.HttpsError(
+        "internal",
+        "Erreur attribution du rôle admin.",
+        (error as Error).message
+      );
+    }
+  });
