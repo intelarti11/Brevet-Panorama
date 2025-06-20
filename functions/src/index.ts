@@ -97,7 +97,7 @@ export const requestInvitation = onCall(
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
       return {
         success: false,
-        message: "Erreur interne du serveur (Firestore indisponible).",
+        message: "Erreur serveur (DB indisponible).", // Message court
         receivedData: request.data,
       };
     }
@@ -126,10 +126,8 @@ export const requestInvitation = onCall(
       );
       return {
         success: true,
-        // Message utilisateur uniquement, sans détails techniques
-        message: `Votre demande d'invitation pour ${email} a bien été enregistrée. Vous serez contacté une fois votre demande examinée.`,
+        message: `Demande pour ${email} enregistrée. Vous serez contacté.`,
         receivedData: request.data,
-        // requestId: newRequestRef.id, // ID is not sent to client anymore
       };
     } catch (writeError: unknown) {
       let errorMsg = "Unknown Firestore write error.";
@@ -142,7 +140,7 @@ export const requestInvitation = onCall(
       );
       return {
         success: false,
-        message: `Échec de l'enregistrement de votre demande: ${errorMsg}`,
+        message: `Échec enregistrement: ${errorMsg}`, // Message court
         receivedData: request.data,
       };
     }
@@ -152,4 +150,3 @@ export const requestInvitation = onCall(
 logger.info(
   `${LOG_PREFIX_V11}: Script end. Admin SDK init attempt done.`
 );
-
