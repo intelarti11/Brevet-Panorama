@@ -26,11 +26,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/logo';
-import { User, LockKeyhole, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Mail, LockKeyhole, Loader2, Eye, EyeOff } from 'lucide-react';
+
+const emailRegex = /^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
 const formSchema = z.object({
-  email: z.string().min(1, { message: "L'identifiant est requis." }),
-  password: z.string().min(6, { message: "Le mot de passe doit contenir au moins 6 caractères." }),
+  email: z.string()
+    .min(1, { message: "L'adresse e-mail est requise." })
+    .regex(emailRegex, { message: "L'adresse e-mail doit être au format prénom.nom@ac-montpellier.fr" }),
+  password: z.string()
+    .min(8, { message: "Le mot de passe doit contenir au moins 8 caractères." })
+    .regex(passwordRegex, { message: "Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial (!@#$%^&*()_+-=[]{};':\"\\|,.<>/?)." }),
 });
 
 export default function LoginPage() {
@@ -49,20 +56,23 @@ export default function LoginPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // REMPLACEZ CECI PAR VOTRE LOGIQUE D'AUTHENTIFICATION BACKEND
+    // Cette logique est une maquette et n'est PAS sécurisée pour la production.
+    await new Promise(resolve => setTimeout(resolve, 1500)); 
     setIsLoading(false);
 
-    if (values.email === "Adminbrevet" && values.password === "SVeil2025") {
+    // Exemple de logique de connexion (à remplacer)
+    if (values.email.startsWith("admin.") && values.password === "SVeil2025!") { // Mot de passe d'exemple avec nouvelle politique
       toast({
         title: "Connexion réussie",
         description: "Bienvenue !",
       });
-      router.push('/dashboard/panorama'); // Updated redirect
+      router.push('/dashboard/panorama');
     } else {
       toast({
         variant: "destructive",
         title: "Échec de la connexion",
-        description: "Identifiant ou mot de passe incorrect. Veuillez réessayer.",
+        description: "Adresse e-mail ou mot de passe incorrect. Veuillez réessayer.",
       });
     }
   }
@@ -73,7 +83,7 @@ export default function LoginPage() {
         <CardHeader className="items-center text-center">
           <Logo className="mb-4" />
           <CardTitle className="font-headline text-2xl">Connectez-vous à Brevet Panorama</CardTitle>
-          <CardDescription>Entrez vos identifiants pour accéder à votre compte.</CardDescription>
+          <CardDescription>Entrez votre adresse e-mail et mot de passe.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -83,11 +93,11 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Identifiant</FormLabel>
+                    <FormLabel>Adresse e-mail</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="text" placeholder="Entrez votre identifiant" {...field} className="pl-10" />
+                        <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                        <Input type="email" placeholder="prénom.nom@ac-montpellier.fr" {...field} className="pl-10" />
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -131,6 +141,18 @@ export default function LoginPage() {
               </Button>
             </form>
           </Form>
+          <div className="mt-6 space-y-2 text-center text-sm">
+            <p>
+              <Link href="/request-invitation" className="font-medium text-primary hover:underline">
+                Demander une invitation
+              </Link>
+            </p>
+            <p>
+              <Link href="/forgot-password" className="font-medium text-primary hover:underline">
+                Mot de passe oublié ?
+              </Link>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
