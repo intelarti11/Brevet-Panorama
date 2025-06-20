@@ -128,7 +128,7 @@ export default function AdminInvitationsPage() {
                   : `Liste des demandes d'invitation avec le statut "en attente".`}
               </CardDescription>
             </div>
-            <Button onClick={fetchPendingInvitations} variant="outline" size="sm" disabled={isLoading /*|| Object.values(actionLoading).some(loading => loading)*/>}>
+            <Button onClick={fetchPendingInvitations} variant="outline" size="sm" disabled={isLoading}>
                 <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Actualiser
             </Button>
