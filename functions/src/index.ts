@@ -75,7 +75,6 @@ export const ultraMinimalFunction = onCall(
   }
 );
 
-// RequestInvitation - Maintenant avec écriture Firestore
 const requestInvitationOptions: HttpsOptions = {
   region: "europe-west1",
   invoker: "public",
@@ -83,7 +82,7 @@ const requestInvitationOptions: HttpsOptions = {
 
 export const requestInvitation = onCall(
   requestInvitationOptions,
-  async (request) => { // Note: 'async' est ajouté ici
+  async (request) => {
     const logMarker = "INVITE_WRITE_V11_LOG";
     logger.info(
       `${logMarker}: Called. Data:`,
@@ -97,7 +96,7 @@ export const requestInvitation = onCall(
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
       return {
         success: false,
-        message: "Erreur serveur (DB indisponible).", // Message court
+        message: "Erreur serveur (DB indisponible).",
         receivedData: request.data,
       };
     }
@@ -127,7 +126,8 @@ export const requestInvitation = onCall(
       return {
         success: true,
         message: `Demande pour ${email} enregistrée. Vous serez contacté.`,
-        receivedData: request.data,
+        // No longer sending ID to client here
+        receivedData: request.data, // Keep for logging if needed
       };
     } catch (writeError: unknown) {
       let errorMsg = "Unknown Firestore write error.";
@@ -140,12 +140,85 @@ export const requestInvitation = onCall(
       );
       return {
         success: false,
-        message: `Échec enregistrement: ${errorMsg}`, // Message court
+        message: `Échec enregistrement: ${errorMsg}`,
         receivedData: request.data,
       };
     }
   }
 );
+
+// Function to list pending invitation requests
+const listPendingInvitationsOptions: HttpsOptions = {
+  region: "europe-west1",
+  invoker: "public", // For now, make it public for easier testing
+};
+
+export const listPendingInvitations = onCall(
+  listPendingInvitationsOptions,
+  async () => {
+    const logMarker = "LIST_INVITES_V1_LOG";
+    logger.info(`${logMarker}: Called.`);
+
+    if (!db) {
+      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
+      return {
+        success: false,
+        message: "Erreur serveur: DB indisponible pour lister.",
+        invitations: [],
+      };
+    }
+
+    try {
+      const snapshot = await db.collection("invitationRequests")
+        .where("status", "==", "pending")
+        .orderBy("requestedAt", "asc")
+        .get();
+
+      if (snapshot.empty) {
+        logger.info(`${logMarker}: No pending invitations found.`);
+        return {
+          success: true,
+          message: "Aucune demande d'invitation en attente.",
+          invitations: [],
+        };
+      }
+
+      const invitations = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        const requestedAtTimestamp = data.requestedAt as admin.firestore.Timestamp;
+        return {
+          id: doc.id,
+          email: data.email,
+          // Convert Firestore Timestamp to ISO string for the client
+          requestedAt: requestedAtTimestamp ? requestedAtTimestamp.toDate().toISOString() : new Date().toISOString(),
+          status: data.status,
+        };
+      });
+
+      logger.info(`${logMarker}: Found ${invitations.length} invitations.`);
+      return {
+        success: true,
+        message: "Invitations en attente récupérées.",
+        invitations: invitations,
+      };
+    } catch (error: unknown) {
+      let errorMsg = "Unknown error while listing invitations.";
+      if (error instanceof Error) {
+        errorMsg = error.message;
+      }
+      logger.error(
+        `${logMarker}: Failed to list invitations.`,
+        {error: errorMsg, originalError: String(error)}
+      );
+      return {
+        success: false,
+        message: `Erreur serveur: ${errorMsg}`,
+        invitations: [],
+      };
+    }
+  }
+);
+
 
 logger.info(
   `${LOG_PREFIX_V11}: Script end. Admin SDK init attempt done.`
