@@ -35,6 +35,7 @@ try {
     }
   );
   db = null; // Ensure db is null if init fails
+  adminApp = null;
   // We don't throw here to allow other minimal functions to potentially work
   // and to ensure these logs are sent.
 }
@@ -74,15 +75,25 @@ export const requestInvitation = onCall(
       {data: request.data}
     );
 
+    if (!adminApp) {
+        logger.error(`${LOG_PREFIX_V10} - requestInvitation: Firebase Admin App (adminApp) is not initialized at call time!`);
+        return { success: false, message: "Internal Server Error: Admin App not ready." };
+    }
     if (!db) {
       logger.error(
-        `${LOG_PREFIX_V10} - requestInvitation: Firestore (db) is not initialized. Cannot process request.`
+        `${LOG_PREFIX_V10} - requestInvitation: Firestore (db) is not initialized at call time. Cannot process request.`
       );
       return {
         success: false,
-        message: "Error: Firestore is not available. Request not processed.",
+        message: "Internal Server Error: Firestore not ready.",
       };
     }
+     if (typeof admin.firestore.FieldValue.serverTimestamp !== 'function') {
+        logger.error(`${LOG_PREFIX_V10} - requestInvitation: admin.firestore.FieldValue.serverTimestamp is NOT a function at call time!`);
+        return { success: false, message: "Internal Server Error: Timestamp issue." };
+    }
+    logger.info(`${LOG_PREFIX_V10} - requestInvitation: Pre-flight checks passed (adminApp, db, serverTimestamp).`);
+
 
     const email = request.data.email;
     if (typeof email !== "string" || !email.includes("@")) {
@@ -109,19 +120,23 @@ export const requestInvitation = onCall(
       );
       return {
         success: true,
-        message: "Debug V10: Invitation request recorded (simulated).",
+        message: "Debug V10: Invitation request recorded.",
       };
     } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(
-        `${LOG_PREFIX_V10} - requestInvitation: Firestore write FAILED for email: ${email}`,
+        `${LOG_PREFIX_V10} - requestInvitation: Firestore write FAILED for email: ${email}. Error Type: ${error?.constructor?.name}`,
         {
-          errorMessage: error.message,
+          errorMessage: errorMessage,
+          errorCode: error.code, // For Firebase errors
           errorStack: error.stack,
+          errorDetails: error.details, // For Firebase errors
+          errorObjectString: JSON.stringify(error)
         }
       );
       return {
         success: false,
-        message: "Error: Could not write to Firestore.",
+        message: `Firestore operation failed: ${errorMessage}. See server logs.`,
       };
     }
   }
