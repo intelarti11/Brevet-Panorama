@@ -2,6 +2,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {z} from "zod";
+import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
 
 // Initialiser Firebase Admin SDK
 try {
@@ -12,46 +13,54 @@ try {
 
 const db = admin.firestore();
 
-// Schéma de validation pour les demandes d'invitation
-const invitationRequestSchema = z.object({
+// --- Schémas Zod pour la validation des données d'entrée ---
+
+const invitationRequestDataSchema = z.object({
   email: z.string().email({message: "E-mail invalide."})
     .regex(
       /^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/,
       {message: "E-mail prenom.nom@ac-montpellier.fr requis."}
     ),
 });
+type InvitationRequestData = z.infer<typeof invitationRequestDataSchema>;
 
-// Schéma pour l'approbation ou le rejet
-const manageInvitationSchema = z.object({
+const manageInvitationDataSchema = z.object({
   email: z.string().email({message: "E-mail invalide."}),
 });
+type ManageInvitationData = z.infer<typeof manageInvitationDataSchema>;
 
-const rejectInvitationSchema = manageInvitationSchema.extend({
+const rejectInvitationDataSchema = manageInvitationDataSchema.extend({
   reason: z.string().optional().describe("Raison optionnelle."),
 });
+type RejectInvitationData = z.infer<typeof rejectInvitationDataSchema>;
+
+const setAdminRoleDataSchema = z.object({
+  email: z.string().email("E-mail invalide.").optional(),
+  uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
+}).refine((data) => data.email || data.uid, {
+  message: "E-mail ou UID requis.",
+  path: ["email"],
+});
+type SetAdminRoleData = z.infer<typeof setAdminRoleDataSchema>;
+
 
 /**
  * Enregistre une nouvelle demande d'invitation.
+ * App Check est appliqué.
  */
-export const requestInvitation = functions.region("europe-west1")
-  .https.onCall(async (data, context) => {
-    functions.logger.info("Nouv. demande invit:", data);
-
-    if (context.app === undefined) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Appel via app vérif. requis."
-      );
-    }
+export const requestInvitation = onCall(
+  { region: "europe-west1", enforceAppCheck: true },
+  async (request: CallableRequest<InvitationRequestData>) => {
+    functions.logger.info("Nouv. demande invit:", request.data);
 
     try {
-      const validationResult = invitationRequestSchema.safeParse(data);
+      const validationResult = invitationRequestDataSchema.safeParse(request.data);
       if (!validationResult.success) {
         const flatErrors = validationResult.error.flatten();
         const errorMsg = "Data invalides: " +
           flatErrors.formErrors.join(", ");
         functions.logger.error("Valid. échouée (req):", flatErrors);
-        throw new functions.https.HttpsError("invalid-argument", errorMsg);
+        throw new HttpsError("invalid-argument", errorMsg.slice(0, 70));
       }
 
       const {email} = validationResult.data;
@@ -65,18 +74,11 @@ export const requestInvitation = functions.region("europe-west1")
       if (!existReqQuery.empty) {
         const existingRequest = existReqQuery.docs[0].data();
         if (existingRequest.status === "approved") {
-          throw new functions.https.HttpsError(
-            "already-exists",
-            "Compte existant."
-          );
+          throw new HttpsError("already-exists", "Compte existant.");
         }
         if (existingRequest.status === "pending") {
-          throw new functions.https.HttpsError(
-            "already-exists",
-            "Demande en cours."
-          );
+          throw new HttpsError("already-exists", "Demande en cours.");
         }
-        // Réutilise une demande rejetée
         await db.collection("invitationRequests")
           .doc(existReqQuery.docs[0].id).set({
             email: lowerEmail,
@@ -91,16 +93,10 @@ export const requestInvitation = functions.region("europe-west1")
             authUid: null,
           }, {merge: true});
 
-        functions.logger.info(
-          `Demande MAJ attente: ${lowerEmail}`
-        );
-        return {
-          success: true,
-          message: "Votre demande a été soumise.",
-        };
+        functions.logger.info(`Demande MAJ attente: ${lowerEmail}`);
+        return { success: true, message: "Votre demande a été soumise." };
       }
 
-      // Nouvelle demande
       await db.collection("invitationRequests").add({
         email: lowerEmail,
         status: "pending",
@@ -109,49 +105,40 @@ export const requestInvitation = functions.region("europe-west1")
       });
 
       functions.logger.info(`Demande enregistrée: ${lowerEmail}`);
-      return {
-        success: true,
-        message: "Demande d'invitation soumise.",
-      };
+      return { success: true, message: "Demande d'invitation soumise." };
     } catch (error: unknown) {
-      functions.logger.error("Err requestInvitation:", error);
-      if (error instanceof functions.https.HttpsError) {
+      functions.logger.error("Err requestInv:", error);
+      if (error instanceof HttpsError) {
         throw error;
       }
       let errMsg = "Echec demande.";
-      if (error instanceof Error) {
-        errMsg = error.message.slice(0, 20);
-      }
-      throw new functions.https.HttpsError("internal", errMsg);
+      if (error instanceof Error) errMsg = error.message.slice(0, 20);
+      throw new HttpsError("internal", errMsg);
     }
-  });
+  }
+);
 
 /**
  * Approuve une demande et crée un user Firebase Auth. Admin requis.
  */
-export const approveInvitation = functions.region("europe-west1")
-  .https.onCall(async (data, context) => {
-    functions.logger.info("Approbation invit:", data);
+export const approveInvitation = onCall(
+  { region: "europe-west1" },
+  async (request: CallableRequest<ManageInvitationData>) => {
+    functions.logger.info("Approbation invit:", request.data);
 
-    if (!context.auth || !context.auth.token || !context.auth.token.admin) {
+    if (!request.auth || !request.auth.token.admin) {
       functions.logger.error("Accès non-autorisé (approve).");
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "Droits admin requis."
-      );
+      throw new HttpsError("permission-denied", "Droits admin requis.");
     }
-    const adminUid = context.auth.uid;
+    const adminUid = request.auth.uid;
     functions.logger.info(`Approve: admin OK. UID: ${adminUid}`);
 
     try {
-      const validationResult = manageInvitationSchema.safeParse(data);
+      const validationResult = manageInvitationDataSchema.safeParse(request.data);
       if (!validationResult.success) {
         const flatErrors = validationResult.error.flatten();
         functions.logger.error("Valid. échouée (approve):", flatErrors);
-        throw new functions.https.HttpsError(
-          "invalid-argument",
-          "Données invalides."
-        );
+        throw new HttpsError("invalid-argument", "Données invalides.");
       }
 
       const {email} = validationResult.data;
@@ -164,30 +151,24 @@ export const approveInvitation = functions.region("europe-west1")
         .get();
 
       if (requestQuery.empty) {
-        throw new functions.https.HttpsError(
-          "not-found",
-          `Aucune demande: ${lowerEmail}.`
-        );
+        const msg = `Aucune demande: ${lowerEmail}.`;
+        throw new HttpsError("not-found", msg.slice(0, 70));
       }
 
       const invitationDoc = requestQuery.docs[0];
       let userRecord;
 
-      // Création de l'utilisateur dans Firebase Authentication
       try {
         userRecord = await admin.auth().createUser({
           email: lowerEmail,
           emailVerified: false,
           disabled: false,
         });
-        functions.logger.info(
-          `User créé: ${userRecord.uid}, pour: ${lowerEmail}`
-        );
+        functions.logger.info(`User créé: ${userRecord.uid}, ${lowerEmail}`);
       } catch (authError: unknown) {
         let code = "unknown";
         if (
-          typeof authError === "object" &&
-          authError !== null &&
+          typeof authError === "object" && authError !== null &&
           "code" in authError &&
           typeof (authError as {code: string}).code === "string"
         ) {
@@ -203,7 +184,7 @@ export const approveInvitation = functions.region("europe-west1")
             let msg = "Err vérif user.";
             if (getUserError instanceof Error) msg = getUserError.message;
             functions.logger.error("Err getUser:", getUserError);
-            throw new functions.https.HttpsError("internal", msg.slice(0, 15));
+            throw new HttpsError("internal", msg.slice(0, 15));
           }
 
           await db.collection("invitationRequests")
@@ -219,15 +200,13 @@ export const approveInvitation = functions.region("europe-west1")
             message: `User ${lowerEmail} existe. Demande ok.`,
           };
         }
-        // Autre erreur Auth
-        functions.logger.error("Auth create fail:", authError);
+        functions.logger.error("Auth create e:", authError); // msg court
         let errMsg = "Err creat user";
         if (authError instanceof Error) errMsg = authError.message;
-        const finalErrMsg = errMsg.slice(0, 15); // Shortened
-        throw new functions.https.HttpsError("internal", finalErrMsg);
+        const finalErrMsg = errMsg.slice(0, 15);
+        throw new HttpsError("internal", finalErrMsg);
       }
 
-      // Mise à jour statut Firestore
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -236,50 +215,44 @@ export const approveInvitation = functions.region("europe-west1")
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(
-        `Invit. approuvée, user créé: ${lowerEmail}`
-      );
+      functions.logger.info(`Invit. ok, user créé: ${lowerEmail}`);
       return {
         success: true,
         message: `Invit. ${lowerEmail} ok. MDP via 'Oublié?'.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Err approveInv:", error);
-      if (error instanceof functions.https.HttpsError) {
+      functions.logger.error("Err approveInv:", error); // msg court
+      if (error instanceof HttpsError) {
         throw error;
       }
-      let errMsg = "Echec approbation.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 15); // Short
-      throw new functions.https.HttpsError("internal", errMsg);
+      let errMsg = "Echec approb."; // msg court
+      if (error instanceof Error) errMsg = error.message.slice(0, 15);
+      throw new HttpsError("internal", errMsg);
     }
-  });
+  }
+);
 
 /**
  * Rejette une demande d'invitation. Admin requis.
  */
-export const rejectInvitation = functions.region("europe-west1")
-  .https.onCall(async (data, context) => {
-    functions.logger.info("Rejet invit:", data);
+export const rejectInvitation = onCall(
+  { region: "europe-west1" },
+  async (request: CallableRequest<RejectInvitationData>) => {
+    functions.logger.info("Rejet invit:", request.data);
 
-    if (!context.auth || !context.auth.token || !context.auth.token.admin) {
+    if (!request.auth || !request.auth.token.admin) {
       functions.logger.error("Accès non-autorisé (reject).");
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "Droits admin requis."
-      );
+      throw new HttpsError("permission-denied", "Droits admin requis.");
     }
-    const adminUid = context.auth.uid;
+    const adminUid = request.auth.uid;
     functions.logger.info(`Reject: admin OK. UID: ${adminUid}`);
 
     try {
-      const validationResult = rejectInvitationSchema.safeParse(data);
+      const validationResult = rejectInvitationDataSchema.safeParse(request.data);
       if (!validationResult.success) {
         const flatErrors = validationResult.error.flatten();
         functions.logger.error("Valid. échouée (reject):", flatErrors);
-        throw new functions.https.HttpsError(
-          "invalid-argument",
-          "Données invalides."
-        );
+        throw new HttpsError("invalid-argument", "Données invalides.");
       }
 
       const {email, reason} = validationResult.data;
@@ -292,10 +265,8 @@ export const rejectInvitation = functions.region("europe-west1")
         .get();
 
       if (requestQuery.empty) {
-        throw new functions.https.HttpsError(
-          "not-found",
-          `Aucune demande: ${lowerEmail}.`
-        );
+        const msg = `Aucune demande: ${lowerEmail}.`;
+        throw new HttpsError("not-found", msg.slice(0, 70));
       }
 
       const invitationDoc = requestQuery.docs[0];
@@ -314,33 +285,32 @@ export const rejectInvitation = functions.region("europe-west1")
         message: `Invitation pour ${lowerEmail} rejetée.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Err rejectInvitation:", error);
-      if (error instanceof functions.https.HttpsError) {
+      functions.logger.error("Err rejectInv:", error);
+      if (error instanceof HttpsError) {
         throw error;
       }
       let errMsg = "Echec rejet.";
       if (error instanceof Error) errMsg = error.message.slice(0, 20);
-      throw new functions.https.HttpsError("internal", errMsg);
+      throw new HttpsError("internal", errMsg);
     }
-  });
+  }
+);
 
 /**
  * Liste invitations en attente. Admin requis.
  */
-export const listPendingInvitations = functions.region("europe-west1")
-  .https.onCall(async (_data, context) => {
+export const listPendingInvitations = onCall(
+  { region: "europe-west1" },
+  async (request: CallableRequest<void>) => { // _data est void car non utilisé
     functions.logger.info("Listage invitations en attente.");
 
-    if (!context.auth || !context.auth.token || !context.auth.token.admin) {
+    if (!request.auth || !request.auth.token.admin) {
       functions.logger.error("Accès non-autorisé (listPending).");
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "Droits admin requis."
-      );
+      throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     functions.logger.info("ListPending: admin OK.");
-    if (context.auth?.uid) {
-      functions.logger.info("Admin UID:", context.auth.uid);
+    if (request.auth?.uid) {
+      functions.logger.info("Admin UID:", request.auth.uid);
     }
 
     try {
@@ -371,46 +341,33 @@ export const listPendingInvitations = functions.region("europe-west1")
       functions.logger.error("Err listPending:", error);
       let errMsg = "Echec liste invit.";
       if (error instanceof Error) errMsg = error.message.slice(0, 20);
-      throw new functions.https.HttpsError("internal", errMsg);
+      throw new HttpsError("internal", errMsg);
     }
-  });
+  }
+);
 
-// Schéma de validation pour setAdminRole
-const setAdminRoleSchema = z.object({
-  email: z.string().email("E-mail invalide.").optional(),
-  uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
-}).refine((inputData) => inputData.email || inputData.uid, {
-  message: "E-mail ou UID requis.",
-  path: ["email"],
-});
-type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
 
 /**
  * Attribue le rôle d'admin. Nécessite que l'appelant soit admin.
  */
-export const setAdminRole = functions.region("europe-west1")
-  .https.onCall(async (data: SetAdminRoleInput, context) => {
-    if (!context.auth || !context.auth.token || !context.auth.token.admin) {
+export const setAdminRole = onCall(
+  { region: "europe-west1" },
+  async (request: CallableRequest<SetAdminRoleData>) => {
+    if (!request.auth || !request.auth.token.admin) {
       functions.logger.error("Accès non-autorisé (setAdminRole).");
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "Droits admin requis."
-      );
+      throw new HttpsError("permission-denied", "Droits admin requis.");
     }
-    const callingAdminUid = context.auth.uid;
+    const callingAdminUid = request.auth.uid;
     functions.logger.info(
-      `SetAdmin par: ${callingAdminUid}`, {data}
+      `SetAdmin par: ${callingAdminUid}`, {data: request.data}
     );
 
     try {
-      const validationResult = setAdminRoleSchema.safeParse(data);
+      const validationResult = setAdminRoleDataSchema.safeParse(request.data);
       if (!validationResult.success) {
         const flatErrors = validationResult.error.flatten();
         functions.logger.error("Err setAdmin valid:", flatErrors);
-        throw new functions.https.HttpsError(
-          "invalid-argument",
-          "Err. données." // Très court message
-        );
+        throw new HttpsError("invalid-argument", "Err. données.");
       }
       const {email, uid: providedUid} = validationResult.data;
       let targetUid = providedUid;
@@ -423,12 +380,12 @@ export const setAdminRole = functions.region("europe-west1")
           let msg = "Err récup user.";
           if (e instanceof Error) msg = e.message.slice(0, 15);
           functions.logger.error(`Err getUserByEmail ${email}:`, e);
-          throw new functions.https.HttpsError("not-found", msg);
+          throw new HttpsError("not-found", msg);
         }
       }
 
       if (!targetUid) {
-        throw new functions.https.HttpsError("not-found", "User non trouvé.");
+        throw new HttpsError("not-found", "User non trouvé.");
       }
 
       await admin.auth().setCustomUserClaims(targetUid, {admin: true});
@@ -440,12 +397,12 @@ export const setAdminRole = functions.region("europe-west1")
       };
     } catch (error: unknown) {
       functions.logger.error("Err setAdminRole:", error);
-      if (error instanceof functions.https.HttpsError) {
+      if (error instanceof HttpsError) {
         throw error;
       }
       let errMsg = "Echec rôle admin.";
       if (error instanceof Error) errMsg = error.message.slice(0, 20);
-      throw new functions.https.HttpsError("internal", errMsg);
+      throw new HttpsError("internal", errMsg);
     }
-  });
-
+  }
+);
