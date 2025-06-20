@@ -17,7 +17,7 @@ const invitationRequestSchema = z.object({
   email: z.string().email({message: "E-mail invalide."})
     .regex(
       /^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/,
-      {message: "L'e-mail doit être prenom.nom@ac-montpellier.fr"}
+      {message: "E-mail doit être prenom.nom@ac-montpellier.fr"}
     ),
 });
 
@@ -204,7 +204,7 @@ export const approveInvitation = functions.region("europe-west1")
 
         if (code === "auth/email-already-exists") {
           // L'utilisateur existe déjà dans Auth, on approuve juste la demande
-          functions.logger.warn("Approbation e-mail existant:", lowerEmail);
+          functions.logger.warn("Approb. e-mail existant:", lowerEmail);
           let existingUser;
           try {
             existingUser = await admin.auth().getUserByEmail(lowerEmail);
@@ -232,9 +232,9 @@ export const approveInvitation = functions.region("europe-west1")
           };
         }
         // Autre erreur lors de la création Auth
-        functions.logger.error("Auth create err:", authError); // Ligne 215 cible
-        let errMsg = "Err creat. user";                       // Ligne 216 cible
-        if (authError instanceof Error) {                     // Ligne 217 cible
+        functions.logger.error("Auth create err:", authError);
+        let errMsg = "Err creat. user";
+        if (authError instanceof Error) {
           errMsg = authError.message;
         }
         const finalErrMsg = errMsg.length > 50 ?
@@ -259,7 +259,7 @@ export const approveInvitation = functions.region("europe-west1")
         message: `Invit. ${lowerEmail} ok. MDP via 'Oublié?'.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Err approveInv:", error); // Ligne 241 cible
+      functions.logger.error("Err approveInv:", error);
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
@@ -422,7 +422,7 @@ const setAdminRoleSchema = z.object({
   email: z.string().email({message: "E-mail invalide."}).optional(),
   uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
 }).refine((inputData) => inputData.email || inputData.uid, {
-  message: "E-mail ou UID requis.", // Message court
+  message: "E-mail ou UID requis.",
   path: ["email"],
 });
 type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
@@ -503,3 +503,4 @@ export const setAdminRole = functions.region("europe-west1")
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
+
