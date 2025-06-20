@@ -28,16 +28,13 @@ import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/logo';
 import { Mail, LockKeyhole, Loader2, Eye, EyeOff } from 'lucide-react';
 
-const emailRegex = /^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/;
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
-
+// Règles de validation assouplies pour le développement
 const formSchema = z.object({
   email: z.string()
     .min(1, { message: "L'adresse e-mail est requise." })
-    .regex(emailRegex, { message: "L'adresse e-mail doit être au format prénom.nom@ac-montpellier.fr" }),
+    .email({ message: "Veuillez entrer une adresse e-mail valide." }), // Format e-mail générique
   password: z.string()
-    .min(8, { message: "Le mot de passe doit contenir au moins 8 caractères." })
-    .regex(passwordRegex, { message: "Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial (!@#$%^&*()_+-=[]{};':\"\\|,.<>/?)." }),
+    .min(1, { message: "Le mot de passe est requis." }), // Mot de passe non vide, sans contrainte de complexité ici
 });
 
 export default function LoginPage() {
@@ -62,7 +59,9 @@ export default function LoginPage() {
     setIsLoading(false);
 
     // Exemple de logique de connexion (à remplacer)
-    if (values.email.startsWith("admin.") && values.password === "SVeil2025!") { // Mot de passe d'exemple avec nouvelle politique
+    // IMPORTANT: Pour se connecter en admin, l'email doit commencer par "admin." 
+    // et le mot de passe doit être "SVeil2025!"
+    if (values.email.startsWith("admin.") && values.password === "SVeil2025!") {
       toast({
         title: "Connexion réussie",
         description: "Bienvenue !",
@@ -97,7 +96,7 @@ export default function LoginPage() {
                     <FormControl>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="email" placeholder="prénom.nom@ac-montpellier.fr" {...field} className="pl-10" />
+                        <Input type="email" placeholder="Entrez votre e-mail" {...field} className="pl-10" />
                       </div>
                     </FormControl>
                     <FormMessage />
