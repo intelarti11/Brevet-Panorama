@@ -6,7 +6,7 @@ import {z} from "zod";
 // Initialiser Firebase Admin SDK
 try {
   admin.initializeApp();
-} catch (e) {
+} catch (e: unknown) {
   functions.logger.error("Firebase admin initialization error", e);
 }
 
@@ -17,7 +17,6 @@ const invitationRequestSchema = z.object({
   email: z.string().email({message: "Adresse e-mail invalide."})
     .regex(
       /^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/,
-      // E-mail: prénom.nom@ac-montpellier.fr (Académie Montpellier)
       {message: "L'e-mail doit être au format prénom.nom@ac-montpellier.fr"}
     ),
 });
@@ -33,16 +32,17 @@ const rejectInvitationSchema = manageInvitationSchema.extend({
 
 /**
  * Enregistre une nouvelle demande d'invitation.
- * Appelée par frontend lors de la soumission du formulaire.
+ * Appelée par le frontend lors de la soumission du formulaire.
  */
 export const requestInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
     functions.logger.info("Nouvelle demande d'invitation reçue:", data);
+
     // Vérification App Check (si activé et requis)
     if (context.app === undefined) {
       throw new functions.https.HttpsError(
         "failed-precondition",
-        "The function must be called from an App Check verified app."
+        "La fonction doit être appelée depuis une app vérifiée par App Check."
       );
     }
 
@@ -104,7 +104,7 @@ export const requestInvitation = functions.region("europe-west1")
         );
         return {
           success: true,
-          message: "Votre demande d'invitation a été soumise avec succès.",
+          message: "Votre demande a été soumise avec succès.",
         };
       }
 
@@ -128,15 +128,11 @@ export const requestInvitation = functions.region("europe-west1")
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
-      let errorMessage = "Erreur lors du traitement de votre demande.";
+      let errorMessage = "Erreur traitement de votre demande.";
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      throw new functions.https.HttpsError(
-        "internal",
-        errorMessage,
-        error
-      );
+      throw new functions.https.HttpsError("internal", errorMessage, error);
     }
   });
 
@@ -148,14 +144,15 @@ export const approveInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
     functions.logger.info("Approbation d'invitation reçue:", data);
 
-    if (!context.auth || !context.auth.token.admin) {
+    // Vérification des droits d'administrateur - ESSENTIEL POUR LA SÉCURITÉ
+    if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non autorisé à approveInvitation:",
         context.auth
       );
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Droits insuffisants pour approuver les invitations."
+        "Droits admin insuffisants."
       );
     }
     functions.logger.info(
@@ -258,11 +255,7 @@ export const approveInvitation = functions.region("europe-west1")
         if (authError instanceof Error) {
           errorMessage = authError.message;
         }
-        throw new functions.https.HttpsError(
-          "internal",
-          errorMessage,
-          authError
-        );
+        throw new functions.https.HttpsError("internal", errorMessage, authError);
       }
 
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
@@ -290,11 +283,7 @@ export const approveInvitation = functions.region("europe-west1")
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      throw new functions.https.HttpsError(
-        "internal",
-        errorMessage,
-        error
-      );
+      throw new functions.https.HttpsError("internal", errorMessage, error);
     }
   });
 
@@ -306,14 +295,15 @@ export const rejectInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
     functions.logger.info("Rejet d'invitation reçu:", data);
 
-    if (!context.auth || !context.auth.token.admin) {
+    // Vérification des droits d'administrateur - ESSENTIEL POUR LA SÉCURITÉ
+    if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non autorisé à rejectInvitation:",
         context.auth
       );
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Droits insuffisants pour rejeter les invitations."
+        "Droits admin insuffisants."
       );
     }
     functions.logger.info(
@@ -374,11 +364,7 @@ export const rejectInvitation = functions.region("europe-west1")
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      throw new functions.https.HttpsError(
-        "internal",
-        errorMessage,
-        error
-      );
+      throw new functions.https.HttpsError("internal", errorMessage, error);
     }
   });
 
@@ -390,14 +376,15 @@ export const listPendingInvitations = functions.region("europe-west1")
   .https.onCall(async (_data, context) => {
     functions.logger.info("Demande de listage des invitations en attente.");
 
-    if (!context.auth || !context.auth.token.admin) {
+    // Vérification des droits d'administrateur - ESSENTIEL POUR LA SÉCURITÉ
+    if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non autorisé à listPendingInvitations:",
         context.auth
       );
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Droits insuffisants pour lister les invitations."
+        "Droits admin insuffisants."
       );
     }
     functions.logger.info(
@@ -433,11 +420,7 @@ export const listPendingInvitations = functions.region("europe-west1")
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      throw new functions.https.HttpsError(
-        "internal",
-        errorMessage,
-        error
-      );
+      throw new functions.https.HttpsError("internal", errorMessage, error);
     }
   });
 
@@ -445,24 +428,29 @@ const setAdminRoleSchema = z.object({
   email: z.string().email({message: "Adresse e-mail invalide."}).optional(),
   uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
 }).refine((inputData) => inputData.email || inputData.uid, {
-  message: "L'e-mail ou l'UID de l'utilisateur est requis.",
+  // Raccourcissement du message pour respecter max-len
+  message: "E-mail ou UID utilisateur requis.",
   path: ["email"],
 });
 type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
 
 export const setAdminRole = functions.region("europe-west1")
   .https.onCall(async (data: SetAdminRoleInput, context) => {
+    // Verify admin privileges of the caller
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
-      functions.logger.error("Accès non autorisé à setAdminRole:", context.auth);
+      functions.logger.error(
+        "Accès non autorisé à setAdminRole:",
+        context.auth
+      );
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Droits insuffisants pour attribuer des rôles admin."
+        "Droits admin insuffisants."
       );
     }
     const callingAdminUid = context.auth.uid;
     functions.logger.info(
-      `Tentative d'attribution de rôle admin par: ${callingAdminUid}`,
-      "pour data:",
+      `Attribution rôle admin par: ${callingAdminUid}`,
+      "data:",
       data
     );
 
@@ -471,8 +459,7 @@ export const setAdminRole = functions.region("europe-west1")
       if (!validationResult.success) {
         const errors = validationResult.error.flatten();
         const errorMsg = "Données invalides: " +
-          errors.formErrors.join(", ") +
-          Object.values(errors.fieldErrors).join(", ");
+          errors.formErrors.join(", ");
         functions.logger.error("Validation échouée setAdminRole:", errors);
         throw new functions.https.HttpsError("invalid-argument", errorMsg);
       }
@@ -480,8 +467,19 @@ export const setAdminRole = functions.region("europe-west1")
       let targetUid = providedUid;
 
       if (email && !targetUid) {
-        const userRecord = await admin.auth().getUserByEmail(email);
-        targetUid = userRecord.uid;
+        try {
+          const userRecord = await admin.auth().getUserByEmail(email);
+          targetUid = userRecord.uid;
+        } catch (e: unknown) {
+          let msg = "Erreur récupération utilisateur par e-mail.";
+          if (e instanceof Error) {
+            msg = e.message;
+          }
+          functions.logger.error(
+            `Erreur getUserByEmail pour ${email}:`, e
+          );
+          throw new functions.https.HttpsError("internal", msg, e);
+        }
       }
 
       if (!targetUid) {
@@ -503,7 +501,7 @@ export const setAdminRole = functions.region("europe-west1")
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
-      let errorMessage = "Erreur attribution du rôle admin.";
+      let errorMessage = "Erreur assignation rôle admin.";
       if (error instanceof Error) {
         errorMessage = error.message;
       }
