@@ -21,8 +21,6 @@ const invitationRequestSchema = z.object({
 // Schéma de validation pour l'approbation ou le rejet
 const manageInvitationSchema = z.object({
   email: z.string().email({ message: "Adresse e-mail invalide." }),
-  // Alternativement, vous pourriez utiliser un ID de document si vous préférez
-  // invitationId: z.string().min(1, { message: "L'ID de la demande est requis."}),
 });
 
 const rejectInvitationSchema = manageInvitationSchema.extend({
@@ -60,11 +58,16 @@ export const requestInvitation = functions.region("europe-west1").https.onCall(a
       if (existingRequest.status === "pending") {
          throw new functions.https.HttpsError("already-exists", "Une demande d'invitation est déjà en cours pour cet e-mail.");
       }
+      // If rejected, allow re-request by updating existing one to pending
       await db.collection("invitationRequests").doc(existingRequestQuery.docs[0].id).set({
         email: lowerEmail,
         status: "pending",
         requestedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        // Clear previous rejection fields if any
+        rejectedAt: null,
+        rejectedBy: null,
+        rejectionReason: null,
       }, { merge: true });
 
       functions.logger.info(`Demande d'invitation mise à jour pour ${lowerEmail}`);
@@ -93,21 +96,18 @@ export const requestInvitation = functions.region("europe-west1").https.onCall(a
 
 /**
  * Approuve une demande d'invitation et crée un utilisateur dans Firebase Auth.
- * DEVRAIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
+ * DOIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
  */
 export const approveInvitation = functions.region("europe-west1").https.onCall(async (data, context) => {
   functions.logger.info("Approbation d'invitation reçue:", data);
 
   // !!! IMPORTANT SÉCURITÉ !!!
-  // Décommentez et implémentez une vérification robuste des droits d'administrateur ici.
-  // Par exemple, en vérifiant un custom claim:
-  // if (!context.auth || !context.auth.token.admin) {
-  //   functions.logger.error("Accès non autorisé à approveInvitation:", context.auth);
-  //   throw new functions.https.HttpsError("permission-denied", "Vous n'avez pas les droits pour effectuer cette action.");
-  // }
-  // Pour cet exemple, la vérification admin est commentée. VOUS DEVEZ L'IMPLÉMENTER.
-  functions.logger.warn("approveInvitation: LA VÉRIFICATION DES DROITS ADMIN EST DÉSACTIVÉE POUR L'EXEMPLE. À IMPLÉMENTER ABSOLUMENT !");
-
+  // Vérification des droits d'administrateur via Custom Claims.
+  if (!context.auth || !context.auth.token.admin) {
+    functions.logger.error("Accès non autorisé à approveInvitation:", context.auth);
+    throw new functions.https.HttpsError("permission-denied", "Vous n'avez pas les droits pour effectuer cette action. Seuls les administrateurs peuvent approuver les invitations.");
+  }
+  functions.logger.info("Vérification admin réussie pour approveInvitation par", context.auth.uid);
 
   try {
     const validationResult = manageInvitationSchema.safeParse(data);
@@ -135,14 +135,13 @@ export const approveInvitation = functions.region("europe-west1").https.onCall(a
     try {
         userRecord = await admin.auth().createUser({
             email: lowerEmail,
-            emailVerified: false, 
+            emailVerified: false,
             disabled: false,
         });
         functions.logger.info("Utilisateur créé avec succès:", userRecord.uid, "pour email:", lowerEmail);
     } catch (authError: any) {
         if (authError.code === 'auth/email-already-exists') {
             functions.logger.warn(`Tentative d'approbation pour un e-mail déjà existant dans Auth: ${lowerEmail}`);
-            // Marquer la demande comme approuvée si l'utilisateur existe déjà dans Auth
             let existingUser;
             try {
                 existingUser = await admin.auth().getUserByEmail(lowerEmail);
@@ -154,10 +153,11 @@ export const approveInvitation = functions.region("europe-west1").https.onCall(a
             await db.collection("invitationRequests").doc(invitationDoc.id).update({
                 status: "approved",
                 approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-                approvedBy: context.auth?.uid || "unknown_admin_or_system", 
-                authUid: existingUser.uid, 
+                approvedBy: context.auth?.uid || "unknown_admin",
+                authUid: existingUser.uid,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
+            // Potentiellement, envoyez un e-mail ici pour informer l'utilisateur.
             return { success: true, message: `L'utilisateur ${lowerEmail} existe déjà dans Firebase Auth. La demande a été marquée comme approuvée.` };
         }
         functions.logger.error("Erreur lors de la création de l'utilisateur dans Firebase Auth:", authError);
@@ -167,13 +167,17 @@ export const approveInvitation = functions.region("europe-west1").https.onCall(a
     await db.collection("invitationRequests").doc(invitationDoc.id).update({
       status: "approved",
       approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-      approvedBy: context.auth?.uid || "unknown_admin_or_system",
+      approvedBy: context.auth.uid, // Garanti d'exister après la vérification admin
       authUid: userRecord.uid,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // TODO: Considérez l'envoi d'un e-mail à l'utilisateur pour l'informer que son compte est créé
+    // et qu'il doit utiliser le flux "Mot de passe oublié" pour définir son mot de passe initial,
+    // ou envoyez-lui un lien de configuration de mot de passe via admin.auth().generatePasswordResetLink().
+
     functions.logger.info(`Invitation approuvée et utilisateur créé pour ${lowerEmail}`);
-    return { success: true, message: `L'invitation pour ${lowerEmail} a été approuvée. L'utilisateur peut maintenant se connecter.` };
+    return { success: true, message: `L'invitation pour ${lowerEmail} a été approuvée. L'utilisateur peut maintenant se connecter (il devra peut-être définir son mot de passe initial via 'Mot de passe oublié').` };
 
   } catch (error: any) {
     functions.logger.error("Erreur dans approveInvitation:", error);
@@ -187,18 +191,19 @@ export const approveInvitation = functions.region("europe-west1").https.onCall(a
 
 /**
  * Rejette une demande d'invitation.
- * DEVRAIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
+ * DOIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
  */
 export const rejectInvitation = functions.region("europe-west1").https.onCall(async (data, context) => {
   functions.logger.info("Rejet d'invitation reçu:", data);
 
   // !!! IMPORTANT SÉCURITÉ !!!
-  // Décommentez et implémentez une vérification robuste des droits d'administrateur ici.
-  // if (!context.auth || !context.auth.token.admin) {
-  //   functions.logger.error("Accès non autorisé à rejectInvitation:", context.auth);
-  //   throw new functions.https.HttpsError("permission-denied", "Vous n'avez pas les droits pour effectuer cette action.");
-  // }
-  functions.logger.warn("rejectInvitation: LA VÉRIFICATION DES DROITS ADMIN EST DÉSACTIVÉE POUR L'EXEMPLE. À IMPLÉMENTER ABSOLUMENT !");
+  // Vérification des droits d'administrateur via Custom Claims.
+  if (!context.auth || !context.auth.token.admin) {
+    functions.logger.error("Accès non autorisé à rejectInvitation:", context.auth);
+    throw new functions.https.HttpsError("permission-denied", "Vous n'avez pas les droits pour effectuer cette action. Seuls les administrateurs peuvent rejeter les invitations.");
+  }
+  functions.logger.info("Vérification admin réussie pour rejectInvitation par", context.auth.uid);
+
 
   try {
     const validationResult = rejectInvitationSchema.safeParse(data);
@@ -225,10 +230,12 @@ export const rejectInvitation = functions.region("europe-west1").https.onCall(as
     await db.collection("invitationRequests").doc(invitationDoc.id).update({
       status: "rejected",
       rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
-      rejectedBy: context.auth?.uid || "unknown_admin_or_system",
+      rejectedBy: context.auth.uid, // Garanti d'exister après la vérification admin
       rejectionReason: reason || null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    // TODO: Considérez l'envoi d'un e-mail à l'utilisateur pour l'informer du rejet.
 
     functions.logger.info(`Invitation rejetée pour ${lowerEmail}`);
     return { success: true, message: `L'invitation pour ${lowerEmail} a été rejetée.` };
@@ -244,18 +251,18 @@ export const rejectInvitation = functions.region("europe-west1").https.onCall(as
 
 /**
  * Liste les demandes d'invitation en attente.
- * DEVRAIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
+ * DOIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
  */
 export const listPendingInvitations = functions.region("europe-west1").https.onCall(async (data, context) => {
   functions.logger.info("Demande de listage des invitations en attente reçue.");
 
   // !!! IMPORTANT SÉCURITÉ !!!
-  // Décommentez et implémentez une vérification robuste des droits d'administrateur ici.
-  // if (!context.auth || !context.auth.token.admin) {
-  //   functions.logger.error("Accès non autorisé à listPendingInvitations:", context.auth);
-  //   throw new functions.https.HttpsError("permission-denied", "Vous n'avez pas les droits pour effectuer cette action.");
-  // }
-  functions.logger.warn("listPendingInvitations: LA VÉRIFICATION DES DROITS ADMIN EST DÉSACTIVÉE POUR L'EXEMPLE. À IMPLÉMENTER ABSOLUMENT !");
+  // Vérification des droits d'administrateur via Custom Claims.
+  if (!context.auth || !context.auth.token.admin) {
+    functions.logger.error("Accès non autorisé à listPendingInvitations:", context.auth);
+    throw new functions.https.HttpsError("permission-denied", "Vous n'avez pas les droits pour effectuer cette action. Seuls les administrateurs peuvent lister les invitations.");
+  }
+  functions.logger.info("Vérification admin réussie pour listPendingInvitations par", context.auth.uid);
 
   try {
     const snapshot = await db.collection("invitationRequests")
@@ -264,7 +271,7 @@ export const listPendingInvitations = functions.region("europe-west1").https.onC
       .get();
 
     if (snapshot.empty) {
-      return { invitations: [] };
+      return { success: true, invitations: [] };
     }
 
     const invitations = snapshot.docs.map(doc => {
@@ -272,18 +279,15 @@ export const listPendingInvitations = functions.region("europe-west1").https.onC
       return {
         id: doc.id,
         email: docData.email,
-        requestedAt: docData.requestedAt.toDate().toISOString(), // Convertir Timestamp en ISO string
+        requestedAt: docData.requestedAt.toDate().toISOString(),
         status: docData.status,
       };
     });
 
-    return { invitations };
+    return { success: true, invitations };
 
   } catch (error: any) {
     functions.logger.error("Erreur dans listPendingInvitations:", error);
     throw new functions.https.HttpsError("internal", "Une erreur est survenue lors de la récupération des invitations.", error.message);
   }
 });
-    
-
-    
