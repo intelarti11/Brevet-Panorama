@@ -1,6 +1,6 @@
 
 import * as functions from "firebase-functions";
-import *import * as admin from "firebase-admin";
+import * as admin from "firebase-admin";
 import {z} from "zod";
 
 // Initialiser Firebase Admin SDK
@@ -385,7 +385,6 @@ export const listPendingInvitations = functions.region("europe-west1")
         "Droits admin insuffisants."
       );
     }
-    // Ligne 258 après corrections précédentes, potentiellement celle-ci.
     functions.logger.info("listPendingInvitations: admin access granted.");
     functions.logger.info("Admin UID:", context.auth.uid);
 
@@ -427,8 +426,7 @@ const setAdminRoleSchema = z.object({
   email: z.string().email({message: "Adresse e-mail invalide."}).optional(),
   uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
 }).refine((inputData) => inputData.email || inputData.uid, {
-  // Message raccourci pour respecter max-len
-  message: "E-mail ou UID utilisateur requis.",
+  message: "E-mail ou UID utilisateur requis.", // Raccourci
   path: ["email"],
 });
 type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
