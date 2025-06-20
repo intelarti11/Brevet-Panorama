@@ -424,7 +424,7 @@ const setAdminRoleSchema = z.object({
   uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
   // Au moins un des deux doit être fourni
 }).refine((inputData) => inputData.email || inputData.uid, {
-  message: "E-mail ou UID requis.", // Shortened
+  message: "E-mail ou UID requis.",
   path: ["email"], // S'applique à `email` si les deux sont absents
 });
 type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
@@ -442,7 +442,7 @@ export const setAdminRole = functions.region("europe-west1")
       );
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Droits admin requis pour attribuer rôle." // Shortened
+        "Droits admin requis pour attribuer rôle."
       );
     }
     const callingAdminUid = context.auth.uid;
@@ -513,6 +513,3 @@ export const setAdminRole = functions.region("europe-west1")
     }
   });
 
-
-
-    
