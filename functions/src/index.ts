@@ -4,8 +4,7 @@ import {onCall, HttpsOptions} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
-// Log prefix pour cette version
-const LOG_PREFIX_V13_1 = "INIT_V13_1"; // Updated log marker
+const LOG_PREFIX_V13_1 = "INIT_V13_1";
 
 logger.info(
   `${LOG_PREFIX_V13_1}: Script top. Admin init.`
@@ -48,11 +47,10 @@ try {
   adminApp = null;
 }
 
-// Ultra minimal function for basic testing
 export const ultraMinimalFunction = onCall(
   {region: "europe-west1"},
   (request) => {
-    const logMarker = "ULTRA_MINIMAL_V13_1_LOG"; // Updated log marker
+    const logMarker = "ULTRA_MINIMAL_V13_1_LOG";
     logger.info(
       `${logMarker}: Called.`,
       {structuredData: true, data: request.data}
@@ -83,7 +81,7 @@ const requestInvitationOptions: HttpsOptions = {
 export const requestInvitation = onCall(
   requestInvitationOptions,
   async (request) => {
-    const logMarker = "INVITE_WRITE_V13_1_LOG"; // Updated log marker
+    const logMarker = "INVITE_WRITE_V13_1_LOG";
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -113,7 +111,6 @@ export const requestInvitation = onCall(
 
     try {
       const collectionName = "invitationRequests";
-      // Check if a pending request for this email already exists
       const existingQuery = db.collection(collectionName)
         .where("email", "==", email)
         .where("status", "==", "pending");
@@ -122,7 +119,7 @@ export const requestInvitation = onCall(
       if (!existingSnapshot.empty) {
         logger.info(`${logMarker}: Pending req for ${email} already exists.`);
         return {
-          success: false, // Or true, depending on desired UX
+          success: false,
           message: `Une demande pour ${email} est déjà en attente.`,
           receivedData: request.data,
         };
@@ -162,10 +159,9 @@ export const requestInvitation = onCall(
   }
 );
 
-// Function to list pending invitation requests
 const listPendingInvitationsOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public", // Allows unauthenticated access
+  invoker: "public",
 };
 
 export const listPendingInvitations = onCall(
@@ -186,7 +182,6 @@ export const listPendingInvitations = onCall(
     try {
       const query = db.collection("invitationRequests")
         .where("status", "==", "pending");
-      // .orderBy("requestedAt", "asc"); // Temporarily removed
       const snapshot = await query.get();
 
       if (snapshot.empty) {
@@ -240,10 +235,8 @@ export const listPendingInvitations = onCall(
   }
 );
 
-// Function to approve an invitation request
 const approveInvitationOptions: HttpsOptions = {
   region: "europe-west1",
-  // invoker: "private" // Default, requires auth if not specified as public
 };
 export const approveInvitation = onCall(
   approveInvitationOptions,
@@ -288,26 +281,24 @@ export const approveInvitation = onCall(
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const emailForLog = docData?.email || "[email non trouvé]";
-      const successMsg = `Invitation ${invitationId} approved for ${emailForLog}.`;
-      logger.info(`${logMarker}: ${successMsg}`);
-      return {success: true, message: `Invitation pour ${emailForLog} approuvée.`};
+      const emailForLog = docData?.email || "[email N/A]";
+      const successMsg = `${logMarker}: OK ${invitationId} for ${emailForLog}.`; // Shortened
+      logger.info(successMsg);
+      return {success: true, message: `Invite pour ${emailForLog} approuvée.`};
     } catch (err: unknown) {
       let errorMsg = "Unknown error approving invitation.";
       if (err instanceof Error) {
         errorMsg = err.message;
       }
-      const logErr = `${logMarker}: Approval FAILED for ${invitationId}.`;
+      const logErr = `${logMarker}: Approval FAIL ${invitationId}.`;
       logger.error(logErr, {error: errorMsg, originalError: String(err)});
       return {success: false, message: `Échec approbation: ${errorMsg}`};
     }
   }
 );
 
-// Function to reject an invitation request
 const rejectInvitationOptions: HttpsOptions = {
   region: "europe-west1",
-  // invoker: "private" // Default, requires auth if not specified as public
 };
 export const rejectInvitation = onCall(
   rejectInvitationOptions,
@@ -362,28 +353,28 @@ export const rejectInvitation = onCall(
         updatePayload.rejectionReason = reason;
       }
 
-      const payloadLogMsg = `Update payload for ${invitationId}:`;
-      logger.info(`${logMarker}: ${payloadLogMsg}`, {payload: updatePayload});
+      const payloadLogMsg = `${logMarker}: Update payload for ${invitationId}:`;
+      logger.info(payloadLogMsg, {payload: updatePayload});
       await inviteRef.update(updatePayload);
 
-      const emailForLog = docData?.email || "[email non trouvé]";
-      const successMessage = `Invitation ${invitationId} rejected for ${emailForLog}.`;
-      logger.info(`${logMarker}: ${successMessage}`);
-      return {success: true, message: `Invitation pour ${emailForLog} rejetée.`};
+      const emailForLog = docData?.email || "[email N/A]";
+      const successMsg = `${logMarker}: KO ${invitationId} for ${emailForLog}.`; // Shortened
+      logger.info(successMsg);
+      return {success: true, message: `Invite ${emailForLog} rejetée.`}; // Shortened
     } catch (err: unknown) {
       let errorMsg = "Unknown error rejecting invitation.";
       if (err instanceof Error) {
         errorMsg = err.message;
       }
-      const logErr = `${logMarker}: Rejection FAILED for ${invitationId}.`;
+      const logErr = `${logMarker}: Rejection FAIL ${invitationId}.`;
       logger.error(logErr, {error: errorMsg, originalError: String(err)});
-      return {success: false, message: `Échec rejet: ${errorMsg}`};
+      return {success: false, message: `Rejet échec: ${errorMsg}`};
     }
   }
 );
 
 logger.info(
-  `${LOG_PREFIX_V13_1}: Script end. Admin SDK init attempt done (v13.1).`
+  `${LOG_PREFIX_V13_1}: Script end. Admin SDK init done (v13.1).`
 );
 
     
