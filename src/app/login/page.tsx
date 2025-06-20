@@ -26,9 +26,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/logo';
-import { Mail, LockKeyhole, Loader2, Eye, EyeOff, User } from 'lucide-react'; // Ajout de l'icône User
+import { Mail, LockKeyhole, Loader2, Eye, EyeOff, User } from 'lucide-react';
 
-// Validation assouplie : le champ 'usernameOrEmail' doit juste être non vide.
 const formSchema = z.object({
   usernameOrEmail: z.string().min(1, { message: "Le nom d'utilisateur ou l'e-mail est requis." }),
   password: z.string().min(1, { message: "Le mot de passe est requis." }),
@@ -53,8 +52,11 @@ export default function LoginPage() {
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulation de délai réseau
     setIsLoading(false);
 
-    const isAdminbrevetLogin = values.usernameOrEmail === "Adminbrevet" && values.password === "SVeil2025!";
-    const isAdminEmailLogin = values.usernameOrEmail.startsWith("admin.") && values.password === "SVeil2025!";
+    // Correction ici: mot de passe attendu est "SVeil2025" (sans '!')
+    const expectedPassword = "SVeil2025"; 
+
+    const isAdminbrevetLogin = values.usernameOrEmail === "Adminbrevet" && values.password === expectedPassword;
+    const isAdminEmailLogin = values.usernameOrEmail.startsWith("admin.") && values.password === expectedPassword;
 
     if (isAdminbrevetLogin || isAdminEmailLogin) {
       toast({
@@ -91,7 +93,7 @@ export default function LoginPage() {
                     <FormControl>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="text" placeholder="Adminbrevet ou prenom.nom@ac-montpellier.fr" {...field} className="pl-10" />
+                        <Input type="text" placeholder="Adminbrevet ou prenom.nom@exemple.com" {...field} className="pl-10" />
                       </div>
                     </FormControl>
                     <FormMessage />
