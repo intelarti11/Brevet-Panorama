@@ -84,7 +84,7 @@ const requestInvitationOptions: HttpsOptions = {
 export const requestInvitation = onCall(
   requestInvitationOptions,
   async (request) => { // Note: 'async' est ajouté ici
-    const logMarker = "INVITE_WRITE_V11_LOG"; // Nouveau marqueur
+    const logMarker = "INVITE_WRITE_V11_LOG";
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -92,12 +92,13 @@ export const requestInvitation = onCall(
 
     if (!adminApp) {
       logger.error(`${logMarker}: AdminApp not initialized! Critical.`);
+      // This error might not be catchable by the client if it prevents func init
     }
     if (!db) {
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
       return {
         success: false,
-        message: "V11: Firestore unavailable for request.",
+        message: "V11: Erreur interne du serveur (Firestore indisponible).",
         receivedData: request.data,
       };
     }
@@ -126,7 +127,8 @@ export const requestInvitation = onCall(
       );
       return {
         success: true,
-        message: `V11: Demande enregistrée. ID: ${newRequestRef.id}`,
+        // This message will be shown in the toast
+        message: `Demande d'invitation pour ${email} enregistrée avec succès.`,
         receivedData: request.data,
         requestId: newRequestRef.id,
       };
@@ -141,7 +143,8 @@ export const requestInvitation = onCall(
       );
       return {
         success: false,
-        message: `V11: Erreur Firestore: ${errorMsg}`,
+        // This message will be shown in the toast
+        message: `V11: Échec de l'enregistrement: ${errorMsg}`,
         receivedData: request.data,
       };
     }
