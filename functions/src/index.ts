@@ -126,6 +126,7 @@ export const requestInvitation = onCall(
       );
       return {
         success: true,
+        // Message utilisateur uniquement, sans détails techniques
         message: `Votre demande d'invitation pour ${email} a bien été enregistrée. Vous serez contacté une fois votre demande examinée.`,
         receivedData: request.data,
         // requestId: newRequestRef.id, // ID is not sent to client anymore
@@ -151,3 +152,4 @@ export const requestInvitation = onCall(
 logger.info(
   `${LOG_PREFIX_V11}: Script end. Admin SDK init attempt done.`
 );
+
