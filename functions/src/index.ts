@@ -77,6 +77,7 @@ export const requestInvitation = functions.region("europe-west1")
             "Demande en cours pour cet e-mail."
           );
         }
+        // Réutilise une demande rejetée pour la remettre en attente
         await db.collection("invitationRequests")
           .doc(existReqQuery.docs[0].id).set({
             email: lowerEmail,
@@ -100,6 +101,7 @@ export const requestInvitation = functions.region("europe-west1")
         };
       }
 
+      // Nouvelle demande
       await db.collection("invitationRequests").add({
         email: lowerEmail,
         status: "pending",
@@ -135,6 +137,7 @@ export const approveInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
     functions.logger.info("Approbation d'invitation:", data);
 
+    // Vérification des droits d'administrateur
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non-autorisé (approve):", context.auth
@@ -162,6 +165,7 @@ export const approveInvitation = functions.region("europe-west1")
       const {email} = validationResult.data;
       const lowerEmail = email.toLowerCase();
 
+      // Recherche de la demande d'invitation en attente
       const requestQuery = await db.collection("invitationRequests")
         .where("email", "==", lowerEmail)
         .where("status", "==", "pending")
@@ -178,10 +182,11 @@ export const approveInvitation = functions.region("europe-west1")
       const invitationDoc = requestQuery.docs[0];
       let userRecord;
 
+      // Création de l'utilisateur dans Firebase Authentication
       try {
         userRecord = await admin.auth().createUser({
           email: lowerEmail,
-          emailVerified: false,
+          emailVerified: false, // L'utilisateur devra vérifier son e-mail
           disabled: false,
         });
         functions.logger.info(
@@ -197,6 +202,7 @@ export const approveInvitation = functions.region("europe-west1")
         }
 
         if (code === "auth/email-already-exists") {
+          // L'utilisateur existe déjà dans Auth, on approuve juste la demande
           functions.logger.warn("Approbation e-mail existant:", lowerEmail);
           let existingUser;
           try {
@@ -224,6 +230,7 @@ export const approveInvitation = functions.region("europe-west1")
             message: `User ${lowerEmail} existe. Demande approuvée.`,
           };
         }
+        // Autre erreur lors de la création Auth
         functions.logger.error("Erreur création user Auth:", authError);
         let errorMessage = "Erreur création user.";
         if (authError instanceof Error) {
@@ -234,11 +241,12 @@ export const approveInvitation = functions.region("europe-west1")
         throw new functions.https.HttpsError("internal", finalErrorMsg, authError);
       }
 
+      // Mise à jour du statut de la demande dans Firestore
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-        approvedBy: context.auth.uid,
-        authUid: userRecord.uid,
+        approvedBy: context.auth.uid, // UID de l'admin qui approuve
+        authUid: userRecord.uid, // UID de l'utilisateur créé dans Auth
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -247,6 +255,7 @@ export const approveInvitation = functions.region("europe-west1")
       );
       return {
         success: true,
+        // eslint-disable-next-line max-len
         message: `Invit. ${lowerEmail} approuvée. MDP via 'Oublié?'.`,
       };
     } catch (error: unknown) {
@@ -272,6 +281,7 @@ export const rejectInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
     functions.logger.info("Rejet d'invitation:", data);
 
+    // Vérification des droits d'administrateur
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non-autorisé (reject):", context.auth
@@ -299,6 +309,7 @@ export const rejectInvitation = functions.region("europe-west1")
       const {email, reason} = validationResult.data;
       const lowerEmail = email.toLowerCase();
 
+      // Recherche de la demande d'invitation en attente
       const requestQuery = await db.collection("invitationRequests")
         .where("email", "==", lowerEmail)
         .where("status", "==", "pending")
@@ -314,10 +325,11 @@ export const rejectInvitation = functions.region("europe-west1")
 
       const invitationDoc = requestQuery.docs[0];
 
+      // Mise à jour du statut de la demande dans Firestore
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "rejected",
         rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
-        rejectedBy: context.auth.uid,
+        rejectedBy: context.auth.uid, // UID de l'admin qui rejette
         rejectionReason: reason || null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -350,6 +362,7 @@ export const listPendingInvitations = functions.region("europe-west1")
   .https.onCall(async (_data, context) => {
     functions.logger.info("Listage des invitations en attente demandé.");
 
+    // Vérification des droits d'administrateur
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non-autorisé (listPending):",
@@ -376,9 +389,12 @@ export const listPendingInvitations = functions.region("europe-west1")
         return {success: true, invitations: []};
       }
 
+      // Formatage des données pour le client
       const invitations = snapshot.docs.map((doc) => {
         const docData = doc.data();
+        // Assurer que requestedAt est une date valide avant toDate()
         const requestedAtDate = docData.requestedAt?.toDate();
+        // Fournir une date par défaut si toDate() échoue ou est undefined
         const isoDate = requestedAtDate ?
           requestedAtDate.toISOString() : new Date(0).toISOString();
         return {
@@ -402,12 +418,14 @@ export const listPendingInvitations = functions.region("europe-west1")
     }
   });
 
+// Schéma de validation pour setAdminRole
 const setAdminRoleSchema = z.object({
   email: z.string().email({message: "E-mail invalide."}).optional(),
   uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
+  // Au moins un des deux doit être fourni
 }).refine((inputData) => inputData.email || inputData.uid, {
   message: "E-mail ou UID requis.", // Shortened
-  path: ["email"],
+  path: ["email"], // S'applique à `email` si les deux sont absents
 });
 type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
 
@@ -417,6 +435,7 @@ type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
  */
 export const setAdminRole = functions.region("europe-west1")
   .https.onCall(async (data: SetAdminRoleInput, context) => {
+    // Vérifie que l'appelant est un admin
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non-autorisé (setAdminRole):", context.auth
@@ -432,6 +451,7 @@ export const setAdminRole = functions.region("europe-west1")
     );
 
     try {
+      // Validation des données d'entrée
       const validationResult = setAdminRoleSchema.safeParse(data);
       if (!validationResult.success) {
         const errors = validationResult.error.flatten();
@@ -443,6 +463,7 @@ export const setAdminRole = functions.region("europe-west1")
       const {email, uid: providedUid} = validationResult.data;
       let targetUid = providedUid;
 
+      // Si l'e-mail est fourni mais pas l'UID, récupérer l'UID via l'e-mail
       if (email && !targetUid) {
         try {
           const userRecord = await admin.auth().getUserByEmail(email);
@@ -461,12 +482,14 @@ export const setAdminRole = functions.region("europe-west1")
       }
 
       if (!targetUid) {
+        // Si aucun UID n'a pu être déterminé
         throw new functions.https.HttpsError(
           "not-found",
           "User non trouvé avec infos fournies."
         );
       }
 
+      // Attribuer le custom claim "admin"
       await admin.auth().setCustomUserClaims(targetUid, {admin: true});
       functions.logger.info(`Rôle admin attribué à: ${targetUid}`);
       const targetIdentifier = email || targetUid;
@@ -477,8 +500,9 @@ export const setAdminRole = functions.region("europe-west1")
     } catch (error: unknown) {
       functions.logger.error("Erreur dans setAdminRole:", error);
       if (error instanceof functions.https.HttpsError) {
-        throw error;
+        throw error; // Relance l'erreur HttpsError existante
       }
+      // Gère les autres types d'erreurs
       let errorMessage = "Echec rôle admin.";
       if (error instanceof Error) {
         errorMessage = error.message;
@@ -489,3 +513,6 @@ export const setAdminRole = functions.region("europe-west1")
     }
   });
 
+
+
+    
