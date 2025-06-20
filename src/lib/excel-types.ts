@@ -70,28 +70,26 @@ export const studentDataSchema = z.object({
 
 export type StudentData = z.infer<typeof studentDataSchema>;
 
-// Schema for basic student data from CSV (e.g. school's student list)
+// Schema for student demographic data from CSV (e.g., school's student list)
+// Updated to match the user's provided CSV example (Nom;Prénom;Né(e) le;Sexe;Classe;Option 1...)
 export const studentBaseSchema = z.object({
-  INE: z.preprocess(preprocessToStringOptional, z.string().min(1, "L'INE est requis")),
+  INE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // Kept optional, as it might or might not be in the list
   NOM: z.preprocess(preprocessToStringOptional, z.string().min(1, "Le nom est requis")),
   PRENOM: z.preprocess(preprocessToStringOptional, z.string().min(1, "Le prénom est requis")),
-  DATE_NAISSANCE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // Expecting format like DD/MM/YYYY
+  DATE_NAISSANCE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // From "Né(e) le"
   SEXE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
   CLASSE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
-  CODE_ETABLISSEMENT: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
-  LIBELLE_ETABLISSEMENT: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
-  CODE_DIVISION: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  OPTION1: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // From "Option 1"
+  OPTION2: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // From "Option 2"
+  OPTION3: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // From "Option 3"
+  // Other fields like CODE_ETABLISSEMENT are removed as they are not in the provided example
 });
 export type StudentBaseData = z.infer<typeof studentBaseSchema>;
 
-// Schema for Brevet Blanc entries from CSV
+// Schema for Brevet Blanc NOTES entries from CSV (kept for potential future use or different import type)
 export const brevetBlancEntrySchema = z.object({
   INE: z.preprocess(preprocessToStringOptional, z.string().min(1, "L'INE est requis.")),
-  // NOM: z.preprocess(preprocessToStringOptional, z.string().min(1, "Le Nom est requis.")), // Optional, INE is primary key
-  // PRENOM: z.preprocess(preprocessToStringOptional, z.string().min(1, "Le Prénom est requis.")), // Optional
   MATIERE: z.preprocess(preprocessToStringOptional, z.string().min(1, "La matière est requise.")),
   NOTE: z.preprocess(preprocessOptionalStringToNumber, z.number({ required_error: "La note est requise.", invalid_type_error: "La note doit être un nombre." }).nullable()),
-  // BAREME: z.preprocess(preprocessOptionalStringToNumber, z.number().positive("Le barème doit être positif.").nullable().optional()), // Optional: if notes are not always /20
-  // DATE_EPREUVE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // Optional
 });
 export type BrevetBlancEntry = z.infer<typeof brevetBlancEntrySchema>;
