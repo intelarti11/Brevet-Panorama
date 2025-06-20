@@ -496,5 +496,3 @@ export const markInvitationAsNotified = onCall(
 logger.info(
   `${LOG_PREFIX}: Script end. Admin SDK init done.`
 );
-
-    
