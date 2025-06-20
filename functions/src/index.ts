@@ -1,4 +1,3 @@
-
 import * as admin from "firebase-admin";
 import {z} from "zod";
 import {
@@ -16,8 +15,6 @@ try {
   adminAppInitialized = true;
 } catch (e: unknown) {
   console.error("CRITICAL: Firebase Admin SDK initialization FAILED:", e);
-  // Consider exiting if this is truly fatal and subsequent code relies on it
-  // process.exit(1); // Or handle more gracefully
 }
 
 let db: admin.firestore.Firestore | undefined = undefined;
@@ -45,8 +42,6 @@ if (!db) {
   console.error(
     "CRITICAL_STOP: Firestore DB (db) is not available. Functions cannot operate."
   );
-  // This state indicates a severe problem.
-  // Subsequent function calls attempting to use 'db' will fail.
 }
 
 // --- Schémas Zod pour la validation des données d'entrée ---
@@ -85,7 +80,7 @@ export const requestInvitation = onCall(
   {region: "europe-west1", enforceAppCheck: true},
   async (request: CallableRequest<InvitationRequestData>) => {
     console.info("Nouv. demande invit:", request.data);
-    if (!db) { // Early check for db availability
+    if (!db) {
         console.error("requestInvitation: Firestore DB not available.");
         throw new HttpsError("internal", "Err. serveur init.");
     }
