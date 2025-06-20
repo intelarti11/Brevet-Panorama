@@ -27,7 +27,7 @@ const manageInvitationSchema = z.object({
 });
 
 const rejectInvitationSchema = manageInvitationSchema.extend({
-  reason: z.string().optional().describe("Raison optionnelle du rejet."),
+  reason: z.string().optional().describe("Raison optionnelle."),
 });
 
 /**
@@ -122,14 +122,13 @@ export const requestInvitation = functions.region("europe-west1")
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      const finalErrorMsg = errorMessage.substring(0, 50);
+      const finalErrorMsg = errorMessage.substring(0, 40);
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
 
 /**
- * Approuve une demande d'invitation et crée un user Firebase Auth.
- * Vérifie les droits d'admin de l'appelant.
+ * Approuve une demande et crée un user Firebase Auth. Admin requis.
  */
 export const approveInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
@@ -144,9 +143,8 @@ export const approveInvitation = functions.region("europe-west1")
         "Droits admin requis."
       );
     }
-    if (context.auth?.uid) {
-      functions.logger.info("Approve: admin OK. UID:", context.auth.uid);
-    }
+    const adminUid = context.auth.uid;
+    functions.logger.info(`Approve: admin OK. UID: ${adminUid}`);
 
 
     try {
@@ -187,7 +185,7 @@ export const approveInvitation = functions.region("europe-west1")
           disabled: false,
         });
         functions.logger.info(
-          "User créé:", userRecord.uid, "pour:", lowerEmail
+          `User créé: ${userRecord.uid}, pour: ${lowerEmail}`
         );
       } catch (authError: unknown) {
         let code = "unknown";
@@ -208,8 +206,8 @@ export const approveInvitation = functions.region("europe-west1")
           } catch (getUserError: unknown) {
             let msg = "Err vérif. user.";
             if (getUserError instanceof Error) msg = getUserError.message;
-            functions.logger.error("Err getUser:", {email: lowerEmail, getUserError});
-            const finalMsg = msg.substring(0, 47);
+            const finalMsg = msg.substring(0, 40);
+            functions.logger.error("Err getUser:", {finalMsg, getUserError});
             throw new functions.https.HttpsError("internal", finalMsg, getUserError);
           }
 
@@ -217,7 +215,7 @@ export const approveInvitation = functions.region("europe-west1")
             .doc(invitationDoc.id).update({
               status: "approved",
               approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-              approvedBy: context.auth?.uid || "unknown_admin",
+              approvedBy: adminUid,
               authUid: existingUser.uid,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
@@ -227,10 +225,10 @@ export const approveInvitation = functions.region("europe-west1")
           };
         }
         // Autre erreur Auth
-        functions.logger.error("Err creation user Auth:", authError);
+        functions.logger.error("Auth create err:", authError);
         let errMsg = "Err creat. user";
         if (authError instanceof Error) errMsg = authError.message;
-        const finalErrMsg = errMsg.substring(0, 47);
+        const finalErrMsg = errMsg.substring(0, 40);
         throw new functions.https.HttpsError("internal", finalErrMsg, authError);
       }
 
@@ -238,7 +236,7 @@ export const approveInvitation = functions.region("europe-west1")
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-        approvedBy: context.auth.uid,
+        approvedBy: adminUid,
         authUid: userRecord.uid,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -251,20 +249,19 @@ export const approveInvitation = functions.region("europe-west1")
         message: `Invit. ${lowerEmail} ok. MDP via 'Oublié?'.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Err approveInv:", error);
+      functions.logger.error("Approve inv err:", error);
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
       let errorMessage = "Echec approbation.";
       if (error instanceof Error) errorMessage = error.message;
-      const finalErrorMsg = errorMessage.substring(0, 47);
+      const finalErrorMsg = errorMessage.substring(0, 40);
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
 
 /**
- * Rejette une demande d'invitation.
- * Vérifie les droits d'admin de l'appelant.
+ * Rejette une demande d'invitation. Admin requis.
  */
 export const rejectInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
@@ -279,9 +276,9 @@ export const rejectInvitation = functions.region("europe-west1")
         "Droits admin requis."
       );
     }
-    if (context.auth?.uid) {
-      functions.logger.info("Reject: admin OK. UID:", context.auth.uid);
-    }
+    const adminUid = context.auth.uid;
+    functions.logger.info(`Reject: admin OK. UID: ${adminUid}`);
+
 
     try {
       const validationResult = rejectInvitationSchema.safeParse(data);
@@ -315,7 +312,7 @@ export const rejectInvitation = functions.region("europe-west1")
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "rejected",
         rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
-        rejectedBy: context.auth.uid,
+        rejectedBy: adminUid,
         rejectionReason: reason || null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -332,13 +329,13 @@ export const rejectInvitation = functions.region("europe-west1")
       }
       let errorMessage = "Echec rejet.";
       if (error instanceof Error) errorMessage = error.message;
-      const finalErrorMsg = errorMessage.substring(0, 47);
+      const finalErrorMsg = errorMessage.substring(0, 40);
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
 
 /**
- * Liste invitations en attente. Statut "pending". Admin requis.
+ * Liste invitations en attente. Admin requis.
  */
 export const listPendingInvitations = functions.region("europe-west1")
   .https.onCall(async (_data, context) => {
@@ -384,10 +381,10 @@ export const listPendingInvitations = functions.region("europe-west1")
 
       return {success: true, invitations};
     } catch (error: unknown) {
-      functions.logger.error("Err listPendingInvitations:", error);
+      functions.logger.error("Err listPending:", error);
       let errorMessage = "Echec liste invit.";
       if (error instanceof Error) errorMessage = error.message;
-      const finalErrorMsg = errorMessage.substring(0, 47);
+      const finalErrorMsg = errorMessage.substring(0, 40);
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
@@ -441,7 +438,7 @@ export const setAdminRole = functions.region("europe-west1")
           let msg = "Err récup. user.";
           if (e instanceof Error) msg = e.message;
           functions.logger.error(`Err getUserByEmail ${email}:`, e);
-          const finalMsg = msg.substring(0, 47);
+          const finalMsg = msg.substring(0, 40);
           throw new functions.https.HttpsError("not-found", finalMsg, e);
         }
       }
@@ -467,9 +464,8 @@ export const setAdminRole = functions.region("europe-west1")
       }
       let errorMessage = "Echec rôle admin.";
       if (error instanceof Error) errorMessage = error.message;
-      const finalErrorMsg = errorMessage.substring(0, 47);
+      const finalErrorMsg = errorMessage.substring(0, 40);
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
 
-      
