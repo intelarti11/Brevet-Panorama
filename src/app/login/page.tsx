@@ -30,9 +30,12 @@ import { Mail, LockKeyhole, Loader2, Eye, EyeOff, User } from 'lucide-react';
 import { getAuth, signInWithEmailAndPassword, type AuthError } from 'firebase/auth';
 import { app } from '@/lib/firebase';
 
+const ADMIN_USERNAME = "adminbrevet";
+const ADMIN_EMAIL_FOR_LOGIN = "florent.romero@ac-montpellier.fr";
+
 const formSchema = z.object({
   usernameOrEmail: z.string()
-    .min(1, { message: "Le nom d'utilisateur ou l'e-mail est requis." }), // Reverted: Removed .email() validation
+    .min(1, { message: "Le nom d'utilisateur ou l'e-mail est requis." }),
   password: z.string().min(1, { message: "Le mot de passe est requis." }),
 });
 
@@ -54,11 +57,13 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      // Firebase signInWithEmailAndPassword expects an email.
-      // If you want to support username login, you'd typically need a backend
-      // function to look up the email associated with the username first.
-      // For now, this will still attempt to sign in with values.usernameOrEmail as if it's an email.
-      await signInWithEmailAndPassword(auth, values.usernameOrEmail, values.password);
+      let emailToUse = values.usernameOrEmail;
+
+      if (values.usernameOrEmail.toLowerCase() === ADMIN_USERNAME.toLowerCase()) {
+        emailToUse = ADMIN_EMAIL_FOR_LOGIN;
+      }
+
+      await signInWithEmailAndPassword(auth, emailToUse, values.password);
       toast({
         title: "Connexion réussie",
         description: "Bienvenue !",
@@ -68,12 +73,11 @@ export default function LoginPage() {
       const authError = error as AuthError;
       console.error("Erreur de connexion Firebase:", authError.code, authError.message);
       let description = "Nom d'utilisateur/e-mail ou mot de passe incorrect.";
-      // Firebase error codes: https://firebase.google.com/docs/auth/admin/errors
+      
       if (authError.code === 'auth/user-not-found' || authError.code === 'auth/wrong-password' || authError.code === 'auth/invalid-credential') {
-        description = "Identifiants incorrects. Veuillez vérifier votre e-mail et mot de passe.";
+        description = "Identifiants incorrects. Veuillez vérifier votre identifiant et mot de passe.";
       } else if (authError.code === 'auth/invalid-email') {
-        // This error might still occur if "Adminbrevet" is passed to Firebase Auth
-        description = "Le format de l'identifiant est invalide pour la connexion par e-mail.";
+        description = "Le format de l'identifiant fourni est invalide pour la connexion par e-mail, ou l'utilisateur mappé n'existe pas.";
       } else if (authError.code === 'auth/too-many-requests') {
         description = "Trop de tentatives de connexion. Veuillez réessayer plus tard.";
       }
