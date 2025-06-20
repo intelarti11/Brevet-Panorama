@@ -26,6 +26,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/logo';
 import { Mail, Loader2, ArrowLeft } from 'lucide-react';
+import { getFunctions, httpsCallable, type HttpsCallableResult } from 'firebase/functions';
+import { app } from '@/lib/firebase'; // Assurez-vous que 'app' est exporté depuis votre config Firebase
 
 const emailRegex = /^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/;
 
@@ -35,9 +37,15 @@ const formSchema = z.object({
     .regex(emailRegex, { message: "L'adresse e-mail doit être au format prénom.nom@ac-montpellier.fr" }),
 });
 
+interface RequestInvitationResponse {
+    success: boolean;
+    message: string;
+}
+
 export default function RequestInvitationPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const functions = getFunctions(app, 'europe-west1'); // Spécifiez la région si vos fonctions y sont déployées
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,16 +56,43 @@ export default function RequestInvitationPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    // SIMULATION: En production, vous enverriez ces données à votre backend
-    // pour enregistrer la demande d'invitation.
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsLoading(false);
+    
+    const callRequestInvitation = httpsCallable< {email: string }, RequestInvitationResponse >(functions, 'requestInvitation');
 
-    toast({
-      title: "Demande d'invitation envoyée",
-      description: `Votre demande pour ${values.email} a été soumise. Un administrateur la vérifiera bientôt.`,
-    });
-    form.reset();
+    try {
+      const result: HttpsCallableResult<RequestInvitationResponse> = await callRequestInvitation({ email: values.email });
+      
+      if (result.data.success) {
+        toast({
+          title: "Demande d'invitation envoyée",
+          description: result.data.message,
+        });
+        form.reset();
+      } else {
+        throw new Error(result.data.message || "Une erreur inconnue est survenue.");
+      }
+    } catch (error: any) {
+      console.error("Erreur lors de la demande d'invitation:", error);
+      let errorMessage = "Une erreur est survenue lors de l'envoi de votre demande.";
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      // Les HttpsError ont un code et un message, on peut les utiliser pour un retour plus précis
+      if (error.code && error.details && error.details.message) {
+          errorMessage = error.details.message;
+      } else if (error.message) {
+          errorMessage = error.message;
+      }
+
+
+      toast({
+        variant: "destructive",
+        title: "Échec de la demande",
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
