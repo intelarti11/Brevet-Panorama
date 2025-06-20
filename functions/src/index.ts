@@ -117,7 +117,7 @@ export const requestInvitation = onCall(
       const existingSnapshot = await existingQuery.get();
 
       if (!existingSnapshot.empty) {
-        const msg = `${logMarker}: Pending req for ${email} exists.`;
+        const msg = `${logMarker}: Pend. req for ${email} exists.`;
         logger.info(msg);
         return {
           success: false,
@@ -146,7 +146,7 @@ export const requestInvitation = onCall(
       if (writeError instanceof Error) {
         errorMsg = writeError.message;
       }
-      const logFail = `${logMarker}: Firestore write FAILED for ${email}.`;
+      const logFail = `${logMarker}: Firestore write FAIL for ${email}.`;
       logger.error(
         logFail,
         {error: errorMsg, originalError: String(writeError)}
@@ -162,13 +162,13 @@ export const requestInvitation = onCall(
 
 const listPendingInvitationsOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public",
+  invoker: "public", // Allows unauthenticated calls for now
 };
 
 export const listPendingInvitations = onCall(
   listPendingInvitationsOptions,
   async () => {
-    const logMarker = "LIST_INVITES_V13_3_LOG";
+    const logMarker = "LIST_INV_V13_3_LOG";
     logger.info(`${logMarker}: Func start. Listing (v13.3).`);
 
     if (!db) {
@@ -183,6 +183,7 @@ export const listPendingInvitations = onCall(
     try {
       const query = db.collection("invitationRequests")
         .where("status", "==", "pending");
+        // .orderBy("requestedAt", "desc"); Temporarily removed for no-index
       const snapshot = await query.get();
 
       if (snapshot.empty) {
@@ -238,6 +239,7 @@ export const listPendingInvitations = onCall(
 
 const approveInvitationOptions: HttpsOptions = {
   region: "europe-west1",
+  invoker: "public", // Added to allow unauthenticated calls for now
 };
 export const approveInvitation = onCall(
   approveInvitationOptions,
@@ -273,7 +275,7 @@ export const approveInvitation = onCall(
         logger.warn(`${logMarker}: ${msg} Status: ${docData?.status}`);
         return {
           success: false,
-          message: `Invitation déjà traitée (${docData?.status}).`,
+          message: `Inv. déjà traitée (${docData?.status}).`,
         };
       }
 
@@ -300,6 +302,7 @@ export const approveInvitation = onCall(
 
 const rejectInvitationOptions: HttpsOptions = {
   region: "europe-west1",
+  invoker: "public", // Added to allow unauthenticated calls for now
 };
 export const rejectInvitation = onCall(
   rejectInvitationOptions,
@@ -337,7 +340,7 @@ export const rejectInvitation = onCall(
         logger.warn(`${logMarker}: ${msg} Status: ${docData?.status}`);
         return {
           success: false,
-          message: `Invitation déjà traitée (${docData?.status}).`,
+          message: `Inv. déjà traitée (${docData?.status}).`,
         };
       }
 
