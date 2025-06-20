@@ -3,18 +3,16 @@
 import {onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 
-// Ce log est crucial. S'il n'apparaît PAS dans les logs du CONTENEUR Cloud Run
-// (pas les logs de la fonction, mais les logs stdout/stderr du conteneur
-// lui-même), alors le script n'est même pas chargé par Node.js.
+// Ce log est crucial.
 console.log(
-  "ULTRA_MINIMAL_V9_LOG: Top of index.ts. Attempting to load. Region: europe-west1"
+  "ULTRA_MINIMAL_V9_LOG: Top of index.ts. Load. Region: europe-west1"
 );
 
 export const ultraMinimalFunction = onCall(
-  {region: "europe-west1"}, // Spécifier la région est une bonne pratique
+  {region: "europe-west1"},
   (request) => {
     logger.info(
-      "ULTRA_MINIMAL_V9_LOG: ultraMinimalFunction was called.",
+      "ULTRA_MINIMAL_V9_LOG: ultraMinimalFunction called.",
       {structuredData: true, data: request.data}
     );
     return {
@@ -26,5 +24,5 @@ export const ultraMinimalFunction = onCall(
 );
 
 console.log(
-  "ULTRA_MINIMAL_V9_LOG: End of index.ts. ultraMinimalFunction defined."
+  "ULTRA_MINIMAL_V9_LOG: End of index.ts. Func defined."
 );
