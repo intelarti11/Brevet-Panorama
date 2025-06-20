@@ -30,8 +30,8 @@ try {
     errStack = error.stack || "No stack";
   }
   logger.error(
-    `${LOG_PREFIX}: FB_INIT_FAIL.`,
-    {m: errMsg.slice(0, 15), s: errStack.slice(0, 20), o: String(error).slice(0, 15)}
+    `${LOG_PREFIX}: FB_INIT_KO.`,
+    {m: errMsg.slice(0, 8), s: errStack.slice(0, 10), o: String(error).slice(0, 8)}
   );
   db = null;
   adminApp = null;
@@ -82,21 +82,21 @@ export const requestInvitation = onCall(
       logger.warn(`${logMarker}: DB not init.`);
       return {
         success: false,
-        m: "Srv Err (DB KO).",
+        m: "Srv.DB KO.", // Raccourci
         d: request.data,
       };
     }
 
     const email = request.data.email;
     if (!email || typeof email !== "string" || !email.includes("@")) {
-      logger.error(`${logMarker}: Invalid mail.`, {e: String(email).slice(0, 15)});
+      logger.error(`${logMarker}: Invalid mail.`, {e: String(email).slice(0, 10)});
       return {
         success: false,
-        m: "Mail invalide.",
+        m: "Mail inv.", // Raccourci
         d: request.data,
       };
     }
-    const emailShort = String(email).slice(0, 15);
+    const emailShort = String(email).slice(0, 10); // Raccourci pour log
 
     try {
       const coll = "invitationRequests";
@@ -109,7 +109,7 @@ export const requestInvitation = onCall(
         logger.info(`${logMarker}: Pend. req ${emailShort} exists.`);
         return {
           success: false,
-          m: `Req ${emailShort} attente.`,
+          m: `Req ${emailShort} att.`, // Raccourci
           d: request.data,
         };
       }
@@ -134,12 +134,12 @@ export const requestInvitation = onCall(
         errorMsg = writeError.message;
       }
       logger.error(
-        `${logMarker}: FS write KO ${emailShort}.`,
-        {e: errorMsg.slice(0, 15), o: String(writeError).slice(0, 10)}
+        `${logMarker}: FS Wrt KO ${emailShort.slice(0,10)}.`,
+        {e: errorMsg.slice(0, 8), o: String(writeError).slice(0, 8)}
       );
       return {
         success: false,
-        m: `Save KO: ${errorMsg.slice(0, 15)}`,
+        m: `Save KO: ${errorMsg.slice(0, 10)}`, // Raccourci
         d: request.data,
       };
     }
@@ -218,12 +218,13 @@ export const listPendingInvitations = onCall(
       if (error instanceof Error) {
         errorMsg = error.message;
       }
-      logger.error(`${logMarker}: List fail. ${errorMsg.slice(0, 15)}`, {
-        o: String(error).slice(0, 10),
-      });
+      logger.error(
+        `${logMarker}: Lst KO. ${errorMsg.slice(0, 8)}`,
+        {o: String(error).slice(0, 8)}
+      );
       return {
         success: false,
-        m: `List KO: ${errorMsg.slice(0, 10)}`,
+        m: `Lst KO: ${errorMsg.slice(0, 8)}`, // Raccourci
         invitations: [],
       };
     }
@@ -245,14 +246,14 @@ export const approveInvitation = onCall(
     );
 
     if (!db || !adminApp) {
-      logger.warn(`${logMarker}: DB/AdminApp KO.`);
-      return {success: false, m: "Err srv (DB/Admin)."};
+      logger.warn(`${logMarker}: DB/Adm KO.`);
+      return {success: false, m: "Srv.DB/Adm KO."}; // Raccourci
     }
 
     const invId = request.data.invitationId;
     if (!invId || typeof invId !== "string") {
       logger.error(`${logMarker}: Invalid ID.`, {id: String(invId).slice(0, 5)});
-      return {success: false, m: "ID inv invalide."};
+      return {success: false, m: "ID inv."}; // Raccourci
     }
     const invIdShort = String(invId).slice(0, 10);
 
@@ -262,7 +263,7 @@ export const approveInvitation = onCall(
 
       if (!invDoc.exists) {
         logger.warn(`${logMarker}: Inv ${invIdShort} not found.`);
-        return {success: false, m: "Inv non trouvée."};
+        return {success: false, m: "Inv no find."}; // Raccourci
       }
 
       const docData = invDoc.data();
@@ -270,16 +271,16 @@ export const approveInvitation = onCall(
         logger.warn(`${logMarker}: Inv ${invIdShort} not pend. St: ${docData?.status}`);
         return {
           success: false,
-          m: `Inv traitée (${docData?.status}).`,
+          m: `Inv done (${docData?.status}).`, // Raccourci
         };
       }
 
       const email = docData?.email;
       if (!email || typeof email !== "string") {
         logger.error(`${logMarker}: Mail absent ${invIdShort}.`);
-        return {success: false, m: "Mail absent."};
+        return {success: false, m: "Mail miss."}; // Raccourci
       }
-      const emailShort = String(email).slice(0, 15);
+      const emailShort = String(email).slice(0, 10); // Raccourci pour log
 
       let userCrMsg = "";
       let userMsgShort = "";
@@ -303,8 +304,8 @@ export const approveInvitation = onCall(
           userMsgShort = "Usr exist.";
         } else {
           const errMsg = authErr.message || "Auth err";
-          logger.error(`${logMarker}: Auth KO: ${emailShort}.`, {e: errMsg.slice(0, 10)});
-          return {success: false, m: `Auth KO: ${errMsg.slice(0, 10)}`};
+          logger.error(`${logMarker}: Auth KO: ${emailShort}.`, {e: errMsg.slice(0, 8)});
+          return {success: false, m: `Auth KO: ${errMsg.slice(0, 8)}`};
         }
       }
 
@@ -316,17 +317,18 @@ export const approveInvitation = onCall(
       logger.info(`${logMarker}: OK ${invIdShort}. ${userMsgShort}`);
       return {
         success: true,
-        m: `Approuvé. ${userCrMsg}`,
+        m: `Approuvé. ${userCrMsg}`, // Raccourci
       };
     } catch (err: unknown) {
       let errorMsg = "Unk err approving.";
       if (err instanceof Error) {
         errorMsg = err.message;
       }
-      logger.error(`${logMarker}: Appr KO ${invIdShort}.`,
-        {e: errorMsg.slice(0, 15), o: String(err).slice(0, 10)}
+      logger.error(
+        `${logMarker}: Appr KO ${invIdShort}.`,
+        {e: errorMsg.slice(0, 8), o: String(err).slice(0, 8)}
       );
-      return {success: false, m: `App. KO: ${errorMsg.slice(0, 15)}`};
+      return {success: false, m: `App. KO: ${errorMsg.slice(0, 8)}`};
     }
   }
 );
@@ -346,7 +348,7 @@ export const rejectInvitation = onCall(
 
     if (!db) {
       logger.warn(`${logMarker}: DB not init.`);
-      return {success: false, m: "Err srv (DB)."};
+      return {success: false, m: "Srv.DB KO."}; // Raccourci
     }
 
     const invId = request.data.invitationId;
@@ -355,7 +357,7 @@ export const rejectInvitation = onCall(
 
     if (!invId || typeof invId !== "string") {
       logger.error(`${logMarker}: Invalid ID.`, {id: invIdShort});
-      return {success: false, m: "ID inv invalide."};
+      return {success: false, m: "ID inv."}; // Raccourci
     }
 
     try {
@@ -364,7 +366,7 @@ export const rejectInvitation = onCall(
 
       if (!invDoc.exists) {
         logger.warn(`${logMarker}: Inv ${invIdShort} not found.`);
-        return {success: false, m: "Inv non trouvée."};
+        return {success: false, m: "Inv no find."}; // Raccourci
       }
 
       const docData = invDoc.data();
@@ -372,7 +374,7 @@ export const rejectInvitation = onCall(
         logger.warn(`${logMarker}: Inv ${invIdShort} not pend. St: ${docData?.status}`);
         return {
           success: false,
-          m: `Inv traitée (${docData?.status}).`,
+          m: `Inv done (${docData?.status}).`, // Raccourci
         };
       }
 
@@ -391,18 +393,19 @@ export const rejectInvitation = onCall(
 
       await invRef.update(payload);
 
-      const emailLog = (docData?.email || "[no_mail]").slice(0, 15);
+      const emailLog = (docData?.email || "[no_mail]").slice(0, 10);
       logger.info(`${logMarker}: KO ${invIdShort} for ${emailLog}.`);
-      return {success: true, m: `${emailLog} Rej.`};
+      return {success: true, m: `${emailLog} Rej.`}; // Raccourci
     } catch (err: unknown) {
       let errorMsg = "Unk err rejecting.";
       if (err instanceof Error) {
         errorMsg = err.message;
       }
-      logger.error(`${logMarker}: Rej. KO ${invIdShort}.`,
-        {e: errorMsg.slice(0, 15), o: String(err).slice(0, 10)}
+      logger.error(
+        `${logMarker}: Rej KO ${invIdShort}.`,
+        {e: errorMsg.slice(0, 8), o: String(err).slice(0, 8)}
       );
-      return {success: false, m: `Rej. KO: ${errorMsg.slice(0, 15)}`};
+      return {success: false, m: `Rej. KO: ${errorMsg.slice(0, 8)}`};
     }
   }
 );
@@ -422,14 +425,14 @@ export const markInvitationAsNotified = onCall(
 
     if (!db) {
       logger.warn(`${logMarker}: DB not init.`);
-      return {success: false, m: "Err srv (DB)."};
+      return {success: false, m: "Srv.DB KO."}; // Raccourci
     }
 
     const invId = request.data.invitationId;
     const invIdShort = String(invId).slice(0, 10);
     if (!invId || typeof invId !== "string") {
       logger.error(`${logMarker}: Invalid ID.`, {id: invIdShort});
-      return {success: false, m: "ID inv invalide."};
+      return {success: false, m: "ID inv."}; // Raccourci
     }
 
     try {
@@ -438,25 +441,25 @@ export const markInvitationAsNotified = onCall(
 
       if (!invDoc.exists) {
         logger.warn(`${logMarker}: Inv ${invIdShort} not found.`);
-        return {success: false, m: "Inv non trouvée."};
+        return {success: false, m: "Inv no find."}; // Raccourci
       }
 
       const docData = invDoc.data();
       if (docData?.status !== "approved") {
         const currSt = docData?.status ?? "unk";
         logger.warn(`${logMarker}: Inv ${invIdShort} not OK (St: ${currSt})`);
-        return {success: false, m: "Inv not appr."};
+        return {success: false, m: "Inv !appr."}; // Raccourci
       }
       if (docData?.notifiedAt) {
         logger.info(`${logMarker}: Inv ${invIdShort} already notified.`);
-        return {success: true, m: "Inv déjà notif."};
+        return {success: true, m: "Inv !notif."}; // Raccourci
       }
 
       await invRef.update({
         notifiedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const emailLog = (docData?.email || "[no_mail]").slice(0, 15);
+      const emailLog = (docData?.email || "[no_mail]").slice(0, 10);
       logger.info(`${logMarker}: Inv ${invIdShort} for ${emailLog} notif.`);
       return {success: true, m: `Notif marquée ${emailLog}.`};
     } catch (err: unknown) {
@@ -464,14 +467,15 @@ export const markInvitationAsNotified = onCall(
       if (err instanceof Error) {
         errorMsg = err.message;
       }
-      logger.error(`${logMarker}: Mark notif KO ${invIdShort}.`,
-        {e: errorMsg.slice(0, 15), o: String(err).slice(0, 10)}
+      logger.error(
+        `${logMarker}: Ntf KO ${invIdShort}.`,
+        {e: errorMsg.slice(0, 8), o: String(err).slice(0, 8)}
       );
-      return {success: false, m: `Notif KO: ${errorMsg.slice(0, 10)}`};
+      return {success: false, m: `Ntf KO: ${errorMsg.slice(0, 8)}`};
     }
   }
 );
 
 logger.info(
-  `${LOG_PREFIX}: End. SDK init OK.`
+  `${LOG_PREFIX}: End. SDK OK.`
 );
