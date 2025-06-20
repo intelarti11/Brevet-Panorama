@@ -4,7 +4,6 @@ import {onCall, HttpsOptions} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
-// Log prefix for this version (V11)
 const LOG_PREFIX_V11 = "INIT_V11";
 
 logger.info(
@@ -48,7 +47,6 @@ try {
   adminApp = null;
 }
 
-// Ultra minimal function for basic testing
 export const ultraMinimalFunction = onCall(
   {region: "europe-west1"},
   (request) => {
@@ -75,12 +73,14 @@ export const ultraMinimalFunction = onCall(
   }
 );
 
-// RequestInvitation - SIMPLIFIED VERSION FOR DEPLOYMENT TEST
+// Explicitly type the options object
+const requestInvitationOptions: HttpsOptions = {
+  region: "europe-west1",
+  invoker: "public",
+};
+
 export const requestInvitation = onCall(
-  {
-    region: "europe-west1",
-    invoker: "public",
-  } as HttpsOptions,
+  requestInvitationOptions,
   (request) => {
     const logMarker = "REQUEST_INVITATION_SIMPLIFIED_V11_LOG";
     logger.info(
@@ -90,7 +90,6 @@ export const requestInvitation = onCall(
 
     if (!adminApp) {
       logger.error(`${logMarker}: AdminApp not initialized!`);
-      // Ne pas retourner ici, test de fin de fonction
     }
     if (!db) {
       logger.warn(
@@ -103,13 +102,12 @@ export const requestInvitation = onCall(
       };
     }
 
-    // Pas d'écriture Firestore, juste un log et un retour
     logger.info(
       `${logMarker}: Email rcvd (not processed): ${request.data.email}`
     );
     return {
       success: true,
-      message: "Simplified v11: Req logged. No Firestore write in this ver.",
+      message: "Simplified v11: Req logged. No Firestore write.",
       receivedData: request.data,
     };
   }
