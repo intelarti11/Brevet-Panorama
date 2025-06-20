@@ -157,7 +157,7 @@ const listPendingInvitationsOptions: HttpsOptions = {
 export const listPendingInvitations = onCall(
   listPendingInvitationsOptions,
   async () => {
-    const logMarker = "LIST_INVITES_V1_LOG";
+    const logMarker = "LIST_INVITES_V2_LOG"; // Changed V1 to V2 to force redeploy
     logger.info(`${logMarker}: Called.`);
 
     if (!db) {
@@ -187,15 +187,16 @@ export const listPendingInvitations = onCall(
 
       const invitations = snapshot.docs.map((doc) => {
         const data = doc.data();
-        const rawTimestamp = data.requestedAt;
+        // Shortened variable name here
+        const reqTimestamp = data.requestedAt;
         let requestedAtISO: string;
 
-        // Robustly check if rawTimestamp is a Firestore Timestamp and can call .toDate()
-        if (rawTimestamp && typeof rawTimestamp.toDate === 'function') {
-          requestedAtISO = (rawTimestamp as admin.firestore.Timestamp).toDate().toISOString();
+        if (reqTimestamp && typeof (reqTimestamp as any).toDate === "function") {
+          requestedAtISO = (reqTimestamp as admin.firestore.Timestamp).toDate().toISOString();
         } else {
           // Log a warning and use a fallback if it's not a valid Timestamp or is missing
-          logger.warn(`${logMarker}: requestedAt for doc ${doc.id} is not a valid Firestore Timestamp or is missing. Value: ${JSON.stringify(rawTimestamp)}. Using current date as fallback.`);
+          const logMessage = `${logMarker}: requestedAt for doc ${doc.id} is not a valid Timestamp or is missing.`;
+          logger.warn(logMessage, {value: JSON.stringify(reqTimestamp)});
           requestedAtISO = new Date().toISOString();
         }
         
