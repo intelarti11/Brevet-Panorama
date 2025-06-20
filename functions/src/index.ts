@@ -278,7 +278,7 @@ export const approveInvitation = onCall(
       }
 
       let userCreationMessage = "";
-      let userMessageShort = "";
+      let userMessageShort = ""; // For logs, kept very short
 
       try {
         const tempPassword = crypto.randomBytes(16).toString("hex");
@@ -291,18 +291,20 @@ export const approveInvitation = onCall(
         const logUMsg = `${logMarker}: User ${userRecord.uid} created.`;
         logger.info(logUMsg);
         userCreationMessage = "Cpt créé. Use 'Mdp oublié'.";
-        userMessageShort = "Cpt créé.";
+        userMessageShort = "Usr créé."; // Shortened for log
       } catch (authErrorUnknown: unknown) {
         const authError = authErrorUnknown as {code?: string; message?: string};
         if (authError.code === "auth/email-already-exists") {
           logger.warn(`${logMarker}: User ${emailToApprove} exists.`);
           userCreationMessage = "Cpt existant.";
-          userMessageShort = "Cpt existant.";
+          userMessageShort = "Usr exist."; // Shortened for log
         } else {
           const errMsg = authError.message || "Auth error";
           const logErr = `${logMarker}: Auth FAIL: ${emailToApprove}.`;
           logger.error(logErr, {error: errMsg});
-          return {success: false, message: `Échec Auth: ${errMsg}`};
+          // Ensure message is short
+          const displayErrMsg = errMsg.substring(0, 30);
+          return {success: false, message: `Échec Auth: ${displayErrMsg}`};
         }
       }
 
@@ -311,11 +313,14 @@ export const approveInvitation = onCall(
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const finalLogMsg = `${logMarker}: OK ${invitationId}. ${userMessageShort}`;
+      // This is the line (314 in user's context) that was causing max-len
+      const finalLogMsg =
+        `${logMarker}: OK ${invitationId}. ${userMessageShort}`;
       logger.info(finalLogMsg);
+
       return {
         success: true,
-        message: `Approuvé. ${userCreationMessage}`,
+        message: `OK. ${userCreationMessage}`, // Kept short for client
       };
     } catch (err: unknown) {
       let errorMsg = "Unknown error approving invitation.";
@@ -324,7 +329,9 @@ export const approveInvitation = onCall(
       }
       const logErr = `${logMarker}: Approve FAIL ${invitationId}.`;
       logger.error(logErr, {error: errorMsg, originalError: String(err)});
-      return {success: false, message: `Approb. échec: ${errorMsg}`};
+      // Ensure message is short
+      const displayErrMsg = errorMsg.substring(0, 40);
+      return {success: false, message: `Approb. échec: ${displayErrMsg}`};
     }
   }
 );
@@ -402,7 +409,9 @@ export const rejectInvitation = onCall(
       }
       const logErr = `${logMarker}: Rej. FAIL ${invitationId}.`;
       logger.error(logErr, {error: errorMsg, originalError: String(err)});
-      return {success: false, message: `Rejet échec: ${errorMsg}`};
+      // Ensure message is short
+      const displayErrMsg = errorMsg.substring(0, 40);
+      return {success: false, message: `Rejet échec: ${displayErrMsg}`};
     }
   }
 );
