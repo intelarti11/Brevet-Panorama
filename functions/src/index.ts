@@ -40,7 +40,7 @@ export const requestInvitation = functions.region("europe-west1")
     if (context.app === undefined) {
       throw new functions.https.HttpsError(
         "failed-precondition",
-        "Appel via app vérifiée requis."
+        "Appel via app vérif. requis."
       );
     }
 
@@ -67,13 +67,13 @@ export const requestInvitation = functions.region("europe-west1")
         if (existingRequest.status === "approved") {
           throw new functions.https.HttpsError(
             "already-exists",
-            "Compte existant pour cet e-mail."
+            "Compte existant."
           );
         }
         if (existingRequest.status === "pending") {
           throw new functions.https.HttpsError(
             "already-exists",
-            "Demande en cours pour cet e-mail."
+            "Demande en cours."
           );
         }
         // Réutilise une demande rejetée
@@ -92,7 +92,7 @@ export const requestInvitation = functions.region("europe-west1")
           }, {merge: true});
 
         functions.logger.info(
-          `Demande MAJ et remise attente: ${lowerEmail}`
+          `Demande MAJ attente: ${lowerEmail}`
         );
         return {
           success: true,
@@ -120,9 +120,9 @@ export const requestInvitation = functions.region("europe-west1")
       }
       let errMsg = "Echec demande.";
       if (error instanceof Error) {
-        errMsg = error.message;
+        errMsg = error.message.slice(0, 20);
       }
-      throw new functions.https.HttpsError("internal", errMsg.slice(0, 30));
+      throw new functions.https.HttpsError("internal", errMsg);
     }
   });
 
@@ -134,7 +134,7 @@ export const approveInvitation = functions.region("europe-west1")
     functions.logger.info("Approbation invit:", data);
 
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
-      functions.logger.error("Accès non-autorisé (approve).", context.auth);
+      functions.logger.error("Accès non-autorisé (approve).");
       throw new functions.https.HttpsError(
         "permission-denied",
         "Droits admin requis."
@@ -142,7 +142,6 @@ export const approveInvitation = functions.region("europe-west1")
     }
     const adminUid = context.auth.uid;
     functions.logger.info(`Approve: admin OK. UID: ${adminUid}`);
-
 
     try {
       const validationResult = manageInvitationSchema.safeParse(data);
@@ -201,10 +200,10 @@ export const approveInvitation = functions.region("europe-west1")
           try {
             existingUser = await admin.auth().getUserByEmail(lowerEmail);
           } catch (getUserError: unknown) {
-            let msg = "Err vérif. user.";
+            let msg = "Err vérif user.";
             if (getUserError instanceof Error) msg = getUserError.message;
-            functions.logger.error("Err getUser:", {getUserError});
-            throw new functions.https.HttpsError("internal", msg.slice(0, 30));
+            functions.logger.error("Err getUser:", getUserError);
+            throw new functions.https.HttpsError("internal", msg.slice(0, 20));
           }
 
           await db.collection("invitationRequests")
@@ -221,10 +220,10 @@ export const approveInvitation = functions.region("europe-west1")
           };
         }
         // Autre erreur Auth
-        functions.logger.error("Auth create err:", authError);
-        let errMsg = "Err creat. user";
+        functions.logger.error("Auth create fail:", authError);
+        let errMsg = "Err creat user";
         if (authError instanceof Error) errMsg = authError.message;
-        const finalErrMsg = errMsg.slice(0, 30);
+        const finalErrMsg = errMsg.slice(0, 20);
         throw new functions.https.HttpsError("internal", finalErrMsg);
       }
 
@@ -245,13 +244,13 @@ export const approveInvitation = functions.region("europe-west1")
         message: `Invit. ${lowerEmail} ok. MDP via 'Oublié?'.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Err approve inv:", error);
+      functions.logger.error("Err approveInv:", error);
       if (error instanceof functions.https.HttpsError) {
         throw error;
       }
       let errMsg = "Echec approbation.";
-      if (error instanceof Error) errMsg = error.message;
-      throw new functions.https.HttpsError("internal", errMsg.slice(0, 30));
+      if (error instanceof Error) errMsg = error.message.slice(0, 20);
+      throw new functions.https.HttpsError("internal", errMsg);
     }
   });
 
@@ -263,7 +262,7 @@ export const rejectInvitation = functions.region("europe-west1")
     functions.logger.info("Rejet invit:", data);
 
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
-      functions.logger.error("Accès non-autorisé (reject).", context.auth);
+      functions.logger.error("Accès non-autorisé (reject).");
       throw new functions.https.HttpsError(
         "permission-denied",
         "Droits admin requis."
@@ -271,7 +270,6 @@ export const rejectInvitation = functions.region("europe-west1")
     }
     const adminUid = context.auth.uid;
     functions.logger.info(`Reject: admin OK. UID: ${adminUid}`);
-
 
     try {
       const validationResult = rejectInvitationSchema.safeParse(data);
@@ -321,8 +319,8 @@ export const rejectInvitation = functions.region("europe-west1")
         throw error;
       }
       let errMsg = "Echec rejet.";
-      if (error instanceof Error) errMsg = error.message;
-      throw new functions.https.HttpsError("internal", errMsg.slice(0, 30));
+      if (error instanceof Error) errMsg = error.message.slice(0, 20);
+      throw new functions.https.HttpsError("internal", errMsg);
     }
   });
 
@@ -334,7 +332,7 @@ export const listPendingInvitations = functions.region("europe-west1")
     functions.logger.info("Listage invitations en attente.");
 
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
-      functions.logger.error("Accès non-autorisé (listPending).", context.auth);
+      functions.logger.error("Accès non-autorisé (listPending).");
       throw new functions.https.HttpsError(
         "permission-denied",
         "Droits admin requis."
@@ -372,14 +370,14 @@ export const listPendingInvitations = functions.region("europe-west1")
     } catch (error: unknown) {
       functions.logger.error("Err listPending:", error);
       let errMsg = "Echec liste invit.";
-      if (error instanceof Error) errMsg = error.message;
-      throw new functions.https.HttpsError("internal", errMsg.slice(0, 30));
+      if (error instanceof Error) errMsg = error.message.slice(0, 20);
+      throw new functions.https.HttpsError("internal", errMsg);
     }
   });
 
 // Schéma de validation pour setAdminRole
 const setAdminRoleSchema = z.object({
-  email: z.string().email({message: "E-mail invalide."}).optional(),
+  email: z.string().email("E-mail invalide.").optional(),
   uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
 }).refine((inputData) => inputData.email || inputData.uid, {
   message: "E-mail ou UID requis.",
@@ -393,7 +391,7 @@ type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
 export const setAdminRole = functions.region("europe-west1")
   .https.onCall(async (data: SetAdminRoleInput, context) => {
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
-      functions.logger.error("Accès non-autorisé (setAdminRole).", context.auth);
+      functions.logger.error("Accès non-autorisé (setAdminRole).");
       throw new functions.https.HttpsError(
         "permission-denied",
         "Droits admin requis."
@@ -401,17 +399,18 @@ export const setAdminRole = functions.region("europe-west1")
     }
     const callingAdminUid = context.auth.uid;
     functions.logger.info(
-      `Attrib. rôle admin par: ${callingAdminUid}`, {data}
+      `SetAdmin par: ${callingAdminUid}`, {data}
     );
 
     try {
       const validationResult = setAdminRoleSchema.safeParse(data);
       if (!validationResult.success) {
-        const errors = validationResult.error.flatten();
-        const errorMsg = "Données invalides: " +
-          errors.formErrors.join(", ");
-        functions.logger.error("Valid. échouée (setAdmin):", errors);
-        throw new functions.https.HttpsError("invalid-argument", errorMsg);
+        const flatErrors = validationResult.error.flatten();
+        functions.logger.error("Err setAdmin valid:", flatErrors);
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "Err. données." // Très court message
+        );
       }
       const {email, uid: providedUid} = validationResult.data;
       let targetUid = providedUid;
@@ -421,10 +420,10 @@ export const setAdminRole = functions.region("europe-west1")
           const userRecord = await admin.auth().getUserByEmail(email);
           targetUid = userRecord.uid;
         } catch (e: unknown) {
-          let msg = "Err récup. user.";
-          if (e instanceof Error) msg = e.message;
+          let msg = "Err récup user.";
+          if (e instanceof Error) msg = e.message.slice(0, 15);
           functions.logger.error(`Err getUserByEmail ${email}:`, e);
-          throw new functions.https.HttpsError("not-found", msg.slice(0, 30));
+          throw new functions.https.HttpsError("not-found", msg);
         }
       }
 
@@ -445,7 +444,9 @@ export const setAdminRole = functions.region("europe-west1")
         throw error;
       }
       let errMsg = "Echec rôle admin.";
-      if (error instanceof Error) errMsg = error.message;
-      throw new functions.https.HttpsError("internal", errMsg.slice(0, 30));
+      if (error instanceof Error) errMsg = error.message.slice(0, 20);
+      throw new functions.https.HttpsError("internal", errMsg);
     }
   });
+
+    
