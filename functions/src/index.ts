@@ -196,7 +196,7 @@ export const listPendingInvitations = onCall(
         } else {
           const shortId = doc.id.substring(0, 10);
           logger.warn(`LST_INV: Bad reqAt ${shortId}...`, {
-            ts: String(reqTimestamp).slice(0,15),
+            ts: String(reqTimestamp).slice(0, 15),
           });
           requestedAtISO = new Date(0).toISOString();
         }
@@ -219,7 +219,7 @@ export const listPendingInvitations = onCall(
       logger.info(logMsg);
       return {
         success: true,
-        message: "Liste des invitations récupérée.",
+        message: "Liste inv. OK.",
         invitations: invitations,
       };
     } catch (error: unknown) {
@@ -408,7 +408,7 @@ export const rejectInvitation = onCall(
       const emailLog = docData?.email || "[no_email]";
       const sucMsg = `${logMarker}: KO ${invitationId} for ${emailLog}.`;
       logger.info(sucMsg);
-      return {success: true, message: `Invite ${emailLog} rejetée.`};
+      return {success: true, message: `Inv. ${emailLog} rejetée.`};
     } catch (err: unknown) {
       let errorMsg = "Unknown error rejecting invitation.";
       if (err instanceof Error) {
@@ -429,7 +429,7 @@ const markInvitationAsNotifiedOptions: HttpsOptions = {
 export const markInvitationAsNotified = onCall(
   markInvitationAsNotifiedOptions,
   async (request) => {
-    const logMarker = "NTFY_V1"; // Shorter marker for this function
+    const logMarker = "NTFY_V1";
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -450,7 +450,7 @@ export const markInvitationAsNotified = onCall(
       const inviteRef = db.collection("invitationRequests").doc(invitationId);
       const inviteDoc = await inviteRef.get();
 
-      if (!inviteDoc.exists){
+      if (!inviteDoc.exists) {
         logger.warn(`${logMarker}: Inv ${invitationId} not found.`);
         return {success: false, message: "Invitation non trouvée."};
       }
@@ -458,8 +458,8 @@ export const markInvitationAsNotified = onCall(
       const docData = inviteDoc.data();
       if (docData?.status !== "approved") {
         const currSt = docData?.status ?? "unknown";
-        logger.warn(`${logMarker}: Inv ${invitationId} not appr. Stat: ${currSt}`);
-        return {success: false, message: "Inv. doit être 'approved' pour notif."};
+        logger.warn(`${logMarker}: Inv ${invitationId} not appr. St: ${currSt}`);
+        return {success: false, message: "Inv. non appr. pr notif."};
       }
       if (docData?.notifiedAt) {
         logger.info(`${logMarker}: Inv ${invitationId} already notified.`);
@@ -471,7 +471,7 @@ export const markInvitationAsNotified = onCall(
       });
 
       const emailLog = docData?.email || "[no_email]";
-      logger.info(`${logMarker}: Inv ${invitationId} for ${emailLog} notified.`);
+      logger.info(`${logMarker}: Inv ${invitationId} for ${emailLog} notif.`);
       return {success: true, message: `Notification marquée pour ${emailLog}.`};
     } catch (err: unknown) {
       let errorMsg = "Erreur lors du marquage de la notification.";
