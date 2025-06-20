@@ -126,8 +126,7 @@ export const requestInvitation = onCall(
       return {
         success: true,
         message: `Demande pour ${email} enregistrée. Vous serez contacté.`,
-        // No longer sending ID to client here
-        receivedData: request.data, // Keep for logging if needed
+        receivedData: request.data,
       };
     } catch (writeError: unknown) {
       let errorMsg = "Unknown Firestore write error.";
@@ -186,16 +185,21 @@ export const listPendingInvitations = onCall(
       const invitations = snapshot.docs.map((doc) => {
         const data = doc.data();
         const requestedAtTimestamp = data.requestedAt as admin.firestore.Timestamp;
+        // Convert Firestore Timestamp to ISO string for the client
+        const requestedAtISO = requestedAtTimestamp ?
+          requestedAtTimestamp.toDate().toISOString() :
+          new Date().toISOString();
         return {
           id: doc.id,
           email: data.email,
-          // Convert Firestore Timestamp to ISO string for the client
-          requestedAt: requestedAtTimestamp ? requestedAtTimestamp.toDate().toISOString() : new Date().toISOString(),
+          requestedAt: requestedAtISO,
           status: data.status,
         };
       });
 
-      logger.info(`${logMarker}: Found ${invitations.length} invitations.`);
+      logger.info(`${logMarker}: Found invitations.`, {
+        count: invitations.length,
+      });
       return {
         success: true,
         message: "Invitations en attente récupérées.",
@@ -206,8 +210,9 @@ export const listPendingInvitations = onCall(
       if (error instanceof Error) {
         errorMsg = error.message;
       }
+      const logErrorMessage = `${logMarker}: Failed to list invitations.`;
       logger.error(
-        `${logMarker}: Failed to list invitations.`,
+        logErrorMessage,
         {error: errorMsg, originalError: String(error)}
       );
       return {
