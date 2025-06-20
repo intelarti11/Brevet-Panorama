@@ -32,8 +32,7 @@ import { app } from '@/lib/firebase';
 
 const formSchema = z.object({
   usernameOrEmail: z.string()
-    .min(1, { message: "L'adresse e-mail est requise." })
-    .email({ message: "Veuillez entrer une adresse e-mail valide." }),
+    .min(1, { message: "Le nom d'utilisateur ou l'e-mail est requis." }), // Reverted: Removed .email() validation
   password: z.string().min(1, { message: "Le mot de passe est requis." }),
 });
 
@@ -55,6 +54,10 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
+      // Firebase signInWithEmailAndPassword expects an email.
+      // If you want to support username login, you'd typically need a backend
+      // function to look up the email associated with the username first.
+      // For now, this will still attempt to sign in with values.usernameOrEmail as if it's an email.
       await signInWithEmailAndPassword(auth, values.usernameOrEmail, values.password);
       toast({
         title: "Connexion réussie",
@@ -69,7 +72,8 @@ export default function LoginPage() {
       if (authError.code === 'auth/user-not-found' || authError.code === 'auth/wrong-password' || authError.code === 'auth/invalid-credential') {
         description = "Identifiants incorrects. Veuillez vérifier votre e-mail et mot de passe.";
       } else if (authError.code === 'auth/invalid-email') {
-        description = "Le format de l'adresse e-mail est invalide.";
+        // This error might still occur if "Adminbrevet" is passed to Firebase Auth
+        description = "Le format de l'identifiant est invalide pour la connexion par e-mail.";
       } else if (authError.code === 'auth/too-many-requests') {
         description = "Trop de tentatives de connexion. Veuillez réessayer plus tard.";
       }
@@ -103,7 +107,7 @@ export default function LoginPage() {
                     <FormControl>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="text" placeholder="prenom.nom@exemple.com" {...field} className="pl-10" />
+                        <Input type="text" placeholder="Identifiant ou prenom.nom@exemple.com" {...field} className="pl-10" />
                       </div>
                     </FormControl>
                     <FormMessage />
