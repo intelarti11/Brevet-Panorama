@@ -24,14 +24,10 @@ try {
   logger.info(`${LOG_PREFIX}: FB Admin SDK init OK.`);
 } catch (eCatch: unknown) {
   let errMsg = "Unk err FB Admin init.";
-  let errStack = "No stack trace.";
   if (eCatch instanceof Error) {
     errMsg = eCatch.message;
-    errStack = eCatch.stack || "No stack";
   }
-  logger.error(
-    `${LOG_PREFIX}:INIT_KO ${String(eCatch).slice(0,30)}` // Line 34
-  );
+  logger.error(`${LOG_PREFIX}:INIT_KO ${errMsg.slice(0,20)} ${String(eCatch).slice(0,20)}`);
   db = null;
   adminApp = null;
 }
@@ -40,10 +36,7 @@ export const ultraMinimalFunction = onCall(
   {region: "europe-west1"},
   (req) => {
     const logMarker = "MIN";
-    logger.info(
-      `${logMarker}: Called.`,
-      {d: req.data}
-    );
+    logger.info(`${logMarker}: Called.`, {d: req.data});
     if (!db) {
       logger.warn(`${logMarker}: DB not init.`);
       return {
@@ -69,10 +62,7 @@ export const requestInvitation = onCall(
   requestInvitationOptions,
   async (req) => {
     const logMarker = "REQ";
-    logger.info(
-      `${logMarker}: Called.`,
-      {d: req.data}
-    );
+    logger.info(`${logMarker}: Called.`, {d: req.data});
 
     if (!adminApp) {
       logger.error(`${logMarker}: AdminApp not init! Crit.`);
@@ -121,7 +111,7 @@ export const requestInvitation = onCall(
         notifiedAt: null,
       });
 
-      logger.info(`${logMarker}:OK ${emailShort} ID:${newRef.id.slice(0,3)}`); // Line 92
+      logger.info(`${logMarker}:OK ${emailShort} ID:${newRef.id.slice(0,1)}`);
       return {
         success: true,
         m: `Req ${emailShort} OK.`,
@@ -186,7 +176,7 @@ export const listPendingInvitations = onCall(
         if (reqTs && typeof reqTs.toDate === "function") {
           reqAtISO = reqTs.toDate().toISOString();
         } else {
-          logger.warn(`${logMarker}:BadRA ${doc.id.sl(0,3)} TS:${String(reqTs).sl(0,3)}`); // Line 125, comma checked
+          logger.warn(`${logMarker}:BadRA ${doc.id.slice(0,1)} TS:${String(reqTs).slice(0,1)}`);
           reqAtISO = new Date(0).toISOString();
         }
 
@@ -215,10 +205,7 @@ export const listPendingInvitations = onCall(
       if (eCatch instanceof Error) {
         errMsg = eCatch.message;
       }
-      logger.error(
-        `${logMarker}:Lst KO ${errMsg.slice(0, 3)}`,
-        {o: String(eCatch).slice(0, 3)}
-      );
+      logger.error(`${logMarker}:Lst KO ${errMsg.slice(0,15)} ${String(eCatch).slice(0,15)}`);
       return {
         success: false,
         m: `Lst KO: ${errMsg.slice(0, 8)}`,
@@ -237,10 +224,7 @@ export const approveInvitation = onCall(
   approveInvitationOptions,
   async (req) => {
     const logMarker = "APR";
-    logger.info(
-      `${logMarker}: Called.`,
-      {d: req.data}
-    );
+    logger.info(`${logMarker}: Called.`, {d: req.data});
 
     if (!db || !adminApp) {
       logger.warn(`${logMarker}: DB/Adm KO.`);
@@ -265,7 +249,7 @@ export const approveInvitation = onCall(
 
       const dData = invDoc.data();
       if (dData?.status !== "pending") {
-        logger.warn(`${logMarker}:Inv ${invIdShort} !pend St:${dData?.status}`); // Line 255
+        logger.warn(`${logMarker}:Inv ${invIdShort} !pend St:${dData?.status?.slice(0,3)}`);
         return {
           success: false,
           m: `Inv done (${dData?.status}).`,
@@ -290,7 +274,7 @@ export const approveInvitation = onCall(
           password: tmpPwd,
           disabled: false,
         });
-        logger.info(`${logMarker}:Usr ${userRec.uid.slice(0,3)} OK`); // Line 271
+        logger.info(`${logMarker}:Usr ${userRec.uid.slice(0,1)}OK`);
         userCrMsg = "Cpt créé. Mdp via 'Oublié'.";
         userMsgShort = "Usr ok.";
       } catch (authErrorUnknown: unknown) {
@@ -311,7 +295,7 @@ export const approveInvitation = onCall(
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      logger.info(`${logMarker}:OK ${invIdShort} ${userMsgShort}`); // Line 307
+      logger.info(`${logMarker}:OK ${invIdShort.slice(0,3)} ${userMsgShort.slice(0,3)}`);
       return {
         success: true,
         m: `Approuvé. ${userCrMsg}`,
@@ -338,10 +322,7 @@ export const rejectInvitation = onCall(
   rejectInvitationOptions,
   async (req) => {
     const logMarker = "REJ";
-    logger.info(
-      `${logMarker}: Called.`,
-      {d: req.data}
-    );
+    logger.info(`${logMarker}: Called.`, {d: req.data});
 
     if (!db) {
       logger.warn(`${logMarker}: DB not init.`);
@@ -368,7 +349,7 @@ export const rejectInvitation = onCall(
 
       const dData = invDoc.data();
       if (dData?.status !== "pending") {
-        logger.warn(`${logMarker}:Inv ${invIdShort} !pend St:${dData?.status}`); // Line 374
+        logger.warn(`${logMarker}:Inv ${invIdShort} !pend St:${dData?.status?.slice(0,3)}`);
         return {
           success: false,
           m: `Inv done (${dData?.status}).`,
@@ -415,10 +396,7 @@ export const markInvitationAsNotified = onCall(
   markInvitationAsNotifiedOptions,
   async (req) => {
     const logMarker = "NTF";
-    logger.info(
-      `${logMarker}: Called.`,
-      {d: req.data}
-    );
+    logger.info(`${logMarker}: Called.`, {d: req.data});
 
     if (!db) {
       logger.warn(`${logMarker}: DB not init.`);
@@ -444,7 +422,7 @@ export const markInvitationAsNotified = onCall(
       const dData = invDoc.data();
       if (dData?.status !== "approved") {
         const currSt = dData?.status ?? "unk";
-        logger.warn(`${logMarker}:Inv ${invIdShort} !OK St:${currSt}`);
+        logger.warn(`${logMarker}:Inv ${invIdShort} !OK St:${currSt.slice(0,3)}`);
         return {success: false, m: "Inv !appr."};
       }
       if (dData?.notifiedAt) {
@@ -457,7 +435,7 @@ export const markInvitationAsNotified = onCall(
       });
 
       const emailLog = (dData?.email || "[no_mail]").slice(0, 8);
-      logger.info(`${logMarker}:Inv ${invIdShort} for ${emailLog} notif.`);
+      logger.info(`${logMarker}:Inv ${invIdShort} ${emailLog} notif.`);
       return {success: true, m: `Notif marquée ${emailLog}.`};
     } catch (eCatch: unknown) {
       let errMsg = "Err mark notif.";
@@ -476,3 +454,5 @@ export const markInvitationAsNotified = onCall(
 logger.info(
   `${LOG_PREFIX}: End. SDK OK.`
 );
+
+    
