@@ -196,7 +196,7 @@ export const listPendingInvitations = onCall(
         } else {
           const warnMsg = `${logMarker}: Invalid reqAt for ${doc.id}.`;
           logger.warn(warnMsg, {reqTsVal: String(reqTimestamp)});
-          requestedAtISO = new Date(0).toISOString();
+          requestedAtISO = new Date(0).toISOString(); // Default fallback
         }
         return {
           id: doc.id,
@@ -228,6 +228,7 @@ export const listPendingInvitations = onCall(
   }
 );
 
+// Added invoker: "public" for prototyping without full auth client-side
 const approveInvitationOptions: HttpsOptions = {
   region: "europe-west1",
   invoker: "public",
@@ -235,7 +236,7 @@ const approveInvitationOptions: HttpsOptions = {
 export const approveInvitation = onCall(
   approveInvitationOptions,
   async (request) => {
-    const logMarker = "APPROVE_INVITE_V4_LOG";
+    const logMarker = "INV_APPR_V5"; // Shortened marker
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -288,16 +289,15 @@ export const approveInvitation = onCall(
         });
         const logUMsg = `${logMarker}: User ${userRecord.uid} created.`;
         logger.info(logUMsg);
-        userCreationMessage = `Compte créé pour ${emailToApprove}. ` +
-          "Utiliser 'Mdp oublié'.";
+        userCreationMessage = "Cpt créé. Use 'Mdp oublié'.";
       } catch (authError: unknown) {
         const errorObject = authError as {code?: string; message?: string};
         if (errorObject.code === "auth/email-already-exists") {
           logger.warn(`${logMarker}: User ${emailToApprove} exists.`);
-          userCreationMessage = `Compte existant: ${emailToApprove}.`;
+          userCreationMessage = "Cpt existant.";
         } else {
           const errMsg = errorObject.message || "Auth error";
-          const logErr = `${logMarker}: Auth create FAIL: ${emailToApprove}.`;
+          const logErr = `${logMarker}: Auth FAIL: ${emailToApprove}.`;
           logger.error(logErr, {error: errMsg});
           return {success: false, message: `Échec Auth: ${errMsg}`};
         }
@@ -308,24 +308,26 @@ export const approveInvitation = onCall(
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const finalMsg = `${logMarker}: OK ${invitationId}. ${userCreationMessage}`;
-      logger.info(finalMsg);
+      const finalLogMsg = `${logMarker}: OK ${invitationId}. ${userCreationMessage}`;
+      logger.info(finalLogMsg);
+      // Shortened success message to avoid max-len
       return {
         success: true,
-        message: `Invite ${emailToApprove} OK. ${userCreationMessage}`,
+        message: `Approbation OK. ${userCreationMessage}`,
       };
     } catch (err: unknown) {
       let errorMsg = "Unknown error approving invitation.";
       if (err instanceof Error) {
         errorMsg = err.message;
       }
-      const logErr = `${logMarker}: Approval FAIL ${invitationId}.`;
+      const logErr = `${logMarker}: Approve FAIL ${invitationId}.`;
       logger.error(logErr, {error: errorMsg, originalError: String(err)});
-      return {success: false, message: `Échec approbation: ${errorMsg}`};
+      return {success: false, message: `Approb. échec: ${errorMsg}`};
     }
   }
 );
 
+// Added invoker: "public" for prototyping without full auth client-side
 const rejectInvitationOptions: HttpsOptions = {
   region: "europe-west1",
   invoker: "public",
@@ -333,7 +335,7 @@ const rejectInvitationOptions: HttpsOptions = {
 export const rejectInvitation = onCall(
   rejectInvitationOptions,
   async (request) => {
-    const logMarker = "REJECT_INVITE_V3_LOG";
+    const logMarker = "INV_REJ_V4"; // Shortened marker
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -381,14 +383,15 @@ export const rejectInvitation = onCall(
       };
 
       if (reason && typeof reason === "string" && reason.trim() !== "") {
-        updatePayload.rejectionReason = reason.substring(0, 200);
+        // Ensure reason does not make the log line too long
+        updatePayload.rejectionReason = reason.substring(0, 50);
       }
 
       const payloadLog = `${logMarker}: Payload for ${invitationId}:`;
       logger.info(payloadLog, {payload: updatePayload});
       await inviteRef.update(updatePayload);
 
-      const emailLog = docData?.email || "[email N/A]";
+      const emailLog = docData?.email || "[no_email]"; // Shortened
       const sucMsg = `${logMarker}: KO ${invitationId} for ${emailLog}.`;
       logger.info(sucMsg);
       return {success: true, message: `Invite ${emailLog} rejetée.`};
@@ -397,7 +400,7 @@ export const rejectInvitation = onCall(
       if (err instanceof Error) {
         errorMsg = err.message;
       }
-      const logErr = `${logMarker}: Rejection FAIL ${invitationId}.`;
+      const logErr = `${logMarker}: Rej. FAIL ${invitationId}.`;
       logger.error(logErr, {error: errorMsg, originalError: String(err)});
       return {success: false, message: `Rejet échec: ${errorMsg}`};
     }
@@ -407,3 +410,5 @@ export const rejectInvitation = onCall(
 logger.info(
   `${LOG_PREFIX_V13_1}: Script end. Admin SDK init done (v13.1).`
 );
+
+    
