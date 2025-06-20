@@ -209,7 +209,10 @@ export const approveInvitation = functions.region("europe-west1")
         );
       } catch (authError: unknown) {
         let code = "unknown";
-        if (typeof authError === "object" && authError !== null && "code" in authError) {
+        if (typeof authError === "object" &&
+            authError !== null &&
+            "code" in authError
+        ) {
           code = (authError as {code: string}).code;
         }
 
