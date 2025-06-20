@@ -185,10 +185,12 @@ export const listPendingInvitations = onCall(
       const invitations = snapshot.docs.map((doc) => {
         const data = doc.data();
         const requestedAtTimestamp = data.requestedAt as admin.firestore.Timestamp;
-        // Convert Firestore Timestamp to ISO string for the client
-        const requestedAtISO = requestedAtTimestamp ?
-          requestedAtTimestamp.toDate().toISOString() :
-          new Date().toISOString();
+        let requestedAtISO: string;
+        if (requestedAtTimestamp) {
+          requestedAtISO = requestedAtTimestamp.toDate().toISOString();
+        } else {
+          requestedAtISO = new Date().toISOString(); // Fallback
+        }
         return {
           id: doc.id,
           email: data.email,
