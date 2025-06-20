@@ -1,6 +1,6 @@
 
 import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
+import *import * as admin from "firebase-admin";
 import {z} from "zod";
 
 // Initialiser Firebase Admin SDK
@@ -17,7 +17,7 @@ const invitationRequestSchema = z.object({
   email: z.string().email({message: "Adresse e-mail invalide."})
     .regex(
       /^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/,
-      {message: "L'e-mail doit être au format prénom.nom@ac-montpellier.fr"}
+      {message: "L'e-mail doit être prénom.nom@ac-montpellier.fr"}
     ),
 });
 
@@ -42,7 +42,7 @@ export const requestInvitation = functions.region("europe-west1")
     if (context.app === undefined) {
       throw new functions.https.HttpsError(
         "failed-precondition",
-        "La fonction doit être appelée depuis une app vérifiée par App Check."
+        "La fonction doit être appelée depuis une app vérifiée."
       );
     }
 
@@ -156,7 +156,7 @@ export const approveInvitation = functions.region("europe-west1")
       );
     }
     functions.logger.info(
-      "Vérification admin réussie pour approveInvitation par",
+      "approveInvitation: admin access granted. Admin UID:",
       context.auth.uid
     );
 
@@ -295,7 +295,6 @@ export const rejectInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
     functions.logger.info("Rejet d'invitation reçu:", data);
 
-    // Vérification des droits d'administrateur - ESSENTIEL POUR LA SÉCURITÉ
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non autorisé à rejectInvitation:",
@@ -307,7 +306,7 @@ export const rejectInvitation = functions.region("europe-west1")
       );
     }
     functions.logger.info(
-      "Vérification admin réussie pour rejectInvitation par",
+      "rejectInvitation: admin access granted. Admin UID:",
       context.auth.uid
     );
 
@@ -376,7 +375,6 @@ export const listPendingInvitations = functions.region("europe-west1")
   .https.onCall(async (_data, context) => {
     functions.logger.info("Demande de listage des invitations en attente.");
 
-    // Vérification des droits d'administrateur - ESSENTIEL POUR LA SÉCURITÉ
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non autorisé à listPendingInvitations:",
@@ -387,10 +385,10 @@ export const listPendingInvitations = functions.region("europe-west1")
         "Droits admin insuffisants."
       );
     }
-    functions.logger.info(
-      "Vérification admin réussie pour listPendingInvitations par",
-      context.auth.uid
-    );
+    // Ligne 258 après corrections précédentes, potentiellement celle-ci.
+    functions.logger.info("listPendingInvitations: admin access granted.");
+    functions.logger.info("Admin UID:", context.auth.uid);
+
 
     try {
       const snapshot = await db.collection("invitationRequests")
@@ -404,11 +402,12 @@ export const listPendingInvitations = functions.region("europe-west1")
 
       const invitations = snapshot.docs.map((doc) => {
         const docData = doc.data();
+        const requestedAtDate = docData.requestedAt?.toDate();
         return {
           id: doc.id,
           email: docData.email,
-          requestedAt: docData.requestedAt?.toDate?.()?.toISOString() ||
-                       new Date(0).toISOString(),
+          requestedAt: requestedAtDate ?
+            requestedAtDate.toISOString() : new Date(0).toISOString(),
           status: docData.status,
         };
       });
@@ -428,7 +427,7 @@ const setAdminRoleSchema = z.object({
   email: z.string().email({message: "Adresse e-mail invalide."}).optional(),
   uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
 }).refine((inputData) => inputData.email || inputData.uid, {
-  // Raccourcissement du message pour respecter max-len
+  // Message raccourci pour respecter max-len
   message: "E-mail ou UID utilisateur requis.",
   path: ["email"],
 });
@@ -436,7 +435,6 @@ type SetAdminRoleInput = z.infer<typeof setAdminRoleSchema>;
 
 export const setAdminRole = functions.region("europe-west1")
   .https.onCall(async (data: SetAdminRoleInput, context) => {
-    // Verify admin privileges of the caller
     if (!context.auth || !context.auth.token || !context.auth.token.admin) {
       functions.logger.error(
         "Accès non autorisé à setAdminRole:",
@@ -444,7 +442,7 @@ export const setAdminRole = functions.region("europe-west1")
       );
       throw new functions.https.HttpsError(
         "permission-denied",
-        "Droits admin insuffisants."
+        "Droits admin insuffisants pour attribuer un rôle admin."
       );
     }
     const callingAdminUid = context.auth.uid;
@@ -488,6 +486,9 @@ export const setAdminRole = functions.region("europe-west1")
           "Utilisateur non trouvé avec les infos fournies."
         );
       }
+
+      // Vérifier que l'admin appelant ne se retire pas son propre rôle par erreur
+      // s'il est le seul admin (à ajouter si nécessaire)
 
       await admin.auth().setCustomUserClaims(targetUid, {admin: true});
       functions.logger.info(`Rôle admin attribué à: ${targetUid}`);
