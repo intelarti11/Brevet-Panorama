@@ -27,6 +27,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/logo';
 import { Mail, LockKeyhole, Loader2, Eye, EyeOff, User } from 'lucide-react';
+import { getAuth, signInWithEmailAndPassword, type AuthError } from 'firebase/auth';
+import { app } from '@/lib/firebase';
 
 const formSchema = z.object({
   usernameOrEmail: z.string().min(1, { message: "Le nom d'utilisateur ou l'e-mail est requis." }),
@@ -38,6 +40,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const auth = getAuth(app);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -49,26 +52,32 @@ export default function LoginPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulation de délai réseau
-    setIsLoading(false);
-
-    const expectedPassword = "test"; // Mot de passe simplifié
-
-    const isAdminbrevetLogin = values.usernameOrEmail === "Adminbrevet" && values.password === expectedPassword;
-    const isAdminEmailLogin = values.usernameOrEmail.startsWith("admin.") && values.password === expectedPassword;
-
-    if (isAdminbrevetLogin || isAdminEmailLogin) {
+    try {
+      await signInWithEmailAndPassword(auth, values.usernameOrEmail, values.password);
       toast({
         title: "Connexion réussie",
         description: "Bienvenue !",
       });
       router.push('/dashboard/panorama');
-    } else {
+    } catch (error: unknown) {
+      const authError = error as AuthError;
+      console.error("Erreur de connexion Firebase:", authError.code, authError.message);
+      let description = "Nom d'utilisateur/e-mail ou mot de passe incorrect.";
+      // Firebase error codes: https://firebase.google.com/docs/auth/admin/errors
+      if (authError.code === 'auth/user-not-found' || authError.code === 'auth/wrong-password' || authError.code === 'auth/invalid-credential') {
+        description = "Identifiants incorrects. Veuillez vérifier votre e-mail et mot de passe.";
+      } else if (authError.code === 'auth/invalid-email') {
+        description = "Le format de l'adresse e-mail est invalide.";
+      } else if (authError.code === 'auth/too-many-requests') {
+        description = "Trop de tentatives de connexion. Veuillez réessayer plus tard.";
+      }
       toast({
         variant: "destructive",
         title: "Échec de la connexion",
-        description: "Nom d'utilisateur/e-mail ou mot de passe incorrect.",
+        description: description,
       });
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -92,7 +101,7 @@ export default function LoginPage() {
                     <FormControl>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input type="text" placeholder="Adminbrevet ou prenom.nom@exemple.com" {...field} className="pl-10" />
+                        <Input type="text" placeholder="prenom.nom@exemple.com" {...field} className="pl-10" />
                       </div>
                     </FormControl>
                     <FormMessage />
