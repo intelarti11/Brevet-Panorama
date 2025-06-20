@@ -156,8 +156,8 @@ const listPendingInvitationsOptions: HttpsOptions = {
 export const listPendingInvitations = onCall(
   listPendingInvitationsOptions,
   async () => {
-    const logMarker = "LIST_INVITES_V3_LOG"; // Changed log marker
-    logger.info(`${logMarker}: INIT - Listing pending invites.`); // New log
+    const logMarker = "LIST_INVITES_V4_LOG"; // Changed log marker
+    logger.info(`${logMarker}: INIT - Listing invites (v4).`);
 
     if (!db) {
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
@@ -191,9 +191,9 @@ export const listPendingInvitations = onCall(
         if (reqTimestamp && typeof reqTimestamp.toDate === "function") {
           requestedAtISO = reqTimestamp.toDate().toISOString();
         } else {
-          const warnMsg = `${logMarker}: Invalid reqAt for ${doc.id}`;
-          logger.warn(warnMsg, {reqTs: String(reqTimestamp)});
-          requestedAtISO = new Date().toISOString();
+          const warnMsg = `${logMarker}: Invalid reqAt for doc ${doc.id}`;
+          logger.warn(warnMsg, {reqTsValue: String(reqTimestamp)});
+          requestedAtISO = new Date().toISOString(); // Fallback
         }
         return {
           id: doc.id,
@@ -203,7 +203,7 @@ export const listPendingInvitations = onCall(
         };
       });
 
-      logger.info(`${logMarker}: Found invitations.`, {count: invitations.length});
+      logger.info(`${logMarker}: Invites found.`, {count: invitations.length});
       return {
         success: true,
         message: "Invitations en attente récupérées.",
@@ -214,8 +214,8 @@ export const listPendingInvitations = onCall(
       if (error instanceof Error) {
         errorMsg = error.message;
       }
-      const logErrorMessage = `${logMarker}: Failed to list invitations.`;
-      logger.error(logErrorMessage, {error: errorMsg, originalError: String(error)});
+      const logErr = `${logMarker}: Failed to list.`;
+      logger.error(logErr, {error: errorMsg, originalError: String(error)});
       return {
         success: false,
         message: `Erreur serveur: ${errorMsg}`,
@@ -227,5 +227,6 @@ export const listPendingInvitations = onCall(
 
 
 logger.info(
-  `${LOG_PREFIX_V11}: Script end. Admin SDK init attempt done.`
+  `${LOG_PREFIX_V11}: Script end. Admin SDK init attempt done (v11).`
 );
+
