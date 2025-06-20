@@ -228,7 +228,6 @@ export const listPendingInvitations = onCall(
   }
 );
 
-// Added invoker: "public" for prototyping without full auth client-side
 const approveInvitationOptions: HttpsOptions = {
   region: "europe-west1",
   invoker: "public",
@@ -236,7 +235,7 @@ const approveInvitationOptions: HttpsOptions = {
 export const approveInvitation = onCall(
   approveInvitationOptions,
   async (request) => {
-    const logMarker = "INV_APPR_V5"; // Shortened marker
+    const logMarker = "INV_APPR_V5";
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -310,10 +309,10 @@ export const approveInvitation = onCall(
 
       const finalLogMsg = `${logMarker}: OK ${invitationId}. ${userCreationMessage}`;
       logger.info(finalLogMsg);
-      // Shortened success message to avoid max-len
+      // Shortened success message
       return {
         success: true,
-        message: `Approbation OK. ${userCreationMessage}`,
+        message: `OK. ${userCreationMessage}`,
       };
     } catch (err: unknown) {
       let errorMsg = "Unknown error approving invitation.";
@@ -327,7 +326,6 @@ export const approveInvitation = onCall(
   }
 );
 
-// Added invoker: "public" for prototyping without full auth client-side
 const rejectInvitationOptions: HttpsOptions = {
   region: "europe-west1",
   invoker: "public",
@@ -335,7 +333,7 @@ const rejectInvitationOptions: HttpsOptions = {
 export const rejectInvitation = onCall(
   rejectInvitationOptions,
   async (request) => {
-    const logMarker = "INV_REJ_V4"; // Shortened marker
+    const logMarker = "INV_REJ_V4";
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -383,7 +381,6 @@ export const rejectInvitation = onCall(
       };
 
       if (reason && typeof reason === "string" && reason.trim() !== "") {
-        // Ensure reason does not make the log line too long
         updatePayload.rejectionReason = reason.substring(0, 50);
       }
 
@@ -391,7 +388,7 @@ export const rejectInvitation = onCall(
       logger.info(payloadLog, {payload: updatePayload});
       await inviteRef.update(updatePayload);
 
-      const emailLog = docData?.email || "[no_email]"; // Shortened
+      const emailLog = docData?.email || "[no_email]";
       const sucMsg = `${logMarker}: KO ${invitationId} for ${emailLog}.`;
       logger.info(sucMsg);
       return {success: true, message: `Invite ${emailLog} rejetée.`};
@@ -410,5 +407,3 @@ export const rejectInvitation = onCall(
 logger.info(
   `${LOG_PREFIX_V13_1}: Script end. Admin SDK init done (v13.1).`
 );
-
-    
