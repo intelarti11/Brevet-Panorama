@@ -25,8 +25,8 @@ import {
 import { Input } from '@/components/ui/input';
 import Logo from '@/components/logo';
 import { Mail, Loader2, ArrowLeft, CheckCircle, AlertTriangle as AlertTriangleIcon } from 'lucide-react';
-import { getFunctions, httpsCallable, type HttpsCallableResult } from 'firebase/functions';
-import { app } from '@/lib/firebase';
+import { httpsCallable, type HttpsCallableResult } from 'firebase/functions';
+import { functions } from '@/lib/firebase';
 import {
   Dialog,
   DialogContent,
@@ -54,7 +54,6 @@ export default function RequestInvitationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState({ title: "", message: "", variant: "success" as "success" | "error" });
-  const functions = getFunctions(app, 'europe-west1');
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -65,6 +64,17 @@ export default function RequestInvitationPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+
+    if (!functions) {
+      setModalConfig({ 
+          title: "Erreur de configuration", 
+          message: "Le service de fonctions Firebase n'est pas disponible.",
+          variant: "error"
+      });
+      setIsLoading(false);
+      setIsModalOpen(true);
+      return;
+    }
 
     const callRequestInvitation = httpsCallable<{email: string }, RequestInvitationResponse >(functions, 'requestInvitation');
     

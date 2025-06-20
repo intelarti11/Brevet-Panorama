@@ -9,8 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertTriangle, RefreshCw, CheckCircle, XCircle, Send, BellRing } from 'lucide-react';
-import { getFunctions, httpsCallable, type HttpsCallableResult } from 'firebase/functions';
-import { app } from '@/lib/firebase';
+import { httpsCallable, type HttpsCallableResult } from 'firebase/functions';
+import { functions as functionsInstance } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -36,29 +36,36 @@ export default function AdminInvitationsPage() {
 
   const { toast } = useToast();
 
-  const functionsInstance = useMemo(() => getFunctions(app, 'europe-west1'), []);
-
   const callListPendingInvitations = useMemo(() =>
-    httpsCallable<void, CloudFunctionResponse>(functionsInstance, 'listPendingInvitations'),
-    [functionsInstance]
+    functionsInstance ? httpsCallable<void, CloudFunctionResponse>(functionsInstance, 'listPendingInvitations') : null,
+    []
   );
   const callApproveInvitation = useMemo(() => 
-    httpsCallable<{ invitationId: string }, CloudFunctionResponse>(functionsInstance, 'approveInvitation'),
-    [functionsInstance]
+    functionsInstance ? httpsCallable<{ invitationId: string }, CloudFunctionResponse>(functionsInstance, 'approveInvitation') : null,
+    []
   );
   const callRejectInvitation = useMemo(() => 
-    httpsCallable<{ invitationId: string, reason?: string }, CloudFunctionResponse>(functionsInstance, 'rejectInvitation'),
-    [functionsInstance]
+    functionsInstance ? httpsCallable<{ invitationId: string, reason?: string }, CloudFunctionResponse>(functionsInstance, 'rejectInvitation') : null,
+    []
   );
   const callMarkInvitationAsNotified = useMemo(() => 
-    httpsCallable<{ invitationId: string }, CloudFunctionResponse>(functionsInstance, 'markInvitationAsNotified'),
-    [functionsInstance]
+    functionsInstance ? httpsCallable<{ invitationId: string }, CloudFunctionResponse>(functionsInstance, 'markInvitationAsNotified') : null,
+    []
   );
 
   const fetchPendingInvitations = useCallback(async (showLoadingIndicator = true) => {
     if (showLoadingIndicator) setIsLoading(true);
     // Keep previous error if not a full reload, or clear it
-    if (showLoadingIndicator) setError(null); 
+    if (showLoadingIndicator) setError(null);
+
+    if (!callListPendingInvitations) {
+      const errorMsg = "Le service de fonctions Firebase n'est pas disponible.";
+      setError(errorMsg);
+      toast({ variant: "destructive", title: "Erreur de configuration", description: errorMsg });
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const result: HttpsCallableResult<CloudFunctionResponse> = await callListPendingInvitations();
       if (result.data.success && result.data.invitations) {
@@ -85,22 +92,32 @@ export default function AdminInvitationsPage() {
 
   const handleAction = async (action: 'approve' | 'reject' | 'notify', invitationId: string, userEmail?: string) => {
     setActionLoading(prev => ({ ...prev, [`${action}-${invitationId}`]: true }));
+
+    let callable = null;
+    let actionVerbForToast = "";
+    if (action === 'approve') {
+      callable = callApproveInvitation;
+      actionVerbForToast = "Approbation";
+    } else if (action === 'reject') {
+      callable = callRejectInvitation;
+      actionVerbForToast = "Rejet";
+    } else if (action === 'notify') {
+      callable = callMarkInvitationAsNotified;
+      actionVerbForToast = "Notification marquée";
+    }
+
+    if (!callable) {
+      toast({ variant: "destructive", title: "Erreur d'Action", description: "Le service de fonctions n'est pas initialisé.", duration: 7000 });
+      setActionLoading(prev => ({ ...prev, [`${action}-${invitationId}`]: false }));
+      return;
+    }
+    
     try {
       let result: HttpsCallableResult<CloudFunctionResponse>;
-      let actionVerbForToast = "";
-
-      if (action === 'approve') {
-        result = await callApproveInvitation({ invitationId });
-        actionVerbForToast = "Approbation";
-      } else if (action === 'reject') {
-        result = await callRejectInvitation({ invitationId }); // No reason passed for now
-        actionVerbForToast = "Rejet";
-      } else if (action === 'notify') {
-        result = await callMarkInvitationAsNotified({ invitationId });
-        actionVerbForToast = "Notification marquée";
+      if (action === 'reject') {
+        result = await callable({ invitationId }); // No reason passed for now
       } else {
-        // Should not happen
-        throw new Error("Action inconnue.");
+        result = await callable({ invitationId });
       }
 
       if (result.data.success) {
@@ -284,4 +301,3 @@ export default function AdminInvitationsPage() {
     </div>
   );
 }
-    
