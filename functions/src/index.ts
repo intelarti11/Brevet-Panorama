@@ -156,8 +156,8 @@ const listPendingInvitationsOptions: HttpsOptions = {
 export const listPendingInvitations = onCall(
   listPendingInvitationsOptions,
   async () => {
-    const logMarker = "LIST_INVITES_V2_LOG";
-    logger.info(`${logMarker}: Listing pending invites.`);
+    const logMarker = "LIST_INVITES_V3_LOG"; // Changed log marker
+    logger.info(`${logMarker}: INIT - Listing pending invites.`); // New log
 
     if (!db) {
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
@@ -192,7 +192,7 @@ export const listPendingInvitations = onCall(
           requestedAtISO = reqTimestamp.toDate().toISOString();
         } else {
           const warnMsg = `${logMarker}: Invalid reqAt for ${doc.id}`;
-          logger.warn(warnMsg, { reqTs: String(reqTimestamp) });
+          logger.warn(warnMsg, {reqTs: String(reqTimestamp)});
           requestedAtISO = new Date().toISOString();
         }
         return {
@@ -203,9 +203,7 @@ export const listPendingInvitations = onCall(
         };
       });
 
-      logger.info(`${logMarker}: Found invitations.`, {
-        count: invitations.length,
-      });
+      logger.info(`${logMarker}: Found invitations.`, {count: invitations.length});
       return {
         success: true,
         message: "Invitations en attente récupérées.",
@@ -217,10 +215,7 @@ export const listPendingInvitations = onCall(
         errorMsg = error.message;
       }
       const logErrorMessage = `${logMarker}: Failed to list invitations.`;
-      logger.error(
-        logErrorMessage,
-        {error: errorMsg, originalError: String(error)}
-      );
+      logger.error(logErrorMessage, {error: errorMsg, originalError: String(error)});
       return {
         success: false,
         message: `Erreur serveur: ${errorMsg}`,
