@@ -7,7 +7,7 @@ import {z} from "zod";
 try {
   admin.initializeApp();
 } catch (e: unknown) {
-  functions.logger.error("Firebase admin init error", e);
+  functions.logger.error("Admin init err", e);
 }
 
 const db = admin.firestore();
@@ -21,7 +21,7 @@ const invitationRequestSchema = z.object({
     ),
 });
 
-// Schéma de validation pour l'approbation ou le rejet
+// Schéma pour l'approbation ou le rejet
 const manageInvitationSchema = z.object({
   email: z.string().email({message: "E-mail invalide."}),
 });
@@ -76,7 +76,7 @@ export const requestInvitation = functions.region("europe-west1")
             "Demande en cours pour cet e-mail."
           );
         }
-        // Réutilise une demande rejetée pour la remettre en attente
+        // Réutilise une demande rejetée
         await db.collection("invitationRequests")
           .doc(existReqQuery.docs[0].id).set({
             email: lowerEmail,
@@ -122,15 +122,14 @@ export const requestInvitation = functions.region("europe-west1")
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      const finalErrorMsg = errorMessage.length > 60 ?
-        errorMessage.substring(0, 57) + "..." : errorMessage;
+      const finalErrorMsg = errorMessage.substring(0, 50);
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
 
 /**
- * Approuve une demande d'invitation et crée un utilisateur Firebase Auth.
- * Vérifie si l'appelant a des droits d'administrateur.
+ * Approuve une demande d'invitation et crée un user Firebase Auth.
+ * Vérifie les droits d'admin de l'appelant.
  */
 export const approveInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
@@ -145,9 +144,10 @@ export const approveInvitation = functions.region("europe-west1")
         "Droits admin requis."
       );
     }
-    functions.logger.info(
-      "Approve: admin OK. UID:", context.auth.uid
-    );
+    if (context.auth?.uid) {
+      functions.logger.info("Approve: admin OK. UID:", context.auth.uid);
+    }
+
 
     try {
       const validationResult = manageInvitationSchema.safeParse(data);
@@ -207,11 +207,9 @@ export const approveInvitation = functions.region("europe-west1")
             existingUser = await admin.auth().getUserByEmail(lowerEmail);
           } catch (getUserError: unknown) {
             let msg = "Err vérif. user.";
-            if (getUserError instanceof Error) {
-              msg = getUserError.message;
-            }
+            if (getUserError instanceof Error) msg = getUserError.message;
             functions.logger.error("Err getUser:", {email: lowerEmail, getUserError});
-            const finalMsg = msg.length > 50 ? msg.substring(0, 47) + "..." : msg;
+            const finalMsg = msg.substring(0, 47);
             throw new functions.https.HttpsError("internal", finalMsg, getUserError);
           }
 
@@ -229,13 +227,10 @@ export const approveInvitation = functions.region("europe-west1")
           };
         }
         // Autre erreur Auth
-        functions.logger.error("Auth create err:", authError);
+        functions.logger.error("Err creation user Auth:", authError);
         let errMsg = "Err creat. user";
-        if (authError instanceof Error) {
-          errMsg = authError.message;
-        }
-        const finalErrMsg = errMsg.length > 50 ?
-          errMsg.substring(0, 47) + "..." : errMsg;
+        if (authError instanceof Error) errMsg = authError.message;
+        const finalErrMsg = errMsg.substring(0, 47);
         throw new functions.https.HttpsError("internal", finalErrMsg, authError);
       }
 
@@ -261,18 +256,15 @@ export const approveInvitation = functions.region("europe-west1")
         throw error;
       }
       let errorMessage = "Echec approbation.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      const finalErrorMsg = errorMessage.length > 50 ?
-        errorMessage.substring(0, 47) + "..." : errorMessage;
+      if (error instanceof Error) errorMessage = error.message;
+      const finalErrorMsg = errorMessage.substring(0, 47);
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
 
 /**
  * Rejette une demande d'invitation.
- * Vérifie si l'appelant a des droits d'administrateur.
+ * Vérifie les droits d'admin de l'appelant.
  */
 export const rejectInvitation = functions.region("europe-west1")
   .https.onCall(async (data, context) => {
@@ -287,9 +279,9 @@ export const rejectInvitation = functions.region("europe-west1")
         "Droits admin requis."
       );
     }
-    functions.logger.info(
-      "Reject: admin OK. UID:", context.auth.uid
-    );
+    if (context.auth?.uid) {
+      functions.logger.info("Reject: admin OK. UID:", context.auth.uid);
+    }
 
     try {
       const validationResult = rejectInvitationSchema.safeParse(data);
@@ -339,11 +331,8 @@ export const rejectInvitation = functions.region("europe-west1")
         throw error;
       }
       let errorMessage = "Echec rejet.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      const finalErrorMsg = errorMessage.length > 50 ?
-        errorMessage.substring(0, 47) + "..." : errorMessage;
+      if (error instanceof Error) errorMessage = error.message;
+      const finalErrorMsg = errorMessage.substring(0, 47);
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
@@ -397,11 +386,8 @@ export const listPendingInvitations = functions.region("europe-west1")
     } catch (error: unknown) {
       functions.logger.error("Err listPendingInvitations:", error);
       let errorMessage = "Echec liste invit.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      const finalErrorMsg = errorMessage.length > 50 ?
-        errorMessage.substring(0, 47) + "..." : errorMessage;
+      if (error instanceof Error) errorMessage = error.message;
+      const finalErrorMsg = errorMessage.substring(0, 47);
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
@@ -453,13 +439,9 @@ export const setAdminRole = functions.region("europe-west1")
           targetUid = userRecord.uid;
         } catch (e: unknown) {
           let msg = "Err récup. user.";
-          if (e instanceof Error) {
-            msg = e.message;
-          }
-          functions.logger.error(
-            `Err getUserByEmail ${email}:`, e
-          );
-          const finalMsg = msg.length > 50 ? msg.substring(0, 47) + "..." : msg;
+          if (e instanceof Error) msg = e.message;
+          functions.logger.error(`Err getUserByEmail ${email}:`, e);
+          const finalMsg = msg.substring(0, 47);
           throw new functions.https.HttpsError("not-found", finalMsg, e);
         }
       }
@@ -484,11 +466,10 @@ export const setAdminRole = functions.region("europe-west1")
         throw error;
       }
       let errorMessage = "Echec rôle admin.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      const finalErrorMsg = errorMessage.length > 50 ?
-        errorMessage.substring(0, 47) + "..." : errorMessage;
+      if (error instanceof Error) errorMessage = error.message;
+      const finalErrorMsg = errorMessage.substring(0, 47);
       throw new functions.https.HttpsError("internal", finalErrorMsg, error);
     }
   });
+
+      
