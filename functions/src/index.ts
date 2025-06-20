@@ -2,6 +2,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {z} from "zod";
+// CallableRequest et HttpsError pour Firebase Functions v2
 import {onCall, HttpsError, type CallableRequest} from "firebase-functions/v2/https";
 
 // Initialiser Firebase Admin SDK
@@ -15,6 +16,7 @@ const db = admin.firestore();
 
 // --- Schémas Zod pour la validation des données d'entrée ---
 
+// Schéma pour la demande d'invitation
 const invitationRequestDataSchema = z.object({
   email: z.string().email({message: "E-mail invalide."})
     .regex(
@@ -24,19 +26,22 @@ const invitationRequestDataSchema = z.object({
 });
 type InvitationRequestData = z.infer<typeof invitationRequestDataSchema>;
 
+// Schéma pour approuver/rejeter une invitation
 const manageInvitationDataSchema = z.object({
   email: z.string().email({message: "E-mail invalide."}),
 });
 type ManageInvitationData = z.infer<typeof manageInvitationDataSchema>;
 
+// Schéma pour rejeter une invitation (avec raison optionnelle)
 const rejectInvitationDataSchema = manageInvitationDataSchema.extend({
   reason: z.string().optional().describe("Raison optionnelle."),
 });
 type RejectInvitationData = z.infer<typeof rejectInvitationDataSchema>;
 
+// Schéma pour définir un rôle admin
 const setAdminRoleDataSchema = z.object({
   email: z.string().email("E-mail invalide.").optional(),
-  uid: z.string().min(1, "UID requis si e-mail non fourni.").optional(),
+  uid: z.string().min(1, "UID requis.").optional(),
 }).refine((data) => data.email || data.uid, {
   message: "E-mail ou UID requis.",
   path: ["email"],
@@ -54,16 +59,16 @@ export const requestInvitation = onCall(
     functions.logger.info("Nouv. demande invit:", request.data);
 
     try {
-      const validationResult = invitationRequestDataSchema.safeParse(request.data);
-      if (!validationResult.success) {
-        const flatErrors = validationResult.error.flatten();
-        const errorMsg = "Data invalides: " +
+      const validResult = invitationRequestDataSchema.safeParse(request.data);
+      if (!validResult.success) {
+        const flatErrors = validResult.error.flatten();
+        const errMsg = "Data invalides: " +
           flatErrors.formErrors.join(", ");
         functions.logger.error("Valid. échouée (req):", flatErrors);
-        throw new HttpsError("invalid-argument", errorMsg.slice(0, 70));
+        throw new HttpsError("invalid-argument", errMsg.slice(0, 60));
       }
 
-      const {email} = validationResult.data;
+      const {email} = validResult.data;
       const lowerEmail = email.toLowerCase();
 
       const existReqQuery = await db.collection("invitationRequests")
@@ -72,11 +77,11 @@ export const requestInvitation = onCall(
         .get();
 
       if (!existReqQuery.empty) {
-        const existingRequest = existReqQuery.docs[0].data();
-        if (existingRequest.status === "approved") {
+        const exReq = existReqQuery.docs[0].data();
+        if (exReq.status === "approved") {
           throw new HttpsError("already-exists", "Compte existant.");
         }
-        if (existingRequest.status === "pending") {
+        if (exReq.status === "pending") {
           throw new HttpsError("already-exists", "Demande en cours.");
         }
         // Réutilise une demande rejetée
@@ -114,7 +119,7 @@ export const requestInvitation = onCall(
         throw error;
       }
       let errMsg = "Echec demande.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 20);
+      if (error instanceof Error) errMsg = error.message.slice(0, 18);
       throw new HttpsError("internal", errMsg);
     }
   }
@@ -136,14 +141,14 @@ export const approveInvitation = onCall(
     functions.logger.info(`Approve: admin OK. UID: ${adminUid}`);
 
     try {
-      const validationResult = manageInvitationDataSchema.safeParse(request.data);
-      if (!validationResult.success) {
-        const flatErrors = validationResult.error.flatten();
-        functions.logger.error("Valid. échouée (approve):", flatErrors);
+      const validResult = manageInvitationDataSchema.safeParse(request.data);
+      if (!validResult.success) {
+        const flatErrors = validResult.error.flatten();
+        functions.logger.error("Valid. échec(approve):", flatErrors);
         throw new HttpsError("invalid-argument", "Données invalides.");
       }
 
-      const {email} = validationResult.data;
+      const {email} = validResult.data;
       const lowerEmail = email.toLowerCase();
 
       const requestQuery = await db.collection("invitationRequests")
@@ -154,7 +159,7 @@ export const approveInvitation = onCall(
 
       if (requestQuery.empty) {
         const msg = `Aucune demande: ${lowerEmail}.`;
-        throw new HttpsError("not-found", msg.slice(0, 70));
+        throw new HttpsError("not-found", msg.slice(0, 50));
       }
 
       const invitationDoc = requestQuery.docs[0];
@@ -187,7 +192,7 @@ export const approveInvitation = onCall(
             let msg = "Err vérif user.";
             if (getUserError instanceof Error) msg = getUserError.message;
             functions.logger.error("Err getUser:", getUserError);
-            throw new HttpsError("internal", msg.slice(0, 15));
+            throw new HttpsError("internal", msg.slice(0, 13));
           }
 
           // Mise à jour statut Firestore pour utilisateur existant
@@ -208,7 +213,7 @@ export const approveInvitation = onCall(
         functions.logger.error("Auth create e:", authError);
         let errMsg = "Err creat user";
         if (authError instanceof Error) errMsg = authError.message;
-        const finalErrMsg = errMsg.slice(0, 15); // Shortened
+        const finalErrMsg = errMsg.slice(0, 13); // Shortened
         throw new HttpsError("internal", finalErrMsg);
       }
 
@@ -232,7 +237,7 @@ export const approveInvitation = onCall(
         throw error;
       }
       let errMsg = "Echec approb.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 15);
+      if (error instanceof Error) errMsg = error.message.slice(0, 13);
       throw new HttpsError("internal", errMsg);
     }
   }
@@ -254,14 +259,14 @@ export const rejectInvitation = onCall(
     functions.logger.info(`Reject: admin OK. UID: ${adminUid}`);
 
     try {
-      const validationResult = rejectInvitationDataSchema.safeParse(request.data);
-      if (!validationResult.success) {
-        const flatErrors = validationResult.error.flatten();
+      const validResult = rejectInvitationDataSchema.safeParse(request.data);
+      if (!validResult.success) {
+        const flatErrors = validResult.error.flatten();
         functions.logger.error("Valid. échouée (reject):", flatErrors);
         throw new HttpsError("invalid-argument", "Données invalides.");
       }
 
-      const {email, reason} = validationResult.data;
+      const {email, reason} = validResult.data;
       const lowerEmail = email.toLowerCase();
 
       const requestQuery = await db.collection("invitationRequests")
@@ -272,7 +277,7 @@ export const rejectInvitation = onCall(
 
       if (requestQuery.empty) {
         const msg = `Aucune demande: ${lowerEmail}.`;
-        throw new HttpsError("not-found", msg.slice(0, 70));
+        throw new HttpsError("not-found", msg.slice(0, 50));
       }
 
       const invitationDoc = requestQuery.docs[0];
@@ -297,7 +302,7 @@ export const rejectInvitation = onCall(
         throw error;
       }
       let errMsg = "Echec rejet.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 20);
+      if (error instanceof Error) errMsg = error.message.slice(0, 18);
       throw new HttpsError("internal", errMsg);
     }
   }
@@ -333,6 +338,7 @@ export const listPendingInvitations = onCall(
       const invitations = snapshot.docs.map((doc) => {
         const docData = doc.data();
         const requestedAtDate = docData.requestedAt?.toDate();
+        // Provide a default if toDate() is undefined
         const isoDate = requestedAtDate ?
           requestedAtDate.toISOString() : new Date(0).toISOString();
         return {
@@ -347,7 +353,7 @@ export const listPendingInvitations = onCall(
     } catch (error: unknown) {
       functions.logger.error("Err listPending:", error);
       let errMsg = "Echec liste invit.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 20);
+      if (error instanceof Error) errMsg = error.message.slice(0, 18);
       throw new HttpsError("internal", errMsg);
     }
   }
@@ -370,13 +376,13 @@ export const setAdminRole = onCall(
     );
 
     try {
-      const validationResult = setAdminRoleDataSchema.safeParse(request.data);
-      if (!validationResult.success) {
-        const flatErrors = validationResult.error.flatten();
+      const validResult = setAdminRoleDataSchema.safeParse(request.data);
+      if (!validResult.success) {
+        const flatErrors = validResult.error.flatten();
         functions.logger.error("Err setAdmin valid:", flatErrors);
         throw new HttpsError("invalid-argument", "Err. données.");
       }
-      const {email, uid: providedUid} = validationResult.data;
+      const {email, uid: providedUid} = validResult.data;
       let targetUid = providedUid;
 
       if (email && !targetUid) {
@@ -385,7 +391,7 @@ export const setAdminRole = onCall(
           targetUid = userRecord.uid;
         } catch (e: unknown) {
           let msg = "Err récup user.";
-          if (e instanceof Error) msg = e.message.slice(0, 15);
+          if (e instanceof Error) msg = e.message.slice(0, 13);
           functions.logger.error(`Err getUserByEmail ${email}:`, e);
           throw new HttpsError("not-found", msg);
         }
@@ -408,7 +414,7 @@ export const setAdminRole = onCall(
         throw error;
       }
       let errMsg = "Echec rôle admin.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 20);
+      if (error instanceof Error) errMsg = error.message.slice(0, 18);
       throw new HttpsError("internal", errMsg);
     }
   }
