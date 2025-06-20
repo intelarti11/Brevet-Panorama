@@ -5,7 +5,8 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle, LogOut, CalendarRange, ShieldCheck, ClipboardEdit, Edit3, Eye, ChevronDown, ChevronUp } from 'lucide-react';
-import * as React from 'react'; // Import React for useState
+import * as React from 'react';
+import { useState, useEffect } from 'react'; // Added useState, useEffect
 
 import Logo from '@/components/logo';
 import {
@@ -36,16 +37,36 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 
-// TODO: Remplacer cette simulation par une véritable gestion d'authentification et de rôles
-// Par exemple, en utilisant Firebase Auth et les Custom Claims.
-// const useAuth = () => ({ isAdmin: true }); // Simulation : l'utilisateur est admin
+import { getAuth, onAuthStateChanged, type User } from 'firebase/auth'; // Added
+import { app } from '@/lib/firebase'; // Added
+
+const ADMIN_EMAIL = "florent.romero@ac-montpellier.fr";
+
 const useAuth = () => {
-  // Pour simuler, vérifiez si l'email est de type admin.nom@ac-montpellier.fr
-  // Dans une vraie app, vous liriez cela depuis l'état d'authentification Firebase
-  // et vérifieriez un custom claim 'admin: true'.
-  // const userEmail = firebase.auth().currentUser?.email;
-  // return { isAdmin: userEmail?.startsWith('admin.') && userEmail?.endsWith('@ac-montpellier.fr') };
-  return { isAdmin: true }; // Pour l'instant, on suppose que l'utilisateur est admin pour le dev
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const authInstance = getAuth(app);
+    const unsubscribe = onAuthStateChanged(authInstance, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        // In a production app, you would ideally check for a custom claim `admin: true`
+        // e.g., currentUser.getIdTokenResult().then(idTokenResult => setIsAdmin(idTokenResult.claims.admin === true));
+        // For this request, we're checking the email address directly.
+        setIsAdmin(currentUser.email === ADMIN_EMAIL);
+      } else {
+        setIsAdmin(false);
+      }
+      setAuthLoading(false);
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, []);
+
+  return { isAdmin, user, authLoading };
 };
 
 
@@ -153,26 +174,38 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
-  const { isAdmin } = useAuth(); // Simulation du statut admin
+  const { isAdmin, authLoading } = useAuth(); 
   const [brevetBlancOpen, setBrevetBlancOpen] = React.useState(false);
 
-  const handleLogout = () => {
-    // TODO: Implémenter la déconnexion Firebase
-    // await firebase.auth().signOut();
-    toast({
-      title: "Déconnexion",
-      description: "Vous avez été déconnecté.",
-    });
-    router.push('/login');
+  const handleLogout = async () => { // Made async
+    const authInstance = getAuth(app);
+    try {
+      await authInstance.signOut();
+      toast({
+        title: "Déconnexion",
+        description: "Vous avez été déconnecté.",
+      });
+      router.push('/login');
+    } catch (error) {
+      console.error("Erreur de déconnexion:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de se déconnecter.",
+      });
+    }
   };
 
   React.useEffect(() => {
-    // Open Brevet Blanc submenu if a child route is active on initial load or navigation
     if (pathname.startsWith('/dashboard/brevet-blanc') && !brevetBlancOpen) {
       setBrevetBlancOpen(true);
     }
   }, [pathname, brevetBlancOpen]);
 
+  if (authLoading) {
+    // Optional: render a loading state for the whole page or just the sidebar
+    // For simplicity, we'll let it render and update. The isAdmin check will handle visibility.
+  }
 
   return (
     <FilterProvider>
