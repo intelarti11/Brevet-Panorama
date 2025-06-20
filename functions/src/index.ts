@@ -123,7 +123,7 @@ export const requestInvitation = onCall(
         email: email,
         requestedAt: admin.firestore.FieldValue.serverTimestamp(),
         status: "pending",
-        notifiedAt: null, // Initialize notifiedAt
+        notifiedAt: null,
       });
 
       const successMsg = `Demande ${email} OK.`;
@@ -219,8 +219,8 @@ export const listPendingInvitations = onCall(
       logger.info(logMsg);
       return {
         success: true,
-        message: "Liste inv. OK.",
-        invitations: invitations,
+        message: "Invitations listées.",
+        invitations
       };
     } catch (error: unknown) {
       let errorMsg = "Unknown error listing invites.";
@@ -408,7 +408,7 @@ export const rejectInvitation = onCall(
       const emailLog = docData?.email || "[no_email]";
       const sucMsg = `${logMarker}: KO ${invitationId} for ${emailLog}.`;
       logger.info(sucMsg);
-      return {success: true, message: `Inv. ${emailLog} rejetée.`};
+      return {success: true, message: `Inv. ${emailLog} rej.`};
     } catch (err: unknown) {
       let errorMsg = "Unknown error rejecting invitation.";
       if (err instanceof Error) {
@@ -458,7 +458,7 @@ export const markInvitationAsNotified = onCall(
       const docData = inviteDoc.data();
       if (docData?.status !== "approved") {
         const currSt = docData?.status ?? "unknown";
-        logger.warn(`${logMarker}: Inv ${invitationId} not appr. St: ${currSt}`);
+        logger.warn(`${logMarker}: Inv ${invitationId} not OK (St: ${currSt})`);
         return {success: false, message: "Inv. non appr. pr notif."};
       }
       if (docData?.notifiedAt) {
@@ -472,7 +472,7 @@ export const markInvitationAsNotified = onCall(
 
       const emailLog = docData?.email || "[no_email]";
       logger.info(`${logMarker}: Inv ${invitationId} for ${emailLog} notif.`);
-      return {success: true, message: `Notification marquée pour ${emailLog}.`};
+      return {success: true, message: `Notif marquée pour ${emailLog}.`};
     } catch (err: unknown) {
       let errorMsg = "Erreur lors du marquage de la notification.";
       if (err instanceof Error) {
@@ -489,3 +489,5 @@ export const markInvitationAsNotified = onCall(
 logger.info(
   `${LOG_PREFIX_V13_1}: Script end. Admin SDK init done (v13.1).`
 );
+
+    
