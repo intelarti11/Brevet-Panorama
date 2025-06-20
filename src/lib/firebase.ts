@@ -5,24 +5,16 @@ import { getFirestore } from 'firebase/firestore';
 // import { getStorage } from 'firebase/storage'; // If you need storage
 
 // Your web app's Firebase configuration
+// IMPORTANT: Ensure these values are correct for YOUR Firebase project.
 const firebaseConfig: FirebaseOptions = {
   apiKey: "AIzaSyAB1KxMlcTkqUoFXJojlRco3AOTpk9jkaw",
   authDomain: "brevet-panorama.firebaseapp.com",
   projectId: "brevet-panorama",
-  storageBucket: "brevet-panorama.appspot.com", // Corrected from .firebasestorage.app to .appspot.com
+  storageBucket: "brevet-panorama.appspot.com",
   messagingSenderId: "486402169414",
   appId: "1:486402169414:web:67ccb79f3c06722fcdc847"
   // measurementId: "YOUR_MEASUREMENT_ID", // Optional: Add if you use Google Analytics
 };
-
-// Check if essential Firebase config values are present (after you've replaced placeholders)
-// This check is now less critical if the user provides the full config directly, but good for general template.
-if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.projectId === "YOUR_PROJECT_ID" || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
-  console.error(
-    "ERREUR DE CONFIGURATION FIREBASE : Clé API ou ID de projet manquant ou non remplacé. " +
-    "Veuillez remplacer les valeurs 'YOUR_...' dans src/lib/firebase.ts par votre configuration Firebase réelle."
-  );
-}
 
 // Initialize Firebase
 let app;
