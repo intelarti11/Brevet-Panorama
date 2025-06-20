@@ -2,7 +2,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {z} from "zod";
-// CallableRequest et HttpsError pour Firebase Functions v2
 import {
   onCall,
   HttpsError,
@@ -20,7 +19,6 @@ const db = admin.firestore();
 
 // --- Schémas Zod pour la validation des données d'entrée ---
 
-// Schéma pour la demande d'invitation
 const invitationRequestDataSchema = z.object({
   email: z.string().email({message: "E-mail invalide."})
     .regex(
@@ -30,33 +28,26 @@ const invitationRequestDataSchema = z.object({
 });
 type InvitationRequestData = z.infer<typeof invitationRequestDataSchema>;
 
-// Schéma pour approuver/rejeter une invitation
 const manageInvitationDataSchema = z.object({
   email: z.string().email({message: "E-mail invalide."}),
 });
 type ManageInvitationData = z.infer<typeof manageInvitationDataSchema>;
 
-// Schéma pour rejeter une invitation (avec raison optionnelle)
 const rejectInvitationDataSchema = manageInvitationDataSchema.extend({
   reason: z.string().optional().describe("Raison optionnelle."),
 });
 type RejectInvitationData = z.infer<typeof rejectInvitationDataSchema>;
 
-// Schéma pour définir un rôle admin
 const setAdminRoleDataSchema = z.object({
   email: z.string().email("E-mail invalide.").optional(),
   uid: z.string().min(1, "UID requis.").optional(),
 }).refine((data) => data.email || data.uid, {
-  message: "E-mail ou UID requis.", // Message court
+  message: "E-mail ou UID requis.",
   path: ["email"],
 });
 type SetAdminRoleData = z.infer<typeof setAdminRoleDataSchema>;
 
 
-/**
- * Enregistre une nouvelle demande d'invitation.
- * App Check est appliqué.
- */
 export const requestInvitation = onCall(
   {region: "europe-west1", enforceAppCheck: true},
   async (request: CallableRequest<InvitationRequestData>) => {
@@ -66,10 +57,8 @@ export const requestInvitation = onCall(
       const validResult = invitationRequestDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        const errMsg = "Data invalides: " +
-          flatErrors.formErrors.join(", ");
-        functions.logger.error("Valid. échouée:", flatErrors);
-        throw new HttpsError("invalid-argument", errMsg.slice(0, 40));
+        functions.logger.error("Valid. échouée (requestInv):", flatErrors);
+        throw new HttpsError("invalid-argument", "Donnees invalides.");
       }
 
       const {email} = validResult.data;
@@ -88,7 +77,6 @@ export const requestInvitation = onCall(
         if (exReq.status === "pending") {
           throw new HttpsError("already-exists", "Demande en cours.");
         }
-        // Réutilise une demande rejetée
         await db.collection("invitationRequests")
           .doc(existReqQuery.docs[0].id).set({
             email: lowerEmail,
@@ -107,7 +95,6 @@ export const requestInvitation = onCall(
         return {success: true, message: "Votre demande a été soumise."};
       }
 
-      // Nouvelle demande
       await db.collection("invitationRequests").add({
         email: lowerEmail,
         status: "pending",
@@ -118,27 +105,42 @@ export const requestInvitation = onCall(
       functions.logger.info(`Demande enregistrée: ${lowerEmail}`);
       return {success: true, message: "Demande d'invitation soumise."};
     } catch (error: unknown) {
-      functions.logger.error("Err requestInv:", error);
+      let code: functions.https.FunctionsErrorCode = "internal";
+      let message = "Echec demande. Verif logs.";
+
       if (error instanceof HttpsError) {
+        functions.logger.error(
+          `Err requestInv (HttpsError ${error.code}):`,
+          {message: error.message, details: error.details, data: request.data}
+        );
         throw error;
+      } else if (error instanceof Error) {
+        functions.logger.error(
+          "Err requestInv (Error instance):",
+          {name: error.name, message: error.message, stack: error.stack, data: request.data}
+        );
+        if (error.name === "ZodError") {
+          code = "invalid-argument";
+          message = "Donnees invalides.";
+        }
+      } else {
+        functions.logger.error(
+            "Err requestInv (type inconnu):",
+            {errorObject: error, data: request.data}
+        );
       }
-      let errMsg = "Echec demande.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 15);
-      throw new HttpsError("internal", errMsg);
+      throw new HttpsError(code, message);
     }
   }
 );
 
-/**
- * Approuve une demande et crée un user Firebase Auth. Admin requis.
- */
 export const approveInvitation = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<ManageInvitationData>) => {
     functions.logger.info("Approbation invit:", request.data);
 
     if (!request.auth || !request.auth.token.admin) {
-      functions.logger.error("Accès non-autorisé (approve).");
+      functions.logger.error("Acces non-autorise (approve).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     const adminUid = request.auth.uid;
@@ -148,8 +150,8 @@ export const approveInvitation = onCall(
       const validResult = manageInvitationDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        functions.logger.error("Valid. échec:", flatErrors);
-        throw new HttpsError("invalid-argument", "Données invalides.");
+        functions.logger.error("Valid. échouée (approveInv):", flatErrors);
+        throw new HttpsError("invalid-argument", "Donnees invalides.");
       }
 
       const {email} = validResult.data;
@@ -162,21 +164,19 @@ export const approveInvitation = onCall(
         .get();
 
       if (requestQuery.empty) {
-        const msg = `Aucune demande: ${lowerEmail}.`;
-        throw new HttpsError("not-found", msg.slice(0, 40));
+        throw new HttpsError("not-found", `Aucune demande: ${lowerEmail}.`);
       }
 
       const invitationDoc = requestQuery.docs[0];
       let userRecord;
 
-      // Création de l'utilisateur dans Firebase Authentication
       try {
         userRecord = await admin.auth().createUser({
           email: lowerEmail,
           emailVerified: false,
           disabled: false,
         });
-        functions.logger.info(`User créé: ${userRecord.uid}`);
+        functions.logger.info(`User cree: ${userRecord.uid}`);
       } catch (authError: unknown) {
         let code = "unknown";
         if (
@@ -193,13 +193,10 @@ export const approveInvitation = onCall(
           try {
             existingUser = await admin.auth().getUserByEmail(lowerEmail);
           } catch (getUserError: unknown) {
-            let msg = "Err vérif user.";
-            if (getUserError instanceof Error) msg = getUserError.message;
-            functions.logger.error("Err getUser:", getUserError);
-            throw new HttpsError("internal", msg.slice(0, 10));
+            functions.logger.error("Err getUser (approveInv):", getUserError);
+            throw new HttpsError("internal", "Err verif user.");
           }
 
-          // Mise à jour statut Firestore pour utilisateur existant
           await db.collection("invitationRequests")
             .doc(invitationDoc.id).update({
               status: "approved",
@@ -213,15 +210,10 @@ export const approveInvitation = onCall(
             message: `User ${lowerEmail} existe. Demande ok.`,
           };
         }
-        // Autre erreur Auth
-        functions.logger.error("Auth create err:", authError); // Shortened
-        let errMsg = "Err create user"; // Shortened
-        if (authError instanceof Error) errMsg = authError.message;
-        const finalErrMsg = errMsg.slice(0, 10); // Very Shortened
-        throw new HttpsError("internal", finalErrMsg);
+        functions.logger.error("Auth create err (approveInv):", authError);
+        throw new HttpsError("internal", "Err create user.");
       }
 
-      // Mise à jour statut Firestore
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -230,33 +222,48 @@ export const approveInvitation = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(`Invit. ok, user créé: ${lowerEmail}`);
+      functions.logger.info(`Invit. ok, user cree: ${lowerEmail}`);
       return {
         success: true,
-        message: `Invit. ${lowerEmail} ok. MDP via 'Oublié?'.`,
+        message: `Invit. ${lowerEmail} ok. MDP via 'Oublie?'.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Err approveInv:", error); // Shortened
+      let code: functions.https.FunctionsErrorCode = "internal";
+      let message = "Echec approbation. Verif logs.";
+
       if (error instanceof HttpsError) {
+        functions.logger.error(
+          `Err approveInv (HttpsError ${error.code}):`,
+          {message: error.message, details: error.details, data: request.data}
+        );
         throw error;
+      } else if (error instanceof Error) {
+        functions.logger.error(
+          "Err approveInv (Error instance):",
+          {name: error.name, message: error.message, stack: error.stack, data: request.data}
+        );
+        if (error.name === "ZodError") {
+          code = "invalid-argument";
+          message = "Donnees invalides.";
+        }
+      } else {
+        functions.logger.error(
+            "Err approveInv (type inconnu):",
+            {errorObject: error, data: request.data}
+        );
       }
-      let errMsg = "Echec approb."; // Shortened
-      if (error instanceof Error) errMsg = error.message.slice(0, 10);
-      throw new HttpsError("internal", errMsg);
+      throw new HttpsError(code, message);
     }
   }
 );
 
-/**
- * Rejette une demande d'invitation. Admin requis.
- */
 export const rejectInvitation = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<RejectInvitationData>) => {
     functions.logger.info("Rejet invit:", request.data);
 
     if (!request.auth || !request.auth.token.admin) {
-      functions.logger.error("Accès non-autorisé (reject).");
+      functions.logger.error("Acces non-autorise (reject).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     const adminUid = request.auth.uid;
@@ -266,8 +273,8 @@ export const rejectInvitation = onCall(
       const validResult = rejectInvitationDataSchema.safeParse(request.data);
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
-        functions.logger.error("Valid. échouée:", flatErrors);
-        throw new HttpsError("invalid-argument", "Données invalides.");
+        functions.logger.error("Valid. échouée (rejectInv):", flatErrors);
+        throw new HttpsError("invalid-argument", "Donnees invalides.");
       }
 
       const {email, reason} = validResult.data;
@@ -280,13 +287,11 @@ export const rejectInvitation = onCall(
         .get();
 
       if (requestQuery.empty) {
-        const msg = `Aucune demande: ${lowerEmail}.`;
-        throw new HttpsError("not-found", msg.slice(0, 40));
+        throw new HttpsError("not-found", `Aucune demande: ${lowerEmail}.`);
       }
 
       const invitationDoc = requestQuery.docs[0];
 
-      // Mise à jour statut Firestore
       await db.collection("invitationRequests").doc(invitationDoc.id).update({
         status: "rejected",
         rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -295,33 +300,48 @@ export const rejectInvitation = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      functions.logger.info(`Invitation rejetée: ${lowerEmail}`);
+      functions.logger.info(`Invitation rejetee: ${lowerEmail}`);
       return {
         success: true,
-        message: `Invitation pour ${lowerEmail} rejetée.`,
+        message: `Invitation pour ${lowerEmail} rejetee.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Err rejectInv:", error);
+      let code: functions.https.FunctionsErrorCode = "internal";
+      let message = "Echec rejet. Verif logs.";
+
       if (error instanceof HttpsError) {
+        functions.logger.error(
+          `Err rejectInv (HttpsError ${error.code}):`,
+          {message: error.message, details: error.details, data: request.data}
+        );
         throw error;
+      } else if (error instanceof Error) {
+        functions.logger.error(
+          "Err rejectInv (Error instance):",
+          {name: error.name, message: error.message, stack: error.stack, data: request.data}
+        );
+        if (error.name === "ZodError") {
+          code = "invalid-argument";
+          message = "Donnees invalides.";
+        }
+      } else {
+        functions.logger.error(
+            "Err rejectInv (type inconnu):",
+            {errorObject: error, data: request.data}
+        );
       }
-      let errMsg = "Echec rejet.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 15);
-      throw new HttpsError("internal", errMsg);
+      throw new HttpsError(code, message);
     }
   }
 );
 
-/**
- * Liste invitations en attente. Admin requis.
- */
 export const listPendingInvitations = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<void>) => {
     functions.logger.info("Listage invitations en attente.");
 
     if (!request.auth || !request.auth.token.admin) {
-      functions.logger.error("Accès non-autorisé (listPending).");
+      functions.logger.error("Acces non-autorise (listPending).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     functions.logger.info("ListPending: admin OK.");
@@ -342,7 +362,6 @@ export const listPendingInvitations = onCall(
       const invitations = snapshot.docs.map((doc) => {
         const docData = doc.data();
         const requestedAtDate = docData.requestedAt?.toDate();
-        // Provide a default if toDate() is undefined
         const isoDate = requestedAtDate ?
           requestedAtDate.toISOString() : new Date(0).toISOString();
         return {
@@ -355,23 +374,37 @@ export const listPendingInvitations = onCall(
 
       return {success: true, invitations};
     } catch (error: unknown) {
-      functions.logger.error("Err listPending:", error);
-      let errMsg = "Echec liste.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 15);
-      throw new HttpsError("internal", errMsg);
+      let code: functions.https.FunctionsErrorCode = "internal";
+      const message = "Echec liste. Verif logs.";
+
+      if (error instanceof HttpsError) {
+        functions.logger.error(
+          `Err listPend (HttpsError ${error.code}):`,
+          {message: error.message, details: error.details}
+        );
+        throw error;
+      } else if (error instanceof Error) {
+        functions.logger.error(
+          "Err listPend (Error instance):",
+          {name: error.name, message: error.message, stack: error.stack}
+        );
+      } else {
+        functions.logger.error(
+            "Err listPend (type inconnu):",
+            {errorObject: error}
+        );
+      }
+      throw new HttpsError(code, message);
     }
   }
 );
 
 
-/**
- * Attribue le rôle d'admin. Nécessite que l'appelant soit admin.
- */
 export const setAdminRole = onCall(
   {region: "europe-west1"},
   async (request: CallableRequest<SetAdminRoleData>) => {
     if (!request.auth || !request.auth.token.admin) {
-      functions.logger.error("Accès non-autorisé (setAdminRole).");
+      functions.logger.error("Acces non-autorise (setAdminRole).");
       throw new HttpsError("permission-denied", "Droits admin requis.");
     }
     const callingAdminUid = request.auth.uid;
@@ -384,7 +417,7 @@ export const setAdminRole = onCall(
       if (!validResult.success) {
         const flatErrors = validResult.error.flatten();
         functions.logger.error("Err setAdmin valid:", flatErrors);
-        throw new HttpsError("invalid-argument", "Err. données.");
+        throw new HttpsError("invalid-argument", "Err. donnees.");
       }
       const {email, uid: providedUid} = validResult.data;
       let targetUid = providedUid;
@@ -394,32 +427,48 @@ export const setAdminRole = onCall(
           const userRecord = await admin.auth().getUserByEmail(email);
           targetUid = userRecord.uid;
         } catch (e: unknown) {
-          let msg = "Err récup user.";
-          if (e instanceof Error) msg = e.message.slice(0, 10);
           functions.logger.error(`Err getUserByEmail ${email}:`, e);
-          throw new HttpsError("not-found", msg);
+          throw new HttpsError("not-found", "Err recup user.");
         }
       }
 
       if (!targetUid) {
-        throw new HttpsError("not-found", "User non trouvé.");
+        throw new HttpsError("not-found", "User non trouve.");
       }
 
       await admin.auth().setCustomUserClaims(targetUid, {admin: true});
-      functions.logger.info(`Rôle admin pour: ${targetUid}`);
+      functions.logger.info(`Role admin pour: ${targetUid}`);
       const targetIdentifier = email || targetUid;
       return {
         success: true,
-        message: `Rôle admin pour ${targetIdentifier}.`,
+        message: `Role admin pour ${targetIdentifier}.`,
       };
     } catch (error: unknown) {
-      functions.logger.error("Err setAdminRole:", error);
+      let code: functions.https.FunctionsErrorCode = "internal";
+      let message = "Echec role admin. Verif logs.";
+
       if (error instanceof HttpsError) {
+        functions.logger.error(
+          `Err setAdmin (HttpsError ${error.code}):`,
+          {message: error.message, details: error.details, data: request.data}
+        );
         throw error;
+      } else if (error instanceof Error) {
+        functions.logger.error(
+          "Err setAdmin (Error instance):",
+          {name: error.name, message: error.message, stack: error.stack, data: request.data}
+        );
+        if (error.name === "ZodError") {
+          code = "invalid-argument";
+          message = "Donnees invalides.";
+        }
+      } else {
+        functions.logger.error(
+            "Err setAdmin (type inconnu):",
+            {errorObject: error, data: request.data}
+        );
       }
-      let errMsg = "Echec rôle admin.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 15);
-      throw new HttpsError("internal", errMsg);
+      throw new HttpsError(code, message);
     }
   }
 );
