@@ -157,8 +157,9 @@ const listPendingInvitationsOptions: HttpsOptions = {
 export const listPendingInvitations = onCall(
   listPendingInvitationsOptions,
   async () => {
-    const logMarker = "LIST_INVITES_V2_LOG"; // Changed V1 to V2 to force redeploy
-    logger.info(`${logMarker}: Called.`);
+    const logMarker = "LIST_INVITES_V2_LOG";
+    // Nouveau log pour forcer la détection de changement
+    logger.info(`${logMarker}: Function invoked. Attempting to list pending invitations.`);
 
     if (!db) {
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
@@ -188,11 +189,11 @@ export const listPendingInvitations = onCall(
       const invitations = snapshot.docs.map((doc) => {
         const data = doc.data();
         // Shortened variable name here
-        const reqTimestamp = data.requestedAt;
+        const reqTimestamp = data.requestedAt as admin.firestore.Timestamp;
         let requestedAtISO: string;
 
-        if (reqTimestamp && typeof (reqTimestamp as any).toDate === "function") {
-          requestedAtISO = (reqTimestamp as admin.firestore.Timestamp).toDate().toISOString();
+        if (reqTimestamp && typeof reqTimestamp.toDate === "function") {
+          requestedAtISO = reqTimestamp.toDate().toISOString();
         } else {
           // Log a warning and use a fallback if it's not a valid Timestamp or is missing
           const logMessage = `${logMarker}: requestedAt for doc ${doc.id} is not a valid Timestamp or is missing.`;
@@ -239,3 +240,4 @@ export const listPendingInvitations = onCall(
 logger.info(
   `${LOG_PREFIX_V11}: Script end. Admin SDK init attempt done.`
 );
+
