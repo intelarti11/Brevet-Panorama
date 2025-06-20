@@ -333,6 +333,7 @@ export default function ImportPage() {
   };
 
   const normalizeCsvHeader = (header: string): string => {
+    if (header === null || header === undefined) return "";
     return header.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/gi, '');
   };
   
@@ -360,7 +361,7 @@ export default function ImportPage() {
           const headerMapping: { [key: string]: string[] } = { 
             INE: ["INE"], 
             NOM: ["NOM"],
-            PRENOM: ["PRENOM", "PRÉNOM", "PRANOM"], 
+            PRENOM: ["PRENOM", "PRÉNOM"], // Corrected: "PRANOM" removed
             SEXE: ["SEXE"],
             CLASSE: ["CLASSE"],
           };
@@ -584,9 +585,7 @@ export default function ImportPage() {
             Importer Liste Élèves (CSV)
           </CardTitle>
           <CardDescription>
-            Téléversez un fichier CSV (.csv) pour les listes d'élèves (délimiteur: point-virgule ';').
-            Colonnes principales attendues: Nom;Prénom;Sexe;Classe.
-            La colonne INE est optionnelle mais recommandée.
+             Colonnes principales attendues: Nom;Prénom;Sexe;Classe. La colonne INE est optionnelle mais recommandée. Délimiteur: point-virgule ';'.
             L'année scolaire sélectionnée ci-dessus sera utilisée pour cet import.
           </CardDescription>
         </CardHeader>
@@ -634,5 +633,7 @@ export default function ImportPage() {
     </div>
   );
 }
+
+    
 
     
