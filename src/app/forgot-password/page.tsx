@@ -62,17 +62,17 @@ export default function ForgotPasswordPage() {
       if (error.code === 'auth/user-not-found') {
         // Ne pas révéler si l'e-mail existe ou non pour des raisons de sécurité,
         // donc afficher le même message générique.
-         errorMessage = `Si un compte est associé à ${values.email}, un lien sera envoyé.`;
+         // Le toast affichera le message succès de toute façon pour ne pas révéler d'info
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = "L'adresse e-mail fournie n'est pas valide.";
       }
-      // Pour les autres erreurs, on peut afficher un message plus générique
-      // ou le message d'erreur de Firebase si jugé approprié pour le débogage.
-      // Pour l'utilisateur, le message générique est souvent préférable.
+      // Pour des raisons de sécurité, on affiche toujours le message "succès"
+      // pour ne pas indiquer si un email existe ou non dans la base.
+      // L'erreur est loggée en console pour le debug.
       toast({
-        variant: "destructive",
-        title: "Échec de l'envoi",
-        description: error.code === 'auth/user-not-found' ? errorMessage : "Impossible d'envoyer l'e-mail de réinitialisation pour le moment.",
+        variant: error.code === 'auth/user-not-found' ? "default" : "destructive", // default pour user-not-found
+        title: error.code === 'auth/user-not-found' ? "Vérifiez vos e-mails" : "Échec de l'envoi",
+        description: error.code === 'auth/user-not-found' ? `Si un compte est associé à ${values.email}, un lien sera envoyé.` : errorMessage,
       });
     } finally {
       setIsLoading(false);
