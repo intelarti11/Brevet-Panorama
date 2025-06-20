@@ -7,11 +7,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react'; // CheckCircle, XCircle removed as they are commented out
+import { Loader2, AlertTriangle, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 import { getFunctions, httpsCallable, type HttpsCallableResult } from 'firebase/functions';
 import { app } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+// TODO: Consider adding a dialog for rejection reason if needed
+// import {
+//   AlertDialog,
+//   AlertDialogAction,
+//   AlertDialogCancel,
+//   AlertDialogContent,
+//   AlertDialogDescription,
+//   AlertDialogFooter,
+//   AlertDialogHeader,
+//   AlertDialogTitle,
+//   AlertDialogTrigger,
+// } from "@/components/ui/alert-dialog";
+// import { Textarea } from "@/components/ui/textarea";
 
 interface InvitationRequest {
   id: string;
@@ -30,20 +43,24 @@ export default function AdminInvitationsPage() {
   const [invitations, setInvitations] = useState<InvitationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({}); // Temporarily unused
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
   const { toast } = useToast();
 
-  // Memoize the functions instance
-  const functionsInstance = useMemo(() => getFunctions(app, 'europe-west1'), []); // app is stable
+  const functionsInstance = useMemo(() => getFunctions(app, 'europe-west1'), []);
 
-  // Memoize the callable function reference
   const callListPendingInvitations = useMemo(() =>
     httpsCallable<void, CloudFunctionResponse>(functionsInstance, 'listPendingInvitations'),
-    [functionsInstance] // Dependency is the memoized functions instance
+    [functionsInstance]
   );
-  // const callApproveInvitation = useMemo(() => httpsCallable<{ email: string }, CloudFunctionResponse>(functionsInstance, 'approveInvitation'),[functionsInstance]);
-  // const callRejectInvitation = useMemo(() => httpsCallable<{ email: string, reason?: string }, CloudFunctionResponse>(functionsInstance, 'rejectInvitation'), [functionsInstance]);
+  const callApproveInvitation = useMemo(() => 
+    httpsCallable<{ invitationId: string }, CloudFunctionResponse>(functionsInstance, 'approveInvitation'),
+    [functionsInstance]
+  );
+  const callRejectInvitation = useMemo(() => 
+    httpsCallable<{ invitationId: string, reason?: string }, CloudFunctionResponse>(functionsInstance, 'rejectInvitation'),
+    [functionsInstance]
+  );
 
   const fetchPendingInvitations = useCallback(async () => {
     setIsLoading(true);
@@ -57,7 +74,7 @@ export default function AdminInvitationsPage() {
       }
     } catch (err: any) {
       console.error("Erreur fetchPendingInvitations:", err);
-      setError(err.message || "Impossible de charger les invitations en attente.");
+      setError(err.message || "Impossible de charger les invitations.");
       toast({ variant: "destructive", title: "Erreur", description: err.message || "Une erreur inconnue est survenue." });
     } finally {
       setIsLoading(false);
@@ -68,31 +85,33 @@ export default function AdminInvitationsPage() {
     fetchPendingInvitations();
   }, [fetchPendingInvitations]);
 
-  // const handleAction = async (action: 'approve' | 'reject', email: string, invitationId: string) => {
-  //   // setActionLoading(prev => ({ ...prev, [invitationId]: true }));
-  //   try {
-  //     let result: HttpsCallableResult<CloudFunctionResponse>;
-  //     if (action === 'approve') {
-  //       // result = await callApproveInvitation({ email });
-  //     } else {
-  //       // result = await callRejectInvitation({ email }); // Assuming reason is optional or handled
-  //     }
+  const handleAction = async (action: 'approve' | 'reject', invitationId: string) => {
+    setActionLoading(prev => ({ ...prev, [invitationId]: true }));
+    try {
+      let result: HttpsCallableResult<CloudFunctionResponse>;
+      if (action === 'approve') {
+        result = await callApproveInvitation({ invitationId });
+      } else {
+        // For now, reject without a specific reason.
+        // TODO: Implement a dialog to ask for a reason if needed.
+        result = await callRejectInvitation({ invitationId });
+      }
 
-  //     // if (result.data.success) {
-  //     //   toast({ title: "Succès", description: result.data.message });
-  //     //   fetchPendingInvitations(); // Refresh list after action
-  //     // } else {
-  //     //   throw new Error(result.data.message || `Échec de l'action: ${action}`);
-  //     // }
-  //   } catch (err: any) {
-  //     console.error(`Erreur ${action}Invitation:`, err);
-  //     toast({ variant: "destructive", title: "Erreur", description: err.message });
-  //   } finally {
-  //     // setActionLoading(prev => ({ ...prev, [invitationId]: false }));
-  //   }
-  // };
+      if (result.data.success) {
+        toast({ title: "Succès", description: result.data.message });
+        fetchPendingInvitations(); // Refresh list after action
+      } else {
+        throw new Error(result.data.message || `Échec de l'action: ${action}`);
+      }
+    } catch (err: any) {
+      console.error(`Erreur ${action}Invitation:`, err);
+      toast({ variant: "destructive", title: "Erreur", description: err.message });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [invitationId]: false }));
+    }
+  };
 
-  if (isLoading) {
+  if (isLoading && invitations.length === 0) { // Show initial loading only if no data yet
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -101,14 +120,15 @@ export default function AdminInvitationsPage() {
     );
   }
 
-  if (error) {
+  if (error && invitations.length === 0) { // Show error only if no data is displayed
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] p-4 text-center">
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-semibold text-destructive mb-2">Erreur de chargement</h2>
         <p className="text-muted-foreground max-w-md mb-4">{error}</p>
-        <Button onClick={fetchPendingInvitations} variant="outline">
-          <RefreshCw className="mr-2 h-4 w-4" /> Réessayer
+        <Button onClick={fetchPendingInvitations} variant="outline" disabled={isLoading}>
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+          Réessayer
         </Button>
       </div>
     );
@@ -119,7 +139,7 @@ export default function AdminInvitationsPage() {
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-foreground tracking-tight">Gestion des Invitations</h1>
         <p className="text-muted-foreground mt-1">
-          Approuvez ou rejetez les demandes d'accès à l'application. (Actions temporairement désactivées)
+          Approuvez ou rejetez les demandes d'accès à l'application.
         </p>
       </header>
 
@@ -135,12 +155,13 @@ export default function AdminInvitationsPage() {
               </CardDescription>
             </div>
             <Button onClick={fetchPendingInvitations} variant="outline" size="sm" disabled={isLoading}>
-                <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`mr-2 h-4 w-4 ${isLoading && !actionLoading[Object.keys(actionLoading)[0]] ? 'animate-spin' : ''}`} />
                 Actualiser
             </Button>
           </div>
         </CardHeader>
         <CardContent>
+          {error && <p className="text-destructive mb-4">Erreur lors du chargement: {error}</p>}
           {invitations.length > 0 ? (
             <div className="overflow-x-auto rounded-md border">
               <Table>
@@ -149,7 +170,7 @@ export default function AdminInvitationsPage() {
                     <TableHead>E-mail du demandeur</TableHead>
                     <TableHead>Date de la demande</TableHead>
                     <TableHead className="text-center">Statut</TableHead>
-                    <TableHead className="text-right">Actions (Désactivées)</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -165,12 +186,11 @@ export default function AdminInvitationsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right space-x-2">
-                        {/*
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleAction('approve', invite.email, invite.id)}
-                          disabled={actionLoading[invite.id]}
+                          onClick={() => handleAction('approve', invite.id)}
+                          disabled={actionLoading[invite.id] || isLoading}
                           className="text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
                         >
                           {actionLoading[invite.id] ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
@@ -179,15 +199,13 @@ export default function AdminInvitationsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleAction('reject', invite.email, invite.id)}
-                          disabled={actionLoading[invite.id]}
+                          onClick={() => handleAction('reject', invite.id)}
+                          disabled={actionLoading[invite.id] || isLoading}
                           className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
                         >
                           {actionLoading[invite.id] ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
                           Rejeter
                         </Button>
-                        */}
-                        <span className="text-xs text-muted-foreground">Actions désactivées</span>
                       </TableCell>
                     </TableRow>
                   ))}

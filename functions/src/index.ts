@@ -5,10 +5,10 @@ import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
 // Log prefix pour cette version
-const LOG_PREFIX_V13 = "INIT_V13"; // Changed log marker
+const LOG_PREFIX_V13_1 = "INIT_V13_1"; // Updated log marker
 
 logger.info(
-  `${LOG_PREFIX_V13}: Script top. Admin init.`
+  `${LOG_PREFIX_V13_1}: Script top. Admin init.`
 );
 
 let db: admin.firestore.Firestore | null = null;
@@ -16,18 +16,18 @@ let adminApp: admin.app.App | null = null;
 
 try {
   logger.info(
-    `${LOG_PREFIX_V13}: Attempting admin.initializeApp()...`
+    `${LOG_PREFIX_V13_1}: Attempting admin.initializeApp()...`
   );
   adminApp = admin.initializeApp();
   logger.info(
-    `${LOG_PREFIX_V13}: admin.initializeApp() SUCCESS.`
+    `${LOG_PREFIX_V13_1}: admin.initializeApp() SUCCESS.`
   );
 
-  logger.info(`${LOG_PREFIX_V13}: Attempting admin.firestore()...`);
+  logger.info(`${LOG_PREFIX_V13_1}: Attempting admin.firestore()...`);
   db = admin.firestore();
-  logger.info(`${LOG_PREFIX_V13}: admin.firestore() SUCCESS.`);
+  logger.info(`${LOG_PREFIX_V13_1}: admin.firestore() SUCCESS.`);
   logger.info(
-    `${LOG_PREFIX_V13}: FB Admin SDK init OK.`
+    `${LOG_PREFIX_V13_1}: FB Admin SDK init OK.`
   );
 } catch (error: unknown) {
   let errorMessage = "Unknown error during Firebase Admin init.";
@@ -37,7 +37,7 @@ try {
     errorStack = error.stack || "No stack trace available";
   }
   logger.error(
-    `${LOG_PREFIX_V13}: CRITICAL_ERROR_DURING_FIREBASE_ADMIN_INIT.`,
+    `${LOG_PREFIX_V13_1}: CRITICAL_ERROR_DURING_FIREBASE_ADMIN_INIT.`,
     {
       errorMessage: errorMessage,
       errorStack: errorStack,
@@ -52,7 +52,7 @@ try {
 export const ultraMinimalFunction = onCall(
   {region: "europe-west1"},
   (request) => {
-    const logMarker = "ULTRA_MINIMAL_V13_LOG"; // Changed log marker
+    const logMarker = "ULTRA_MINIMAL_V13_1_LOG"; // Updated log marker
     logger.info(
       `${logMarker}: Called.`,
       {structuredData: true, data: request.data}
@@ -69,7 +69,7 @@ export const ultraMinimalFunction = onCall(
     }
     return {
       success: true,
-      message: "Ultra minimal function (v13) executed.",
+      message: "Ultra minimal function (v13.1) executed.",
       receivedData: request.data,
     };
   }
@@ -83,7 +83,7 @@ const requestInvitationOptions: HttpsOptions = {
 export const requestInvitation = onCall(
   requestInvitationOptions,
   async (request) => {
-    const logMarker = "INVITE_WRITE_V13_LOG"; // Changed log marker
+    const logMarker = "INVITE_WRITE_V13_1_LOG"; // Updated log marker
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
@@ -113,6 +113,21 @@ export const requestInvitation = onCall(
 
     try {
       const collectionName = "invitationRequests";
+      // Check if a pending request for this email already exists
+      const existingQuery = db.collection(collectionName)
+        .where("email", "==", email)
+        .where("status", "==", "pending");
+      const existingSnapshot = await existingQuery.get();
+
+      if (!existingSnapshot.empty) {
+        logger.info(`${logMarker}: Pending request for ${email} already exists.`);
+        return {
+          success: false, // Or true, depending on desired UX
+          message: `Une demande pour ${email} est déjà en attente.`,
+          receivedData: request.data,
+        };
+      }
+
       const newRequestRef = db.collection(collectionName).doc();
       await newRequestRef.set({
         email: email,
@@ -121,9 +136,9 @@ export const requestInvitation = onCall(
       });
 
       logger.info(
-        `${logMarker}: Firestore write OK: ${email}. ID: ${newRequestRef.id}`
+        `${logMarker}: Firestore write OK for ${email}. ID: ${newRequestRef.id}`
       );
-      const successMsg = `Demande pour ${email} ok.`;
+      const successMsg = `Demande pour ${email} enregistrée.`;
       return {
         success: true,
         message: successMsg,
@@ -135,7 +150,7 @@ export const requestInvitation = onCall(
         errorMsg = writeError.message;
       }
       logger.error(
-        `${logMarker}: Firestore write FAILED: ${email}.`,
+        `${logMarker}: Firestore write FAILED for ${email}.`,
         {error: errorMsg, originalError: String(writeError)}
       );
       return {
@@ -150,14 +165,16 @@ export const requestInvitation = onCall(
 // Function to list pending invitation requests
 const listPendingInvitationsOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public",
+  invoker: "public", // Allows unauthenticated access
 };
 
 export const listPendingInvitations = onCall(
   listPendingInvitationsOptions,
   async () => {
-    const logMarker = "LIST_INVITES_V13_LOG"; // Changed log marker
-    logger.info(`${logMarker}: INIT - Listing invites (v13 - no order).`);
+    const logMarker = "LIST_INVITES_V13_1_LOG"; // Updated log marker
+    logger.info(
+      `${logMarker}: Force Re-Eval - Listing invites (v13.1 - with order).`
+    );
 
     if (!db) {
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
@@ -169,9 +186,9 @@ export const listPendingInvitations = onCall(
     }
 
     try {
-      // Temporarily removed .orderBy("requestedAt", "asc")
       const query = db.collection("invitationRequests")
-        .where("status", "==", "pending");
+        .where("status", "==", "pending")
+        .orderBy("requestedAt", "asc"); // Restored orderBy
       const snapshot = await query.get();
 
       if (snapshot.empty) {
@@ -191,9 +208,11 @@ export const listPendingInvitations = onCall(
         if (reqTimestamp && typeof reqTimestamp.toDate === "function") {
           requestedAtISO = reqTimestamp.toDate().toISOString();
         } else {
-          const warnMsg = `${logMarker}: Invalid reqAt: doc ${doc.id}`;
+          // Fallback if requestedAt is not a valid Timestamp
+          const warnMsg = `${logMarker}: Invalid reqAt for doc ${doc.id}.`;
           logger.warn(warnMsg, {reqTsVal: String(reqTimestamp)});
-          requestedAtISO = new Date().toISOString(); // Fallback
+          // Fallback to current date or a placeholder, as this indicates data inconsistency
+          requestedAtISO = new Date(0).toISOString(); // Use epoch or similar placeholder
         }
         return {
           id: doc.id,
@@ -203,7 +222,7 @@ export const listPendingInvitations = onCall(
         };
       });
 
-      logger.info(`${logMarker}: Invites found.`, {count: invitations.length});
+      logger.info(`${logMarker}: Invites found. Cnt: ${invitations.length}`);
       return {
         success: true,
         message: "Invitations en attente récupérées.",
@@ -214,18 +233,130 @@ export const listPendingInvitations = onCall(
       if (error instanceof Error) {
         errorMsg = error.message;
       }
-      const logErr = `${logMarker}: Failed to list invites.`;
+      const logErr = `${logMarker}: List invites failed.`;
       logger.error(logErr, {error: errorMsg, originalError: String(error)});
       return {
         success: false,
-        message: `Erreur serveur: ${errorMsg}`,
+        message: `Erreur serveur (liste): ${errorMsg}`,
         invitations: [],
       };
     }
   }
 );
 
+// Function to approve an invitation request
+const approveInvitationOptions: HttpsOptions = {
+  region: "europe-west1",
+  // invoker: "private" // Or specific invokers if you manage admin users via Firebase Auth
+};
+export const approveInvitation = onCall(
+  approveInvitationOptions,
+  async (request) => {
+    const logMarker = "APPROVE_INVITE_V1_LOG";
+    logger.info(`${logMarker}: Called. Data:`, {structuredData: true, data: request.data});
+
+    if (!db) {
+      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
+      return {success: false, message: "Erreur serveur (DB)." };
+    }
+
+    const invitationId = request.data.invitationId;
+    if (!invitationId || typeof invitationId !== "string") {
+      logger.error(`${logMarker}: Invalid/missing invitationId.`, {invitationId});
+      return {success: false, message: "ID d'invitation invalide."};
+    }
+
+    try {
+      const inviteRef = db.collection("invitationRequests").doc(invitationId);
+      const inviteDoc = await inviteRef.get();
+
+      if (!inviteDoc.exists) {
+        logger.warn(`${logMarker}: Invitation ${invitationId} not found.`);
+        return {success: false, message: "Invitation non trouvée."};
+      }
+
+      if (inviteDoc.data()?.status !== "pending") {
+        logger.warn(`${logMarker}: Invite ${invitationId} not pending. Status: ${inviteDoc.data()?.status}`);
+        return {success: false, message: `Invitation déjà traitée (${inviteDoc.data()?.status}).`};
+      }
+
+      await inviteRef.update({
+        status: "approved",
+        approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // TODO: Potentially create Firebase Auth user or send approval email here
+
+      logger.info(`${logMarker}: Invitation ${invitationId} approved for ${inviteDoc.data()?.email}.`);
+      return {success: true, message: `Invitation pour ${inviteDoc.data()?.email} approuvée.`};
+    } catch (err: unknown) {
+      let errorMsg = "Unknown error approving invitation.";
+      if (err instanceof Error) {errorMsg = err.message;}
+      logger.error(`${logMarker}: Approval FAILED for ${invitationId}.`, {error: errorMsg, originalError: String(err)});
+      return {success: false, message: `Échec approbation: ${errorMsg}`};
+    }
+  }
+);
+
+// Function to reject an invitation request
+const rejectInvitationOptions: HttpsOptions = {
+  region: "europe-west1",
+  // invoker: "private"
+};
+export const rejectInvitation = onCall(
+  rejectInvitationOptions,
+  async (request) => {
+    const logMarker = "REJECT_INVITE_V1_LOG";
+    logger.info(`${logMarker}: Called. Data:`, {structuredData: true, data: request.data});
+
+    if (!db) {
+      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
+      return {success: false, message: "Erreur serveur (DB)."};
+    }
+
+    const invitationId = request.data.invitationId;
+    const reason = request.data.reason; // Optional reason
+
+    if (!invitationId || typeof invitationId !== "string") {
+      logger.error(`${logMarker}: Invalid/missing invitationId.`, {invitationId});
+      return {success: false, message: "ID d'invitation invalide."};
+    }
+
+    try {
+      const inviteRef = db.collection("invitationRequests").doc(invitationId);
+      const inviteDoc = await inviteRef.get();
+
+      if (!inviteDoc.exists) {
+        logger.warn(`${logMarker}: Invitation ${invitationId} not found.`);
+        return {success: false, message: "Invitation non trouvée."};
+      }
+
+      if (inviteDoc.data()?.status !== "pending") {
+         logger.warn(`${logMarker}: Invite ${invitationId} not pending. Status: ${inviteDoc.data()?.status}`);
+        return {success: false, message: `Invitation déjà traitée (${inviteDoc.data()?.status}).`};
+      }
+
+      const updateData: any = {
+        status: "rejected",
+        rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      if (reason && typeof reason === "string") {
+        updateData.rejectionReason = reason;
+      }
+
+      await inviteRef.update(updateData);
+
+      logger.info(`${logMarker}: Invitation ${invitationId} rejected for ${inviteDoc.data()?.email}.`);
+      return {success: true, message: `Invitation pour ${inviteDoc.data()?.email} rejetée.`};
+    } catch (err: unknown) {
+      let errorMsg = "Unknown error rejecting invitation.";
+      if (err instanceof Error) {errorMsg = err.message;}
+      logger.error(`${logMarker}: Rejection FAILED for ${invitationId}.`, {error: errorMsg, originalError: String(err)});
+      return {success: false, message: `Échec rejet: ${errorMsg}`};
+    }
+  }
+);
 
 logger.info(
-  `${LOG_PREFIX_V13}: Script end. Admin SDK init attempt done (v13).`
+  `${LOG_PREFIX_V13_1}: Script end. Admin SDK init attempt done (v13.1).`
 );
