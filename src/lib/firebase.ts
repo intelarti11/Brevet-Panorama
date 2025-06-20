@@ -1,7 +1,7 @@
 
 import { initializeApp, getApp, getApps, type FirebaseOptions } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-// import { getAuth } from 'firebase/auth'; // If you need auth
+import { getAuth } from 'firebase/auth'; // If you need auth
 // import { getStorage } from 'firebase/storage'; // If you need storage
 
 // Your web app's Firebase configuration
@@ -31,15 +31,18 @@ if (!getApps().length) {
 }
 
 let db;
+let auth; // Declare auth
+
 if (app) {
   try {
     db = getFirestore(app);
+    auth = getAuth(app); // Initialize auth
   } catch (e) {
-    console.error("Erreur d'initialisation Firestore:", e);
+    console.error("Erreur d'initialisation Firestore/Auth:", e);
      // It might be wise to throw an error here or handle this state
   }
 } else {
-  console.error("L'application Firebase n'est pas initialisée. Firestore est inaccessible.");
+  console.error("L'application Firebase n'est pas initialisée. Firestore/Auth est inaccessible.");
 }
 
-export { app, db /*, auth, storage */ };
+export { app, db, auth /*, storage */ };

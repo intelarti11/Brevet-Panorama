@@ -26,10 +26,9 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/logo';
 import { Mail, Loader2, ArrowLeft } from 'lucide-react';
+import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
+import { app } from '@/lib/firebase'; // Assurez-vous que app est exporté depuis firebase.ts
 
-// Permet n'importe quel email pour la réinitialisation, au cas où.
-// Si vous voulez forcer le format @ac-montpellier.fr ici aussi, utilisez:
-// const emailRegex = /^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/;
 const formSchema = z.object({
   email: z.string()
     .min(1, { message: "L'adresse e-mail est requise." })
@@ -39,6 +38,7 @@ const formSchema = z.object({
 export default function ForgotPasswordPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const auth = getAuth(app); // Obtenir l'instance Auth
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -49,16 +49,34 @@ export default function ForgotPasswordPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    // SIMULATION: En production, vous contacteriez votre backend
-    // pour initier l'envoi d'un e-mail de réinitialisation.
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsLoading(false);
-
-    toast({
-      title: "Vérifiez vos e-mails",
-      description: `Si un compte est associé à ${values.email}, un lien de réinitialisation de mot de passe a été envoyé.`,
-    });
-    form.reset();
+    try {
+      await sendPasswordResetEmail(auth, values.email);
+      toast({
+        title: "Vérifiez vos e-mails",
+        description: `Si un compte est associé à ${values.email}, un lien de réinitialisation de mot de passe a été envoyé.`,
+      });
+      form.reset();
+    } catch (error: any) {
+      console.error("Erreur d'envoi de l'e-mail de réinitialisation:", error);
+      let errorMessage = "Une erreur est survenue lors de l'envoi de l'e-mail.";
+      if (error.code === 'auth/user-not-found') {
+        // Ne pas révéler si l'e-mail existe ou non pour des raisons de sécurité,
+        // donc afficher le même message générique.
+         errorMessage = `Si un compte est associé à ${values.email}, un lien sera envoyé.`;
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "L'adresse e-mail fournie n'est pas valide.";
+      }
+      // Pour les autres erreurs, on peut afficher un message plus générique
+      // ou le message d'erreur de Firebase si jugé approprié pour le débogage.
+      // Pour l'utilisateur, le message générique est souvent préférable.
+      toast({
+        variant: "destructive",
+        title: "Échec de l'envoi",
+        description: error.code === 'auth/user-not-found' ? errorMessage : "Impossible d'envoyer l'e-mail de réinitialisation pour le moment.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
