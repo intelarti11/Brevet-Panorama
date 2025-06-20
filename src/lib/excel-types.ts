@@ -70,4 +70,18 @@ export const studentDataSchema = z.object({
 
 export type StudentData = z.infer<typeof studentDataSchema>;
 
+// Schema for basic student data from CSV
+export const studentBaseSchema = z.object({
+  INE: z.preprocess(preprocessToStringOptional, z.string().min(1, "L'INE est requis")),
+  NOM: z.preprocess(preprocessToStringOptional, z.string().min(1, "Le nom est requis")),
+  PRENOM: z.preprocess(preprocessToStringOptional, z.string().min(1, "Le prénom est requis")),
+  DATE_NAISSANCE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // Expecting format like DD/MM/YYYY
+  CODE_ETABLISSEMENT: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  LIBELLE_ETABLISSEMENT: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  CODE_DIVISION: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()),
+  // Add other base fields as needed, e.g., sexe, etc.
+  // Ensure the CSV headers match these keys (or map them during parsing)
+});
+
+export type StudentBaseData = z.infer<typeof studentBaseSchema>;
     
