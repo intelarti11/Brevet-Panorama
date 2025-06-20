@@ -18,12 +18,17 @@ const invitationRequestSchema = z.object({
     .regex(/^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@ac-montpellier\.fr$/, { message: "L'adresse e-mail doit être au format prénom.nom@ac-montpellier.fr" }),
 });
 
-// Schéma de validation pour l'approbation
-const approveInvitationSchema = z.object({
+// Schéma de validation pour l'approbation ou le rejet
+const manageInvitationSchema = z.object({
   email: z.string().email({ message: "Adresse e-mail invalide." }),
   // Alternativement, vous pourriez utiliser un ID de document si vous préférez
   // invitationId: z.string().min(1, { message: "L'ID de la demande est requis."}),
 });
+
+const rejectInvitationSchema = manageInvitationSchema.extend({
+    reason: z.string().optional().describe("Raison optionnelle du rejet."),
+});
+
 
 /**
  * Enregistre une nouvelle demande d'invitation.
@@ -33,7 +38,6 @@ export const requestInvitation = functions.region("europe-west1").https.onCall(a
   functions.logger.info("Nouvelle demande d'invitation reçue:", data);
 
   try {
-    // Validation des données d'entrée
     const validationResult = invitationRequestSchema.safeParse(data);
     if (!validationResult.success) {
       functions.logger.error("Validation échouée pour requestInvitation:", validationResult.error.flatten());
@@ -41,10 +45,10 @@ export const requestInvitation = functions.region("europe-west1").https.onCall(a
     }
 
     const { email } = validationResult.data;
+    const lowerEmail = email.toLowerCase();
 
-    // Vérifier si une demande existe déjà pour cet e-mail
     const existingRequestQuery = await db.collection("invitationRequests")
-      .where("email", "==", email)
+      .where("email", "==", lowerEmail)
       .limit(1)
       .get();
 
@@ -56,28 +60,25 @@ export const requestInvitation = functions.region("europe-west1").https.onCall(a
       if (existingRequest.status === "pending") {
          throw new functions.https.HttpsError("already-exists", "Une demande d'invitation est déjà en cours pour cet e-mail.");
       }
-      // Si rejected, on pourrait permettre une nouvelle demande ou la mettre à jour
-      // Pour l'instant, on crée une nouvelle demande ou on met à jour si elle était rejected.
       await db.collection("invitationRequests").doc(existingRequestQuery.docs[0].id).set({
-        email: email.toLowerCase(),
-        status: "pending", // "pending", "approved", "rejected"
+        email: lowerEmail,
+        status: "pending",
         requestedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
 
-      functions.logger.info(`Demande d'invitation mise à jour pour ${email}`);
+      functions.logger.info(`Demande d'invitation mise à jour pour ${lowerEmail}`);
       return { success: true, message: "Votre demande d'invitation a été soumise avec succès." };
     }
 
-    // Enregistrer la nouvelle demande dans Firestore
     await db.collection("invitationRequests").add({
-      email: email.toLowerCase(),
-      status: "pending", // "pending", "approved", "rejected"
+      email: lowerEmail,
+      status: "pending",
       requestedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    functions.logger.info(`Demande d'invitation enregistrée pour ${email}`);
+    functions.logger.info(`Demande d'invitation enregistrée pour ${lowerEmail}`);
     return { success: true, message: "Votre demande d'invitation a été soumise avec succès." };
 
   } catch (error: any) {
@@ -98,9 +99,8 @@ export const approveInvitation = functions.region("europe-west1").https.onCall(a
   functions.logger.info("Approbation d'invitation reçue:", data);
 
   // !!! IMPORTANT SÉCURITÉ !!!
-  // Vérifiez ici que l'appelant est un administrateur.
-  // Cela se fait généralement en vérifiant les custom claims de l'utilisateur authentifié.
-  // Exemple :
+  // Décommentez et implémentez une vérification robuste des droits d'administrateur ici.
+  // Par exemple, en vérifiant un custom claim:
   // if (!context.auth || !context.auth.token.admin) {
   //   functions.logger.error("Accès non autorisé à approveInvitation:", context.auth);
   //   throw new functions.https.HttpsError("permission-denied", "Vous n'avez pas les droits pour effectuer cette action.");
@@ -110,84 +110,70 @@ export const approveInvitation = functions.region("europe-west1").https.onCall(a
 
 
   try {
-    const validationResult = approveInvitationSchema.safeParse(data);
+    const validationResult = manageInvitationSchema.safeParse(data);
     if (!validationResult.success) {
       functions.logger.error("Validation échouée pour approveInvitation:", validationResult.error.flatten());
       throw new functions.https.HttpsError("invalid-argument", "Données invalides pour l'approbation.");
     }
 
     const { email } = validationResult.data;
+    const lowerEmail = email.toLowerCase();
 
-    // Trouver la demande d'invitation dans Firestore
     const requestQuery = await db.collection("invitationRequests")
-      .where("email", "==", email.toLowerCase())
-      .where("status", "==", "pending") // On ne peut approuver que les demandes en attente
+      .where("email", "==", lowerEmail)
+      .where("status", "==", "pending")
       .limit(1)
       .get();
 
     if (requestQuery.empty) {
-      throw new functions.https.HttpsError("not-found", `Aucune demande d'invitation en attente trouvée pour ${email}.`);
+      throw new functions.https.HttpsError("not-found", `Aucune demande d'invitation en attente trouvée pour ${lowerEmail}.`);
     }
 
     const invitationDoc = requestQuery.docs[0];
-
-    // Créer l'utilisateur dans Firebase Authentication
-    // Un mot de passe temporaire peut être généré ou vous pouvez utiliser
-    // le flux de réinitialisation de mot de passe de Firebase Auth pour que l'utilisateur définisse le sien.
-    // Pour cet exemple, nous ne créons pas de mot de passe ici.
-    // L'utilisateur devra utiliser le flux "mot de passe oublié" après création.
-    // Ou vous pourriez envoyer un lien de création de mot de passe (plus complexe).
     let userRecord;
+
     try {
         userRecord = await admin.auth().createUser({
-            email: email.toLowerCase(),
-            emailVerified: false, // L'e-mail est vérifié par le format ac-montpellier.fr
-            // Vous pouvez définir un mot de passe temporaire ici si vous le souhaitez :
-            // password: "temporaryPassword123!", // Assurez-vous qu'il soit conforme
+            email: lowerEmail,
+            emailVerified: false, 
             disabled: false,
         });
-        functions.logger.info("Utilisateur créé avec succès:", userRecord.uid, "pour email:", email);
+        functions.logger.info("Utilisateur créé avec succès:", userRecord.uid, "pour email:", lowerEmail);
     } catch (authError: any) {
         if (authError.code === 'auth/email-already-exists') {
-            functions.logger.warn(`Tentative d'approbation pour un e-mail déjà existant dans Auth: ${email}`);
+            functions.logger.warn(`Tentative d'approbation pour un e-mail déjà existant dans Auth: ${lowerEmail}`);
             // Marquer la demande comme approuvée si l'utilisateur existe déjà dans Auth
-            // mais n'était pas approuvé dans la collection 'invitationRequests'.
+            let existingUser;
+            try {
+                existingUser = await admin.auth().getUserByEmail(lowerEmail);
+            } catch (getUserError) {
+                 functions.logger.error(`Erreur en essayant de récupérer l'utilisateur existant ${lowerEmail} par e-mail:`, getUserError);
+                 throw new functions.https.HttpsError("internal", "Erreur lors de la vérification de l'utilisateur existant.", (getUserError as Error).message);
+            }
+
             await db.collection("invitationRequests").doc(invitationDoc.id).update({
                 status: "approved",
                 approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-                approvedBy: context.auth?.uid || "unknown_admin_or_system", // ID de l'admin qui approuve
-                authUid: authError.uid || null, // Si l'erreur fournit l'UID de l'utilisateur existant
+                approvedBy: context.auth?.uid || "unknown_admin_or_system", 
+                authUid: existingUser.uid, 
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-            return { success: true, message: `L'utilisateur ${email} existe déjà dans Firebase Auth. La demande a été marquée comme approuvée.` };
+            return { success: true, message: `L'utilisateur ${lowerEmail} existe déjà dans Firebase Auth. La demande a été marquée comme approuvée.` };
         }
         functions.logger.error("Erreur lors de la création de l'utilisateur dans Firebase Auth:", authError);
         throw new functions.https.HttpsError("internal", "Erreur lors de la création de l'utilisateur.", authError.message);
     }
 
-
-    // Mettre à jour le statut de la demande dans Firestore
     await db.collection("invitationRequests").doc(invitationDoc.id).update({
       status: "approved",
       approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-      approvedBy: context.auth?.uid || "unknown_admin_or_system", // ID de l'admin qui approuve (si disponible)
+      approvedBy: context.auth?.uid || "unknown_admin_or_system",
       authUid: userRecord.uid,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // Optionnel : Ajouter l'utilisateur à une collection "users" avec son rôle
-    // await db.collection("users").doc(userRecord.uid).set({
-    //   email: userRecord.email,
-    //   role: "user", // ou tout autre rôle par défaut
-    //   createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    // });
-
-    functions.logger.info(`Invitation approuvée et utilisateur créé pour ${email}`);
-    // Ici, vous pourriez déclencher un e-mail pour informer l'utilisateur.
-    // Pour l'instant, l'utilisateur devra utiliser "mot de passe oublié"
-    // pour définir son mot de passe s'il n'a pas été défini lors de la création.
-
-    return { success: true, message: `L'invitation pour ${email} a été approuvée. L'utilisateur peut maintenant se connecter (il devra peut-être réinitialiser son mot de passe).` };
+    functions.logger.info(`Invitation approuvée et utilisateur créé pour ${lowerEmail}`);
+    return { success: true, message: `L'invitation pour ${lowerEmail} a été approuvée. L'utilisateur peut maintenant se connecter.` };
 
   } catch (error: any) {
     functions.logger.error("Erreur dans approveInvitation:", error);
@@ -198,7 +184,106 @@ export const approveInvitation = functions.region("europe-west1").https.onCall(a
   }
 });
 
-// Vous pouvez ajouter d'autres fonctions ici, par exemple pour rejeter une invitation,
-// lister les demandes, assigner des rôles d'admin, etc.
-// Pensez à toujours sécuriser les fonctions qui modifient des données ou accordent des accès.
+
+/**
+ * Rejette une demande d'invitation.
+ * DEVRAIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
+ */
+export const rejectInvitation = functions.region("europe-west1").https.onCall(async (data, context) => {
+  functions.logger.info("Rejet d'invitation reçu:", data);
+
+  // !!! IMPORTANT SÉCURITÉ !!!
+  // Décommentez et implémentez une vérification robuste des droits d'administrateur ici.
+  // if (!context.auth || !context.auth.token.admin) {
+  //   functions.logger.error("Accès non autorisé à rejectInvitation:", context.auth);
+  //   throw new functions.https.HttpsError("permission-denied", "Vous n'avez pas les droits pour effectuer cette action.");
+  // }
+  functions.logger.warn("rejectInvitation: LA VÉRIFICATION DES DROITS ADMIN EST DÉSACTIVÉE POUR L'EXEMPLE. À IMPLÉMENTER ABSOLUMENT !");
+
+  try {
+    const validationResult = rejectInvitationSchema.safeParse(data);
+    if (!validationResult.success) {
+      functions.logger.error("Validation échouée pour rejectInvitation:", validationResult.error.flatten());
+      throw new functions.https.HttpsError("invalid-argument", "Données invalides pour le rejet.");
+    }
+
+    const { email, reason } = validationResult.data;
+    const lowerEmail = email.toLowerCase();
+
+    const requestQuery = await db.collection("invitationRequests")
+      .where("email", "==", lowerEmail)
+      .where("status", "==", "pending")
+      .limit(1)
+      .get();
+
+    if (requestQuery.empty) {
+      throw new functions.https.HttpsError("not-found", `Aucune demande d'invitation en attente trouvée pour ${lowerEmail}.`);
+    }
+
+    const invitationDoc = requestQuery.docs[0];
+
+    await db.collection("invitationRequests").doc(invitationDoc.id).update({
+      status: "rejected",
+      rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      rejectedBy: context.auth?.uid || "unknown_admin_or_system",
+      rejectionReason: reason || null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    functions.logger.info(`Invitation rejetée pour ${lowerEmail}`);
+    return { success: true, message: `L'invitation pour ${lowerEmail} a été rejetée.` };
+
+  } catch (error: any) {
+    functions.logger.error("Erreur dans rejectInvitation:", error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError("internal", "Une erreur est survenue lors du rejet.", error.message);
+  }
+});
+
+/**
+ * Liste les demandes d'invitation en attente.
+ * DEVRAIT ÊTRE APPELÉE UNIQUEMENT PAR UN ADMINISTRATEUR via une interface sécurisée.
+ */
+export const listPendingInvitations = functions.region("europe-west1").https.onCall(async (data, context) => {
+  functions.logger.info("Demande de listage des invitations en attente reçue.");
+
+  // !!! IMPORTANT SÉCURITÉ !!!
+  // Décommentez et implémentez une vérification robuste des droits d'administrateur ici.
+  // if (!context.auth || !context.auth.token.admin) {
+  //   functions.logger.error("Accès non autorisé à listPendingInvitations:", context.auth);
+  //   throw new functions.https.HttpsError("permission-denied", "Vous n'avez pas les droits pour effectuer cette action.");
+  // }
+  functions.logger.warn("listPendingInvitations: LA VÉRIFICATION DES DROITS ADMIN EST DÉSACTIVÉE POUR L'EXEMPLE. À IMPLÉMENTER ABSOLUMENT !");
+
+  try {
+    const snapshot = await db.collection("invitationRequests")
+      .where("status", "==", "pending")
+      .orderBy("requestedAt", "desc")
+      .get();
+
+    if (snapshot.empty) {
+      return { invitations: [] };
+    }
+
+    const invitations = snapshot.docs.map(doc => {
+      const docData = doc.data();
+      return {
+        id: doc.id,
+        email: docData.email,
+        requestedAt: docData.requestedAt.toDate().toISOString(), // Convertir Timestamp en ISO string
+        status: docData.status,
+      };
+    });
+
+    return { invitations };
+
+  } catch (error: any) {
+    functions.logger.error("Erreur dans listPendingInvitations:", error);
+    throw new functions.https.HttpsError("internal", "Une erreur est survenue lors de la récupération des invitations.", error.message);
+  }
+});
+    
+
     

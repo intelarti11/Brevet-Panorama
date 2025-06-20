@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle, LogOut, CalendarRange } from 'lucide-react';
+import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle, LogOut, CalendarRange, ShieldCheck } from 'lucide-react';
 
 import Logo from '@/components/logo';
 import {
@@ -31,6 +31,19 @@ import {
 } from '@/contexts/FilterContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+
+// TODO: Remplacer cette simulation par une véritable gestion d'authentification et de rôles
+// Par exemple, en utilisant Firebase Auth et les Custom Claims.
+// const useAuth = () => ({ isAdmin: true }); // Simulation : l'utilisateur est admin
+const useAuth = () => {
+  // Pour simuler, vérifiez si l'email est de type admin.nom@ac-montpellier.fr
+  // Dans une vraie app, vous liriez cela depuis l'état d'authentification Firebase
+  // et vérifieriez un custom claim 'admin: true'.
+  // const userEmail = firebase.auth().currentUser?.email;
+  // return { isAdmin: userEmail?.startsWith('admin.') && userEmail?.endsWith('@ac-montpellier.fr') };
+  return { isAdmin: true }; // Pour l'instant, on suppose que l'utilisateur est admin pour le dev
+};
+
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -136,8 +149,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
+  const { isAdmin } = useAuth(); // Simulation du statut admin
 
   const handleLogout = () => {
+    // TODO: Implémenter la déconnexion Firebase
+    // await firebase.auth().signOut();
     toast({
       title: "Déconnexion",
       description: "Vous avez été déconnecté.",
@@ -213,6 +229,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === '/dashboard/admin/invitations'}
+                    tooltip={{ children: "Administration", side: "right", align: "center" }}
+                  >
+                    <Link href="/dashboard/admin/invitations">
+                      <ShieldCheck />
+                      <span>Administration</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
             <SidebarFilters /> 
           </SidebarContent>
@@ -236,3 +266,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     </FilterProvider>
   );
 }
+
+
+    
