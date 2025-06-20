@@ -357,34 +357,33 @@ export default function ImportPage() {
           const rawHeaders = lines[0].split(';').map(h => h.trim());
           const normalizedFileHeaders = rawHeaders.map(normalizeCsvHeader);
 
-          // Define which schema keys to look for based on user request
-          const headerMapping: { [key: string]: string[] } = { // Simplified to only keys in StudentBaseData
-            INE: ["INE"], // Keep optional
+          const headerMapping: { [key: string]: string[] } = { 
+            INE: ["INE"], 
             NOM: ["NOM"],
-            PRENOM: ["PRENOM", "PRÉNOM"], 
+            PRENOM: ["PRENOM", "PRÉNOM", "PRANOM"], 
             SEXE: ["SEXE"],
             CLASSE: ["CLASSE"],
           };
 
           const schemaKeyToCsvIndex: { [key: string]: number } = {};
-          // Map only the requested headers
           const requestedSchemaKeys: (keyof StudentBaseData)[] = ["INE", "NOM", "PRENOM", "SEXE", "CLASSE"];
 
           for (const schemaKey of requestedSchemaKeys) {
-            const possibleNormalizedHeaders = headerMapping[schemaKey]?.map(normalizeCsvHeader);
+            const possibleOriginalHeaders = headerMapping[schemaKey];
             let foundIndex = -1;
-            if (possibleNormalizedHeaders) {
-              for (const pHeader of possibleNormalizedHeaders) {
-                  const idx = normalizedFileHeaders.indexOf(pHeader);
+            if (possibleOriginalHeaders) {
+              for (const originalHeader of possibleOriginalHeaders) {
+                  const normalizedPossibleHeader = normalizeCsvHeader(originalHeader);
+                  const idx = normalizedFileHeaders.indexOf(normalizedPossibleHeader);
                   if (idx !== -1) {
                       foundIndex = idx;
-                      break;
+                      break; 
                   }
               }
             }
             if (foundIndex !== -1) {
-                 schemaKeyToCsvIndex[schemaKey] = foundIndex;
-            } else if (schemaKey === 'NOM' || schemaKey === 'PRENOM') { // Required fields
+                 schemaKeyToCsvIndex[schemaKey.toUpperCase() as keyof StudentBaseData] = foundIndex;
+            } else if (schemaKey === 'NOM' || schemaKey === 'PRENOM') { 
                 throw new Error(`Colonne CSV requise manquante pour Liste Élèves: ${schemaKey}. En-têtes normalisés trouvés: ${normalizedFileHeaders.join(', ')}`);
             }
           }
@@ -396,12 +395,12 @@ export default function ImportPage() {
             if (lines[i].trim() === '') continue;
             const values = lines[i].split(';').map(v => v.trim());
             const rawRowForSchema: any = {};
-
-            // Populate only the keys that were successfully mapped
-            for (const schemaKey in schemaKeyToCsvIndex) {
-                const index = schemaKeyToCsvIndex[schemaKey];
-                if (values[index] !== undefined) { // Ensure value exists at index
-                  rawRowForSchema[schemaKey.toUpperCase()] = values[index];
+            
+            for (const schemaKey of requestedSchemaKeys) {
+                const mappedKey = schemaKey.toUpperCase() as keyof StudentBaseData;
+                const index = schemaKeyToCsvIndex[mappedKey];
+                if (index !== undefined && values[index] !== undefined) { 
+                  rawRowForSchema[mappedKey] = values[index];
                 }
             }
             
@@ -434,7 +433,6 @@ export default function ImportPage() {
                 anneeScolaire: academicYearForImport,
                 importedAt: serverTimestamp()
             };
-            // Add only the fields present in the student object (which are the ones from the schema)
             if (student.INE) studentDataWithYear.INE = student.INE;
             if (student.NOM) studentDataWithYear.NOM = student.NOM;
             if (student.PRENOM) studentDataWithYear.PRENOM = student.PRENOM;
@@ -636,3 +634,5 @@ export default function ImportPage() {
     </div>
   );
 }
+
+    
