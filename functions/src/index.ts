@@ -123,8 +123,7 @@ export const requestInvitation = onCall(
       logger.info(
         `${logMarker}: Firestore write OK for ${email}. ID: ${newRequestRef.id}`
       );
-      // Raccourci pour respecter max-len
-      const successMsg = `Demande pour ${email} enregistrée. Vous serez contacté.`;
+      const successMsg = `Demande pour ${email} enregistrée.`;
       return {
         success: true,
         message: successMsg,
@@ -158,8 +157,7 @@ export const listPendingInvitations = onCall(
   listPendingInvitationsOptions,
   async () => {
     const logMarker = "LIST_INVITES_V2_LOG";
-    // Nouveau log pour forcer la détection de changement
-    logger.info(`${logMarker}: Function invoked. Attempting to list pending invitations.`);
+    logger.info(`${logMarker}: Listing pending invites.`);
 
     if (!db) {
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
@@ -171,7 +169,6 @@ export const listPendingInvitations = onCall(
     }
 
     try {
-      // Break the chain to avoid max-len
       const query = db.collection("invitationRequests")
         .where("status", "==", "pending")
         .orderBy("requestedAt", "asc");
@@ -188,19 +185,16 @@ export const listPendingInvitations = onCall(
 
       const invitations = snapshot.docs.map((doc) => {
         const data = doc.data();
-        // Shortened variable name here
         const reqTimestamp = data.requestedAt as admin.firestore.Timestamp;
         let requestedAtISO: string;
 
         if (reqTimestamp && typeof reqTimestamp.toDate === "function") {
           requestedAtISO = reqTimestamp.toDate().toISOString();
         } else {
-          // Log a warning and use a fallback if it's not a valid Timestamp or is missing
-          const logMessage = `${logMarker}: requestedAt for doc ${doc.id} is not a valid Timestamp or is missing.`;
-          logger.warn(logMessage, {value: JSON.stringify(reqTimestamp)});
+          const warnMsg = `${logMarker}: Invalid reqAt for ${doc.id}`;
+          logger.warn(warnMsg, { reqTs: String(reqTimestamp) });
           requestedAtISO = new Date().toISOString();
         }
-        
         return {
           id: doc.id,
           email: data.email,
@@ -240,4 +234,3 @@ export const listPendingInvitations = onCall(
 logger.info(
   `${LOG_PREFIX_V11}: Script end. Admin SDK init attempt done.`
 );
-
