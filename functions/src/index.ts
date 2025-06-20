@@ -3,8 +3,8 @@
 import {onCall, HttpsOptions} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import { UserRecord } from "firebase-admin/auth"; // Ajout pour Auth
-import * as crypto from "crypto"; // Pour générer un mot de passe aléatoire
+import {UserRecord} from "firebase-admin/auth";
+import * as crypto from "crypto";
 
 const LOG_PREFIX_V13_1 = "INIT_V13_1";
 
@@ -38,7 +38,7 @@ try {
     errorStack = error.stack || "No stack trace available";
   }
   logger.error(
-    `${LOG_PREFIX_V13_1}: CRITICAL_ERROR_DURING_FIREBASE_ADMIN_INIT.`,
+    `${LOG_PREFIX_V13_1}: CRIT_ERR_FIREBASE_ADMIN_INIT.`,
     {
       errorMessage: errorMessage,
       errorStack: errorStack,
@@ -240,7 +240,7 @@ export const listPendingInvitations = onCall(
 
 const approveInvitationOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public",
+  invoker: "public", // Permettre appels non authentifiés
 };
 export const approveInvitation = onCall(
   approveInvitationOptions,
@@ -250,14 +250,13 @@ export const approveInvitation = onCall(
       {structuredData: true, data: request.data});
 
     if (!db || !adminApp) {
-      logger.warn(`${logMarker}: Firestore (db) or AdminApp not initialized.`);
+      logger.warn(`${logMarker}: DB or AdminApp not init.`);
       return {success: false, message: "Erreur serveur (DB/Admin)."};
     }
 
     const invitationId = request.data.invitationId;
     if (!invitationId || typeof invitationId !== "string") {
-      logger.error(`${logMarker}: Invalid/missing invitationId.`,
-        {invitationId});
+      logger.error(`${logMarker}: Invalid ID.`, {invitationId});
       return {success: false, message: "ID d'invitation invalide."};
     }
 
@@ -282,41 +281,48 @@ export const approveInvitation = onCall(
 
       const emailToApprove = docData?.email;
       if (!emailToApprove || typeof emailToApprove !== "string") {
-        logger.error(`${logMarker}: Email missing in invite ${invitationId}.`);
-        return {success: false, message: "Email manquant dans l'invitation."};
+        logger.error(`${logMarker}: Email missing in ${invitationId}.`);
+        return {success: false, message: "Email manquant."};
       }
 
-      // Étape 1: Créer l'utilisateur dans Firebase Auth
       let userCreationMessage = "";
       try {
         const tempPassword = crypto.randomBytes(16).toString("hex");
         const userRecord: UserRecord = await admin.auth().createUser({
           email: emailToApprove,
-          emailVerified: true, // Marquer comme vérifié car l'admin approuve
-          password: tempPassword, // Mot de passe fort et non communiqué
+          emailVerified: true,
+          password: tempPassword,
           disabled: false,
         });
-        logger.info(`${logMarker}: User ${userRecord.uid} created for ${emailToApprove}.`);
-        userCreationMessage = `Compte créé pour ${emailToApprove}. L'utilisateur doit utiliser "Mot de passe oublié" pour se connecter.`;
-      } catch (authError: any) {
-        if (authError.code === "auth/email-already-exists") {
-          logger.warn(`${logMarker}: User ${emailToApprove} already exists in Auth.`);
-          userCreationMessage = `Un compte existe déjà pour ${emailToApprove}.`;
+        const logUMsg = `${logMarker}: User ${userRecord.uid} created.`;
+        logger.info(logUMsg);
+        userCreationMessage = `Compte créé pour ${emailToApprove}. ` +
+          "L'utilisateur doit utiliser 'Mot de passe oublié'.";
+      } catch (authError: unknown) {
+        // Check if authError is an object with a 'code' property
+        const errorObject = authError as {code?: string; message?: string};
+        if (errorObject.code === "auth/email-already-exists") {
+          logger.warn(`${logMarker}: User ${emailToApprove} exists.`);
+          userCreationMessage = `Compte existant pour ${emailToApprove}.`;
         } else {
-          logger.error(`${logMarker}: Auth user creation FAILED for ${emailToApprove}.`, {error: authError});
-          return { success: false, message: `Échec création utilisateur Auth: ${authError.message}` };
+          const errMsg = errorObject.message || "Auth error";
+          logger.error(`${logMarker}: Auth create FAIL: ${emailToApprove}.`,
+            {error: errMsg});
+          return {success: false, message: `Échec Auth: ${errMsg}`};
         }
       }
 
-      // Étape 2: Mettre à jour le statut de l'invitation dans Firestore
       await inviteRef.update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const finalSuccessMsg = `${logMarker}: OK ${invitationId} for ${emailToApprove}. ${userCreationMessage}`;
-      logger.info(finalSuccessMsg);
-      return { success: true, message: `Invite ${emailToApprove} approuvée. ${userCreationMessage}` };
+      const finalMsg = `${logMarker}: OK ${invitationId}. ${userCreationMessage}`;
+      logger.info(finalMsg);
+      return {
+        success: true,
+        message: `Invite ${emailToApprove} OK. ${userCreationMessage}`,
+      };
 
     } catch (err: unknown) {
       let errorMsg = "Unknown error approving invitation.";
@@ -332,7 +338,7 @@ export const approveInvitation = onCall(
 
 const rejectInvitationOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public",
+  invoker: "public", // Permettre appels non authentifiés
 };
 export const rejectInvitation = onCall(
   rejectInvitationOptions,
@@ -350,8 +356,7 @@ export const rejectInvitation = onCall(
     const reason = request.data.reason;
 
     if (!invitationId || typeof invitationId !== "string") {
-      logger.error(`${logMarker}: Invalid/missing invitationId.`,
-        {invitationId});
+      logger.error(`${logMarker}: Invalid ID.`, {invitationId});
       return {success: false, message: "ID d'invitation invalide."};
     }
 
@@ -384,7 +389,7 @@ export const rejectInvitation = onCall(
       };
 
       if (reason && typeof reason === "string" && reason.trim() !== "") {
-        updatePayload.rejectionReason = reason.substring(0, 200); // Max length
+        updatePayload.rejectionReason = reason.substring(0, 200);
       }
 
       const payloadLog = `${logMarker}: Payload for ${invitationId}:`;
