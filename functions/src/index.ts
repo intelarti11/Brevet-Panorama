@@ -203,7 +203,7 @@ export const approveInvitation = functions.region("europe-west1")
             let msg = "Err vérif user.";
             if (getUserError instanceof Error) msg = getUserError.message;
             functions.logger.error("Err getUser:", getUserError);
-            throw new functions.https.HttpsError("internal", msg.slice(0, 20));
+            throw new functions.https.HttpsError("internal", msg.slice(0, 15));
           }
 
           await db.collection("invitationRequests")
@@ -223,7 +223,7 @@ export const approveInvitation = functions.region("europe-west1")
         functions.logger.error("Auth create fail:", authError);
         let errMsg = "Err creat user";
         if (authError instanceof Error) errMsg = authError.message;
-        const finalErrMsg = errMsg.slice(0, 20);
+        const finalErrMsg = errMsg.slice(0, 15); // Shortened
         throw new functions.https.HttpsError("internal", finalErrMsg);
       }
 
@@ -249,7 +249,7 @@ export const approveInvitation = functions.region("europe-west1")
         throw error;
       }
       let errMsg = "Echec approbation.";
-      if (error instanceof Error) errMsg = error.message.slice(0, 20);
+      if (error instanceof Error) errMsg = error.message.slice(0, 15); // Short
       throw new functions.https.HttpsError("internal", errMsg);
     }
   });
@@ -449,4 +449,3 @@ export const setAdminRole = functions.region("europe-west1")
     }
   });
 
-    
