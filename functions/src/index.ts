@@ -123,7 +123,6 @@ export const requestInvitation = onCall(
       logger.info(
         `${logMarker}: Firestore write OK for ${email}. ID: ${newRequestRef.id}`
       );
-      // Message de succès pour l'utilisateur (sans ID interne)
       return {
         success: true,
         message: `Demande pour ${email} enregistrée. Vous serez contacté.`,
@@ -169,10 +168,11 @@ export const listPendingInvitations = onCall(
     }
 
     try {
-      const snapshot = await db.collection("invitationRequests")
+      // Break the chain to avoid max-len
+      const query = db.collection("invitationRequests")
         .where("status", "==", "pending")
-        .orderBy("requestedAt", "asc")
-        .get();
+        .orderBy("requestedAt", "asc");
+      const snapshot = await query.get();
 
       if (snapshot.empty) {
         logger.info(`${logMarker}: No pending invitations found.`);
@@ -185,14 +185,12 @@ export const listPendingInvitations = onCall(
 
       const invitations = snapshot.docs.map((doc) => {
         const data = doc.data();
-        // Shortened variable name here
         const reqTimestamp = data.requestedAt as admin.firestore.Timestamp;
         let requestedAtISO: string;
         if (reqTimestamp) {
           requestedAtISO = reqTimestamp.toDate().toISOString();
         } else {
-          // Fallback if timestamp is somehow missing
-          requestedAtISO = new Date().toISOString();
+          requestedAtISO = new Date().toISOString(); // Fallback
         }
         return {
           id: doc.id,
@@ -233,4 +231,3 @@ export const listPendingInvitations = onCall(
 logger.info(
   `${LOG_PREFIX_V11}: Script end. Admin SDK init attempt done.`
 );
-

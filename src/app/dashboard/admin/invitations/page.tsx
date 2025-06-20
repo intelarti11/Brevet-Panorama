@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react'; // CheckCircle, XCircle removed as they are commented out
 import { getFunctions, httpsCallable, type HttpsCallableResult } from 'firebase/functions';
-import { app } from '@/lib/firebase'; // Assurez-vous que 'app' est exporté depuis votre config Firebase
+import { app } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -23,24 +23,21 @@ interface InvitationRequest {
 interface CloudFunctionResponse {
   success: boolean;
   message: string;
-  invitations?: InvitationRequest[]; // Pour listPendingInvitations
+  invitations?: InvitationRequest[];
 }
-
-// TODO: Sécuriser cette page pour qu'elle ne soit accessible qu'aux administrateurs.
-// Cela impliquerait un contexte d'authentification et une vérification des rôles/custom claims.
 
 export default function AdminInvitationsPage() {
   const [invitations, setInvitations] = useState<InvitationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({}); // Pour gérer le chargement par action/ID
+  // const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({}); // Temporarily unused
 
   const { toast } = useToast();
-  const functions = getFunctions(app, 'europe-west1'); // Assurez-vous que la région est correcte
+  const functions = getFunctions(app, 'europe-west1');
 
   const callListPendingInvitations = httpsCallable<void, CloudFunctionResponse>(functions, 'listPendingInvitations');
-  const callApproveInvitation = httpsCallable<{ email: string }, CloudFunctionResponse>(functions, 'approveInvitation');
-  const callRejectInvitation = httpsCallable<{ email: string, reason?: string }, CloudFunctionResponse>(functions, 'rejectInvitation');
+  // const callApproveInvitation = httpsCallable<{ email: string }, CloudFunctionResponse>(functions, 'approveInvitation'); // Temporarily commented
+  // const callRejectInvitation = httpsCallable<{ email: string, reason?: string }, CloudFunctionResponse>(functions, 'rejectInvitation'); // Temporarily commented
 
   const fetchPendingInvitations = useCallback(async () => {
     setIsLoading(true);
@@ -55,7 +52,7 @@ export default function AdminInvitationsPage() {
     } catch (err: any) {
       console.error("Erreur fetchPendingInvitations:", err);
       setError(err.message || "Impossible de charger les invitations en attente.");
-      toast({ variant: "destructive", title: "Erreur", description: err.message });
+      toast({ variant: "destructive", title: "Erreur", description: err.message || "Une erreur inconnue est survenue." });
     } finally {
       setIsLoading(false);
     }
@@ -65,30 +62,29 @@ export default function AdminInvitationsPage() {
     fetchPendingInvitations();
   }, [fetchPendingInvitations]);
 
-  const handleAction = async (action: 'approve' | 'reject', email: string, invitationId: string) => {
-    setActionLoading(prev => ({ ...prev, [invitationId]: true }));
-    try {
-      let result: HttpsCallableResult<CloudFunctionResponse>;
-      if (action === 'approve') {
-        result = await callApproveInvitation({ email });
-      } else {
-        // Pour l'instant, pas de raison de rejet dans cette UI simple
-        result = await callRejectInvitation({ email });
-      }
+  // const handleAction = async (action: 'approve' | 'reject', email: string, invitationId: string) => {
+  //   setActionLoading(prev => ({ ...prev, [invitationId]: true }));
+  //   try {
+  //     let result: HttpsCallableResult<CloudFunctionResponse>;
+  //     if (action === 'approve') {
+  //       // result = await callApproveInvitation({ email });
+  //     } else {
+  //       // result = await callRejectInvitation({ email }); // Assuming reason is optional or handled
+  //     }
 
-      if (result.data.success) {
-        toast({ title: "Succès", description: result.data.message });
-        fetchPendingInvitations(); // Recharger la liste
-      } else {
-        throw new Error(result.data.message || `Échec de l'action: ${action}`);
-      }
-    } catch (err: any) {
-      console.error(`Erreur ${action}Invitation:`, err);
-      toast({ variant: "destructive", title: "Erreur", description: err.message });
-    } finally {
-      setActionLoading(prev => ({ ...prev, [invitationId]: false }));
-    }
-  };
+  //     // if (result.data.success) {
+  //     //   toast({ title: "Succès", description: result.data.message });
+  //     //   fetchPendingInvitations(); // Refresh list after action
+  //     // } else {
+  //     //   throw new Error(result.data.message || `Échec de l'action: ${action}`);
+  //     // }
+  //   } catch (err: any) {
+  //     console.error(`Erreur ${action}Invitation:`, err);
+  //     toast({ variant: "destructive", title: "Erreur", description: err.message });
+  //   } finally {
+  //     // setActionLoading(prev => ({ ...prev, [invitationId]: false }));
+  //   }
+  // };
 
   if (isLoading) {
     return (
@@ -117,7 +113,7 @@ export default function AdminInvitationsPage() {
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-foreground tracking-tight">Gestion des Invitations</h1>
         <p className="text-muted-foreground mt-1">
-          Approuvez ou rejetez les demandes d'accès à l'application.
+          Approuvez ou rejetez les demandes d'accès à l'application. (Actions temporairement désactivées)
         </p>
       </header>
 
@@ -127,12 +123,12 @@ export default function AdminInvitationsPage() {
             <div>
               <CardTitle className="text-xl">Demandes en Attente</CardTitle>
               <CardDescription>
-                {invitations.length === 0 
-                  ? "Aucune demande d'invitation en attente." 
+                {invitations.length === 0
+                  ? "Aucune demande d'invitation en attente."
                   : `Liste des demandes d'invitation avec le statut "en attente".`}
               </CardDescription>
             </div>
-            <Button onClick={fetchPendingInvitations} variant="outline" size="sm" disabled={isLoading || Object.values(actionLoading).some(loading => loading)}>
+            <Button onClick={fetchPendingInvitations} variant="outline" size="sm" disabled={isLoading /*|| Object.values(actionLoading).some(loading => loading)*/>}>
                 <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Actualiser
             </Button>
@@ -147,7 +143,7 @@ export default function AdminInvitationsPage() {
                     <TableHead>E-mail du demandeur</TableHead>
                     <TableHead>Date de la demande</TableHead>
                     <TableHead className="text-center">Statut</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right">Actions (Désactivées)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -163,6 +159,7 @@ export default function AdminInvitationsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right space-x-2">
+                        {/*
                         <Button
                           variant="outline"
                           size="sm"
@@ -183,6 +180,8 @@ export default function AdminInvitationsPage() {
                           {actionLoading[invite.id] ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
                           Rejeter
                         </Button>
+                        */}
+                        <span className="text-xs text-muted-foreground">Actions désactivées</span>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -197,6 +196,3 @@ export default function AdminInvitationsPage() {
     </div>
   );
 }
-
-
-    
