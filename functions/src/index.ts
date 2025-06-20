@@ -4,11 +4,11 @@ import {onCall, HttpsOptions} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
-// Log prefix pour cette version (V11 avec écriture Firestore)
-const LOG_PREFIX_V11 = "INIT_V11";
+// Log prefix pour cette version
+const LOG_PREFIX_V13 = "INIT_V13"; // Changed log marker
 
 logger.info(
-  `${LOG_PREFIX_V11}: Script top. About to init admin.`
+  `${LOG_PREFIX_V13}: Script top. Admin init.`
 );
 
 let db: admin.firestore.Firestore | null = null;
@@ -16,18 +16,18 @@ let adminApp: admin.app.App | null = null;
 
 try {
   logger.info(
-    `${LOG_PREFIX_V11}: Attempting admin.initializeApp()...`
+    `${LOG_PREFIX_V13}: Attempting admin.initializeApp()...`
   );
   adminApp = admin.initializeApp();
   logger.info(
-    `${LOG_PREFIX_V11}: admin.initializeApp() SUCCESS.`
+    `${LOG_PREFIX_V13}: admin.initializeApp() SUCCESS.`
   );
 
-  logger.info(`${LOG_PREFIX_V11}: Attempting admin.firestore()...`);
+  logger.info(`${LOG_PREFIX_V13}: Attempting admin.firestore()...`);
   db = admin.firestore();
-  logger.info(`${LOG_PREFIX_V11}: admin.firestore() SUCCESS.`);
+  logger.info(`${LOG_PREFIX_V13}: admin.firestore() SUCCESS.`);
   logger.info(
-    `${LOG_PREFIX_V11}: Firebase Admin SDK initialized successfully.`
+    `${LOG_PREFIX_V13}: FB Admin SDK init OK.`
   );
 } catch (error: unknown) {
   let errorMessage = "Unknown error during Firebase Admin init.";
@@ -37,7 +37,7 @@ try {
     errorStack = error.stack || "No stack trace available";
   }
   logger.error(
-    `${LOG_PREFIX_V11}: CRITICAL_ERROR_DURING_FIREBASE_ADMIN_INIT.`,
+    `${LOG_PREFIX_V13}: CRITICAL_ERROR_DURING_FIREBASE_ADMIN_INIT.`,
     {
       errorMessage: errorMessage,
       errorStack: errorStack,
@@ -52,14 +52,14 @@ try {
 export const ultraMinimalFunction = onCall(
   {region: "europe-west1"},
   (request) => {
-    const logMarker = "ULTRA_MINIMAL_V11_LOG";
+    const logMarker = "ULTRA_MINIMAL_V13_LOG"; // Changed log marker
     logger.info(
-      `${logMarker}: ultraMinimalFunction called.`,
+      `${logMarker}: Called.`,
       {structuredData: true, data: request.data}
     );
     if (!db) {
       logger.warn(
-        `${logMarker}: Firestore (db) is not initialized.`
+        `${logMarker}: Firestore (db) not initialized.`
       );
       return {
         success: false,
@@ -69,7 +69,7 @@ export const ultraMinimalFunction = onCall(
     }
     return {
       success: true,
-      message: "Ultra minimal function (v11) executed successfully.",
+      message: "Ultra minimal function (v13) executed.",
       receivedData: request.data,
     };
   }
@@ -83,17 +83,17 @@ const requestInvitationOptions: HttpsOptions = {
 export const requestInvitation = onCall(
   requestInvitationOptions,
   async (request) => {
-    const logMarker = "INVITE_WRITE_V11_LOG";
+    const logMarker = "INVITE_WRITE_V13_LOG"; // Changed log marker
     logger.info(
       `${logMarker}: Called. Data:`,
       {structuredData: true, data: request.data}
     );
 
     if (!adminApp) {
-      logger.error(`${logMarker}: AdminApp not initialized! Critical.`);
+      logger.error(`${logMarker}: AdminApp not init! Critical.`);
     }
     if (!db) {
-      logger.warn(`${logMarker}: Firestore (db) not initialized.`);
+      logger.warn(`${logMarker}: Firestore (db) not init.`);
       return {
         success: false,
         message: "Erreur serveur (DB indisponible).",
@@ -121,9 +121,9 @@ export const requestInvitation = onCall(
       });
 
       logger.info(
-        `${logMarker}: Firestore write OK for ${email}. ID: ${newRequestRef.id}`
+        `${logMarker}: Firestore write OK: ${email}. ID: ${newRequestRef.id}`
       );
-      const successMsg = `Demande pour ${email} enregistrée.`;
+      const successMsg = `Demande pour ${email} ok.`;
       return {
         success: true,
         message: successMsg,
@@ -135,7 +135,7 @@ export const requestInvitation = onCall(
         errorMsg = writeError.message;
       }
       logger.error(
-        `${logMarker}: Firestore write FAILED for ${email}.`,
+        `${logMarker}: Firestore write FAILED: ${email}.`,
         {error: errorMsg, originalError: String(writeError)}
       );
       return {
@@ -150,14 +150,14 @@ export const requestInvitation = onCall(
 // Function to list pending invitation requests
 const listPendingInvitationsOptions: HttpsOptions = {
   region: "europe-west1",
-  invoker: "public", // For now, make it public for easier testing
+  invoker: "public",
 };
 
 export const listPendingInvitations = onCall(
   listPendingInvitationsOptions,
   async () => {
-    const logMarker = "LIST_INVITES_V4_LOG"; // Changed log marker
-    logger.info(`${logMarker}: INIT - Listing invites (v4).`);
+    const logMarker = "LIST_INVITES_V13_LOG"; // Changed log marker
+    logger.info(`${logMarker}: INIT - Listing invites (v13 - no order).`);
 
     if (!db) {
       logger.warn(`${logMarker}: Firestore (db) not initialized.`);
@@ -169,13 +169,13 @@ export const listPendingInvitations = onCall(
     }
 
     try {
+      // Temporarily removed .orderBy("requestedAt", "asc")
       const query = db.collection("invitationRequests")
-        .where("status", "==", "pending")
-        .orderBy("requestedAt", "asc");
+        .where("status", "==", "pending");
       const snapshot = await query.get();
 
       if (snapshot.empty) {
-        logger.info(`${logMarker}: No pending invitations found.`);
+        logger.info(`${logMarker}: No pending invites found.`);
         return {
           success: true,
           message: "Aucune demande d'invitation en attente.",
@@ -191,8 +191,8 @@ export const listPendingInvitations = onCall(
         if (reqTimestamp && typeof reqTimestamp.toDate === "function") {
           requestedAtISO = reqTimestamp.toDate().toISOString();
         } else {
-          const warnMsg = `${logMarker}: Invalid reqAt for doc ${doc.id}`;
-          logger.warn(warnMsg, {reqTsValue: String(reqTimestamp)});
+          const warnMsg = `${logMarker}: Invalid reqAt: doc ${doc.id}`;
+          logger.warn(warnMsg, {reqTsVal: String(reqTimestamp)});
           requestedAtISO = new Date().toISOString(); // Fallback
         }
         return {
@@ -210,11 +210,11 @@ export const listPendingInvitations = onCall(
         invitations: invitations,
       };
     } catch (error: unknown) {
-      let errorMsg = "Unknown error while listing invitations.";
+      let errorMsg = "Unknown error listing invites.";
       if (error instanceof Error) {
         errorMsg = error.message;
       }
-      const logErr = `${logMarker}: Failed to list.`;
+      const logErr = `${logMarker}: Failed to list invites.`;
       logger.error(logErr, {error: errorMsg, originalError: String(error)});
       return {
         success: false,
@@ -227,6 +227,5 @@ export const listPendingInvitations = onCall(
 
 
 logger.info(
-  `${LOG_PREFIX_V11}: Script end. Admin SDK init attempt done (v11).`
+  `${LOG_PREFIX_V13}: Script end. Admin SDK init attempt done (v13).`
 );
-
