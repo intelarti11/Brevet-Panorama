@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ReactNode, ChangeEvent } from 'react';
@@ -5,7 +6,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getAuth, type User, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { useFilters } from '@/contexts/FilterContext';
 import { app, db, functions as functionsInstance } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertTriangle, Save, Frown, PenSquare, Info } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 interface Student {
   id: string;
@@ -63,8 +65,10 @@ const useUserSubject = () => {
 
 
 export default function SaisieNotesPage() {
-    const { subject, isLoading: isAuthLoading } = useUserSubject();
-    const { selectedAcademicYear, ALL_ACADEMIC_YEARS_VALUE } = useFilters();
+    const { subject, isLoading: isAuthLoading, user } = useUserSubject();
+    const [selectedYear, setSelectedYear] = useState<string>('');
+    const [availableYears, setAvailableYears] = useState<string[]>([]);
+    const [isYearsLoading, setIsYearsLoading] = useState(true);
     const [students, setStudents] = useState<Student[]>([]);
     const [editedNotes, setEditedNotes] = useState<EditedNotes>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
@@ -72,14 +76,52 @@ export default function SaisieNotesPage() {
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
 
+    useEffect(() => {
+        const fetchYears = async () => {
+            if (!user) return; // Wait for user to be authenticated
+            setIsYearsLoading(true);
+            try {
+                const bbRef = collection(db, 'BrevetBlanc');
+                const querySnapshot = await getDocs(bbRef);
+                const yearsFromDb = new Set<string>();
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if (data.anneeScolaire) {
+                        yearsFromDb.add(data.anneeScolaire);
+                    }
+                });
+
+                const currentYearStr = new Date().getFullYear().toString();
+                yearsFromDb.add(currentYearStr);
+
+                const sortedYears = Array.from(yearsFromDb).sort((a, b) => b.localeCompare(a));
+                setAvailableYears(sortedYears);
+                if (sortedYears.length > 0 && !selectedYear) {
+                    setSelectedYear(sortedYears[0]);
+                }
+            } catch (err: any) {
+                console.error("Error fetching years from BrevetBlanc:", err);
+                toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de charger les années scolaires disponibles." });
+                const currentYearStr = new Date().getFullYear().toString();
+                setAvailableYears([currentYearStr]);
+                 if (!selectedYear) {
+                    setSelectedYear(currentYearStr);
+                 }
+            } finally {
+                setIsYearsLoading(false);
+            }
+        };
+        fetchYears();
+    }, [toast, user, selectedYear]);
+
     const fetchStudents = useCallback(async () => {
-        if (!subject || selectedAcademicYear === ALL_ACADEMIC_YEARS_VALUE) {
+        if (!subject || !selectedYear) {
             setStudents([]);
             setEditedNotes({});
-            if (selectedAcademicYear === ALL_ACADEMIC_YEARS_VALUE) {
-              setError("Veuillez sélectionner une année scolaire pour commencer.");
-            } else if (!isAuthLoading) {
+            if (!subject && !isAuthLoading) {
               setError("Aucune matière ne vous est assignée. Impossible de saisir des notes.");
+            } else if (!selectedYear && !isYearsLoading) {
+              setError("Veuillez sélectionner une année scolaire pour commencer.");
             }
             setIsLoadingData(false);
             return;
@@ -89,7 +131,7 @@ export default function SaisieNotesPage() {
         setError(null);
         try {
             const studentsRef = collection(db, 'BrevetBlanc');
-            const q = query(studentsRef, where("anneeScolaire", "==", selectedAcademicYear));
+            const q = query(studentsRef, where("anneeScolaire", "==", selectedYear));
             const querySnapshot = await getDocs(q);
 
             const fetchedStudents: Student[] = [];
@@ -113,7 +155,6 @@ export default function SaisieNotesPage() {
                 };
             });
             
-            // Sort students by class then by name
             fetchedStudents.sort((a, b) => {
               const classCompare = (a.CLASSE ?? '').localeCompare(b.CLASSE ?? '');
               if (classCompare !== 0) return classCompare;
@@ -129,7 +170,7 @@ export default function SaisieNotesPage() {
         } finally {
             setIsLoadingData(false);
         }
-    }, [subject, selectedAcademicYear, ALL_ACADEMIC_YEARS_VALUE, toast, isAuthLoading]);
+    }, [subject, selectedYear, toast, isAuthLoading, isYearsLoading]);
 
     useEffect(() => {
         fetchStudents();
@@ -196,7 +237,7 @@ export default function SaisieNotesPage() {
 
 
     const renderContent = () => {
-        if (isAuthLoading || isLoadingData) {
+        if (isAuthLoading || (selectedYear && isLoadingData)) {
             return (
                 <div className="space-y-4">
                     <Skeleton className="h-10 w-1/4" />
@@ -251,7 +292,7 @@ export default function SaisieNotesPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">Aucun élève trouvé pour l'année scolaire {selectedAcademicYear}. Veuillez importer une liste d'élèves ou sélectionner une autre année.</p>
+                    <p className="text-muted-foreground">Aucun élève trouvé pour l'année scolaire {selectedYear}. Veuillez importer une liste d'élèves ou sélectionner une autre année.</p>
                   </CardContent>
                 </Card>
             );
@@ -264,7 +305,7 @@ export default function SaisieNotesPage() {
                       <PenSquare className="mr-3 h-6 w-6 text-primary"/>
                       Saisie des notes pour : {subject}
                     </CardTitle>
-                    <CardDescription>Année scolaire : {selectedAcademicYear}. Saisissez les notes pour les deux brevets blancs.</CardDescription>
+                    <CardDescription>Année scolaire : {selectedYear}. Saisissez les notes pour les deux brevets blancs.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto rounded-md border">
@@ -320,11 +361,31 @@ export default function SaisieNotesPage() {
 
     return (
         <div className="space-y-6 p-1 md:p-4">
-            <header className="mb-6">
-                <h1 className="text-3xl font-bold text-foreground tracking-tight">Saisie des Notes du Brevet Blanc</h1>
-                <p className="text-muted-foreground mt-1">
-                    Cette page vous permet de saisir les notes pour la matière qui vous a été assignée.
-                </p>
+            <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-foreground tracking-tight">Saisie des Notes du Brevet Blanc</h1>
+                    <p className="text-muted-foreground mt-1">
+                        Cette page vous permet de saisir les notes pour la matière qui vous a été assignée.
+                    </p>
+                </div>
+                <div className="w-full sm:w-52">
+                  <Label htmlFor="year-select">Année Scolaire</Label>
+                  <Select 
+                      value={selectedYear} 
+                      onValueChange={setSelectedYear} 
+                      disabled={isYearsLoading || availableYears.length === 0}
+                  >
+                      <SelectTrigger id="year-select">
+                          <SelectValue placeholder={isYearsLoading ? "Chargement..." : "Choisir..."} />
+                      </SelectTrigger>
+                      <SelectContent>
+                          {!isYearsLoading && availableYears.map(year => (
+                              <SelectItem key={year} value={year}>{year}</SelectItem>
+                          ))}
+                          {isYearsLoading && <SelectItem value="" disabled>Chargement des années...</SelectItem>}
+                      </SelectContent>
+                  </Select>
+                </div>
             </header>
             {renderContent()}
         </div>
