@@ -1,30 +1,31 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // brevetResults: Résultats des examens des élèves
-    // - Tout utilisateur authentifié peut lire les résultats.
-    // - Seul l'administrateur peut écrire (créer, mettre à jour, supprimer) les résultats, généralement via l'importation.
+
+    // Demandes d'invitation :
+    // - Tout le monde peut en créer une (pour la page de demande).
+    // - Seul l'admin peut lire la liste, la mettre à jour ou la supprimer.
+    match /invitationRequests/{requestId} {
+      allow read, update, delete: if request.auth != null && request.auth.token.email == 'florent.romero@ac-montpellier.fr';
+      allow create: if true;
+    }
+
+    // Résultats du brevet :
+    // - Tous les utilisateurs connectés peuvent lire les données (pour les dashboards).
+    // - Seul l'admin peut écrire/importer des données.
     match /brevetResults/{resultId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.token.email == 'florent.romero@ac-montpellier.fr';
     }
 
-    // studentDemographics: Listes de base des élèves
-    // - Tout utilisateur authentifié peut lire les listes.
-    // - Seul l'administrateur peut écrire (créer, mettre à jour, supprimer) les listes, généralement via l'importation.
-    match /studentDemographics/{studentId} {
+    // Données pour le Brevet Blanc (listes d'élèves, etc.)
+    // - Tous les utilisateurs connectés peuvent les lire.
+    // - Seul l'admin peut écrire/importer des données.
+    match /BrevetBlanc/{studentId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.token.email == 'florent.romero@ac-montpellier.fr';
-    }
-
-    // invitationRequests: Demandes d'accès à l'application par les utilisateurs
-    // - N'importe qui peut créer une nouvelle demande d'invitation.
-    // - Seul l'administrateur peut lire la liste complète des demandes, et les mettre à jour/supprimer.
-    match /invitationRequests/{requestId} {
-      allow create: if true;
-      allow read, update, delete: if request.auth != null && request.auth.token.email == 'florent.romero@ac-montpellier.fr';
     }
   }
 }

@@ -240,7 +240,7 @@ export default function ImportPage() {
           setIsStudentListCsvImporting(true);
           const db = getFirestore(app);
           const batch = writeBatch(db);
-          const collectionRef = collection(db, 'studentDemographics');
+          const collectionRef = collection(db, 'BrevetBlanc');
           let csvDocsAdded = 0;
           const academicYearForImport = importYear || new Date().getFullYear().toString();
           dataToImport.forEach(student => {
