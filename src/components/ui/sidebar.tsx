@@ -170,6 +170,11 @@ const Sidebar = React.forwardRef<
     ref
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const [hasMounted, setHasMounted] = React.useState(false)
+
+    React.useEffect(() => {
+      setHasMounted(true)
+    }, [])
 
     if (collapsible === "none") {
       return (
@@ -186,7 +191,8 @@ const Sidebar = React.forwardRef<
       )
     }
     
-    if (isMobile) {
+    // Render mobile sidebar only on the client after mount
+    if (hasMounted && isMobile) {
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
           <SheetContent
@@ -207,6 +213,7 @@ const Sidebar = React.forwardRef<
       )
     }
 
+    // Render desktop sidebar on server and on client (initial render and desktop view)
     return (
       <div
         ref={ref}
