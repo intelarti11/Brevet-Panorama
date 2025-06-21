@@ -674,13 +674,8 @@ const SidebarMenuSkeleton = React.forwardRef<
         />
       )}
       <Skeleton
-        className="h-4 flex-1 max-w-[--skeleton-width]"
+        className="h-4 w-4/5"
         data-sidebar="menu-skeleton-text"
-        style={
-          {
-            "--skeleton-width": "80%",
-          } as React.CSSProperties
-        }
       />
     </div>
   )
