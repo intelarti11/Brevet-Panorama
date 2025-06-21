@@ -8,8 +8,8 @@ import { PanelLeft } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
-import { Button, buttonVariants as allButtonVariants } from "@/components/ui/button" // Exported buttonVariants
-import type { ButtonProps } from "@/components/ui/button"; // Import ButtonProps
+import { Button, buttonVariants as allButtonVariants } from "@/components/ui/button"
+import type { ButtonProps } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
@@ -191,8 +191,13 @@ const Sidebar = React.forwardRef<
       )
     }
     
-    // Render mobile sidebar only on the client after mount
-    if (hasMounted && isMobile) {
+    if (!hasMounted) {
+      // On the server, and on initial client render, render nothing for the mobile sheet
+      // to prevent hydration mismatch. For the desktop, the CSS will hide it initially.
+      return null;
+    }
+    
+    if (isMobile) {
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
           <SheetContent
@@ -213,7 +218,6 @@ const Sidebar = React.forwardRef<
       )
     }
 
-    // Render desktop sidebar on server and on client (initial render and desktop view)
     return (
       <div
         ref={ref}
@@ -261,13 +265,10 @@ Sidebar.displayName = "Sidebar"
 
 const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
-  ButtonProps // Use ButtonProps directly
+  ButtonProps
 >(({ className, onClick, children, asChild, variant, size, ...props }, ref) => {
   const { toggleSidebar } = useSidebar();
 
-  // Determine children for the internal Button.
-  // If asChild is true, use the children passed to SidebarTrigger.
-  // Otherwise, use children passed to SidebarTrigger, or default to PanelLeft icon.
   const internalButtonChildren = asChild
     ? children
     : children ?? (
@@ -283,13 +284,13 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar="trigger"
       variant={asChild ? props.variant : (variant || "ghost")}
       size={asChild ? props.size : (size || "icon")}
-      className={cn("h-7 w-7", className)} // Base trigger style, specific size
+      className={cn("h-7 w-7", className)}
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
       }}
       asChild={asChild}
-      {...props} // Pass other props like id, aria-label etc.
+      {...props}
     >
       {internalButtonChildren}
     </Button>
