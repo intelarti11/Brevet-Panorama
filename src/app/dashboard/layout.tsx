@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle, LogOut, CalendarRange, ShieldCheck, ClipboardEdit, Edit3, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { Database, LayoutGrid, PanelLeft, FileUp, Filter, AlertTriangle, LogOut, CalendarRange, ShieldCheck, ClipboardEdit, Edit3, Eye, ChevronDown, ChevronUp, Users, BookUser } from 'lucide-react';
 import * as React from 'react';
 import { useState, useEffect } from 'react'; // Added useState, useEffect
 
@@ -176,6 +176,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { toast } = useToast();
   const { isAdmin, authLoading } = useAuth(); 
   const [brevetBlancOpen, setBrevetBlancOpen] = React.useState(false);
+  const [adminOpen, setAdminOpen] = React.useState(false);
 
   const handleLogout = async () => { // Made async
     const authInstance = getAuth(app);
@@ -200,7 +201,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     if (pathname.startsWith('/dashboard/brevet-blanc') && !brevetBlancOpen) {
       setBrevetBlancOpen(true);
     }
-  }, [pathname, brevetBlancOpen]);
+    if (pathname.startsWith('/dashboard/admin') && !adminOpen) {
+      setAdminOpen(true);
+    }
+  }, [pathname, brevetBlancOpen, adminOpen]);
 
   if (authLoading) {
     // Optional: render a loading state for the whole page or just the sidebar
@@ -316,15 +320,39 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {isAdmin && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    asChild
-                    isActive={pathname === '/dashboard/admin/invitations'}
+                    onClick={() => setAdminOpen(!adminOpen)}
+                    isActive={pathname.startsWith('/dashboard/admin')}
                     tooltip={{ children: "Administration", side: "right", align: "center" }}
+                    className="flex w-full justify-between items-center"
                   >
-                    <Link href="/dashboard/admin/invitations">
+                    <div className="flex items-center gap-2">
                       <ShieldCheck />
                       <span>Administration</span>
-                    </Link>
+                    </div>
+                    {adminOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </SidebarMenuButton>
+                  {adminOpen && (
+                    <SidebarMenuSub>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          href="/dashboard/admin/invitations"
+                          isActive={pathname === '/dashboard/admin/invitations'}
+                        >
+                          <BookUser />
+                          <span>Invitations</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          href="/dashboard/admin/gestion"
+                          isActive={pathname === '/dashboard/admin/gestion'}
+                        >
+                          <Users />
+                          <span>Gestion</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
+                  )}
                 </SidebarMenuItem>
               )}
             </SidebarMenu>
