@@ -2,9 +2,29 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read and write access to all documents for authenticated users
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    
+    // brevetResults: Résultats des examens des élèves
+    // - Tout utilisateur authentifié peut lire les résultats.
+    // - Seul l'administrateur peut écrire (créer, mettre à jour, supprimer) les résultats, généralement via l'importation.
+    match /brevetResults/{resultId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.email == 'florent.romero@ac-montpellier.fr';
+    }
+
+    // studentDemographics: Listes de base des élèves
+    // - Tout utilisateur authentifié peut lire les listes.
+    // - Seul l'administrateur peut écrire (créer, mettre à jour, supprimer) les listes, généralement via l'importation.
+    match /studentDemographics/{studentId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.email == 'florent.romero@ac-montpellier.fr';
+    }
+
+    // invitationRequests: Demandes d'accès à l'application par les utilisateurs
+    // - N'importe qui peut créer une nouvelle demande d'invitation.
+    // - Seul l'administrateur peut lire la liste complète des demandes, et les mettre à jour/supprimer.
+    match /invitationRequests/{requestId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null && request.auth.token.email == 'florent.romero@ac-montpellier.fr';
     }
   }
 }
