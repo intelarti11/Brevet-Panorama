@@ -5,7 +5,6 @@ import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
 // Your web app's Firebase configuration
-// IMPORTANT: Ensure these values are correct for YOUR Firebase project.
 const firebaseConfig: FirebaseOptions = {
   apiKey: "AIzaSyAB1KxMlcTkqUoFXJojlRco3AOTpk9jkaw",
   authDomain: "brevet-panorama.firebaseapp.com",
@@ -13,35 +12,27 @@ const firebaseConfig: FirebaseOptions = {
   storageBucket: "brevet-panorama.appspot.com",
   messagingSenderId: "486402169414",
   appId: "1:486402169414:web:67ccb79f3c06722fcdc847"
-  // measurementId: "YOUR_MEASUREMENT_ID", // Optional: Add if you use Google Analytics
 };
 
 // Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app, 'europe-west1');
 
-// Connect to emulators in development mode.
-// This should only run on the client and only once.
+// In development, connect to the emulators.
+// This check ensures the code only runs on the client-side.
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    // Use a property on the window to ensure this runs only once per page load,
-    // preventing issues with hot-reloading.
-    // @ts-ignore
-    if (!window.EMULATORS_CONNECTED) {
-        console.log("Connecting to Firebase emulators...");
-        try {
-            // Use 127.0.0.1 instead of localhost to avoid potential network issues.
-            connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-            connectFirestoreEmulator(db, '127.0.0.1', 8080);
-            connectFunctionsEmulator(functions, '127.0.0.1', 5001);
-            console.log("Successfully connected to Firebase emulators.");
-            // @ts-ignore
-            window.EMULATORS_CONNECTED = true;
-        } catch (error) {
-            console.error("Error connecting to Firebase emulators:", error);
-        }
+    console.log("Connecting to Firebase emulators...");
+    // Firebase SDK methods for connecting to emulators are designed to be run only once.
+    // They will not re-initialize if called multiple times due to hot-reloading.
+    try {
+        connectAuthEmulator(auth, "http://localhost:9099");
+        connectFirestoreEmulator(db, "localhost", 8080);
+        connectFunctionsEmulator(functions, "localhost", 5001);
+        console.log("Successfully configured emulators.");
+    } catch (error) {
+        console.error("Error connecting to emulators: ", error);
     }
 }
 

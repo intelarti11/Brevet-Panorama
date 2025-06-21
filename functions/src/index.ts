@@ -90,7 +90,7 @@ export const listPendingInvitations = onCall(
         .get();
 
       if (snapshot.empty) {
-        return {success: true, message: "Aucune demande trouvée.", invitations: []};
+        return {success: true, message: "Non trouvée.", invitations: []};
       }
 
       const invitations = snapshot.docs.map((doc) => {
