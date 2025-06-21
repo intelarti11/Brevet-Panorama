@@ -344,10 +344,9 @@ export const updateBrevetBlancNotes = onCall(
 
     const subject = request.auth.token.subject as string;
     if (!subject || !MATIERES_AUTORISEES.includes(subject)) {
-      throw new HttpsError(
-        "permission-denied",
-        "Vous n'avez pas la permission de saisir des notes pour cette matière."
-      );
+      const errorMsg =
+        "Vous n'avez pas la permission de saisir des notes pour cette matière.";
+      throw new HttpsError("permission-denied", errorMsg);
     }
 
     const updates = request.data.updates as {
@@ -371,7 +370,6 @@ export const updateBrevetBlancNotes = onCall(
         logger.warn("ID élève manquant ou invalide dans le lot.", {update});
         continue;
       }
-      
       const studentRef = db.collection("BrevetBlanc").doc(studentId);
       const notesToSet: {[key: string]: number} = {};
 
@@ -381,28 +379,33 @@ export const updateBrevetBlancNotes = onCall(
       if (noteBB2 !== null && !isNaN(noteBB2)) {
         notesToSet["bb2"] = noteBB2;
       }
-      
-      // Use dot notation to update the specific subject field within the 'notes' map.
+
+      // Use dot notation to update the specific subject field.
       // This will create or overwrite the subject's notes.
-      batch.set(studentRef, {
+      const payload = {
         notes: {
           [subject]: notesToSet,
         },
-      }, {merge: true});
+      };
+      batch.set(studentRef, payload, {merge: true});
     }
 
     try {
       await batch.commit();
-      logger.info(
+      const successMsg =
         `${updates.length} notes mises à jour pour la matière ${subject} ` +
-        `par ${request.auth.token.email}.`
-      );
+        `par ${request.auth.token.email}.`;
+      logger.info(successMsg);
       return {success: true, message: "Notes enregistrées avec succès."};
     } catch (error) {
       logger.error(
-        "Échec de la mise à jour des notes du brevet blanc:", {error}
+        "Échec de la mise à jour des notes du brevet blanc:",
+        {error}
       );
-      throw new HttpsError("internal", "Erreur lors de la sauvegarde des notes.");
+      throw new HttpsError(
+        "internal",
+        "Erreur lors de la sauvegarde des notes."
+      );
     }
   }
 );
