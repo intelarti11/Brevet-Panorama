@@ -1,9 +1,8 @@
-
 'use client';
 
 import type { ReactNode, ChangeEvent } from 'react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getAuth, type User } from 'firebase/auth';
+import { getAuth, type User, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useFilters } from '@/contexts/FilterContext';
@@ -67,7 +66,7 @@ export default function SaisieNotesPage() {
     const { subject, isLoading: isAuthLoading } = useUserSubject();
     const { selectedAcademicYear, ALL_ACADEMIC_YEARS_VALUE } = useFilters();
     const [students, setStudents] = useState<Student[]>([]);
-    const [editedNotes, setEditedNotes] = useState<EditedNotes>({});
+    const [editedNotes, setEditedNotes] = useState<EditedNotes({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
