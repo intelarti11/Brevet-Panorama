@@ -66,7 +66,7 @@ export default function SaisieNotesPage() {
     const { subject, isLoading: isAuthLoading } = useUserSubject();
     const { selectedAcademicYear, ALL_ACADEMIC_YEARS_VALUE } = useFilters();
     const [students, setStudents] = useState<Student[]>([]);
-    const [editedNotes, setEditedNotes] = useState<EditedNotes({});
+    const [editedNotes, setEditedNotes] = useState<EditedNotes>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
