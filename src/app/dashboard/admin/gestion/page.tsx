@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertTriangle, RefreshCw, Users, ShieldCheck, Save } from 'lucide-react';
 import { httpsCallable, type HttpsCallableResult } from 'firebase/functions';
@@ -177,13 +178,21 @@ export default function AdminGestionPage() {
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead>Adresse E-mail</TableHead>
-                  <TableHead>Matière Assignée</TableHead>
+                  <TableHead>Matière Actuelle</TableHead>
+                  <TableHead>Action : Changer la matière</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user.uid}>
                     <TableCell className="font-medium">{user.email}</TableCell>
+                    <TableCell>
+                      {user.customClaims?.subject ? (
+                        <Badge variant="secondary">{user.customClaims.subject}</Badge>
+                      ) : (
+                        <Badge variant="outline">Non assignée</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Select
