@@ -331,3 +331,78 @@ export const setUserSubject = onCall(
     }
   }
 );
+
+/**
+ * Met à jour les notes d'un brevet blanc pour une série d'élèves.
+ */
+export const updateBrevetBlancNotes = onCall(
+  {region: "europe-west1"},
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Authentification requise.");
+    }
+
+    const subject = request.auth.token.subject as string;
+    if (!subject || !MATIERES_AUTORISEES.includes(subject)) {
+      throw new HttpsError(
+        "permission-denied",
+        "Vous n'avez pas la permission de saisir des notes pour cette matière."
+      );
+    }
+
+    const updates = request.data.updates as {
+      studentId: string;
+      noteBB1: number | null;
+      noteBB2: number | null;
+    }[];
+
+    if (!Array.isArray(updates)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Les données fournies sont invalides."
+      );
+    }
+
+    const batch = db.batch();
+
+    for (const update of updates) {
+      const {studentId, noteBB1, noteBB2} = update;
+      if (!studentId || typeof studentId !== "string") {
+        logger.warn("ID élève manquant ou invalide dans le lot.", {update});
+        continue;
+      }
+      
+      const studentRef = db.collection("BrevetBlanc").doc(studentId);
+      const notesToSet: {[key: string]: number} = {};
+
+      if (noteBB1 !== null && !isNaN(noteBB1)) {
+        notesToSet["bb1"] = noteBB1;
+      }
+      if (noteBB2 !== null && !isNaN(noteBB2)) {
+        notesToSet["bb2"] = noteBB2;
+      }
+      
+      // Use dot notation to update the specific subject field within the 'notes' map.
+      // This will create or overwrite the subject's notes.
+      batch.set(studentRef, {
+        notes: {
+          [subject]: notesToSet,
+        },
+      }, {merge: true});
+    }
+
+    try {
+      await batch.commit();
+      logger.info(
+        `${updates.length} notes mises à jour pour la matière ${subject} ` +
+        `par ${request.auth.token.email}.`
+      );
+      return {success: true, message: "Notes enregistrées avec succès."};
+    } catch (error) {
+      logger.error(
+        "Échec de la mise à jour des notes du brevet blanc:", {error}
+      );
+      throw new HttpsError("internal", "Erreur lors de la sauvegarde des notes.");
+    }
+  }
+);
