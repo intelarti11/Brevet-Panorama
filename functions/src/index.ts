@@ -1,446 +1,285 @@
 
-"use strict";
-import type {onCall, HttpsOptions} from "firebase-functions/v2/https";
+import {onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import type {UserRecord} from "firebase-admin/auth";
-import * as crypto from "crypto";
 import * as admin from "firebase-admin";
+import * as crypto from "crypto";
 
-const LOG_PREFIX = "FN_V13";
-
-logger.info(`${LOG_PREFIX}:Top. Admin init.`);
-
-let db: admin.firestore.Firestore | null = null;
-let adminApp: admin.app.App | null = null;
-
+// Initialiser le SDK Admin Firebase.
+// Il est préférable de le faire une seule fois.
 try {
-  logger.info(`${LOG_PREFIX}:Admin.initializeApp()...`);
-  adminApp = admin.initializeApp();
-  logger.info(`${LOG_PREFIX}:admin.initializeApp() OK.`);
-
-  logger.info(`${LOG_PREFIX}:Admin.firestore()...`);
-  db = admin.firestore();
-  logger.info(`${LOG_PREFIX}:admin.firestore() OK.`);
-  logger.info(`${LOG_PREFIX}:FB Admin SDK init OK.`);
-} catch (eCatch: unknown) {
-  let errMsg = "Unk err FB Admin init.";
-  if (eCatch instanceof Error) {
-    errMsg = eCatch.message;
-  }
-  logger.error(`${LOG_PREFIX}:INIT_KO ${errMsg.slice(0,7)}`, {o:String(eCatch).slice(0,7)});
-  db = null;
-  adminApp = null;
+  admin.initializeApp();
+  logger.info("Firebase Admin SDK initialisé avec succès.");
+} catch (error) {
+  logger.error("Erreur lors de l'initialisation du SDK Admin Firebase:", error);
 }
 
-export const ultraMinimalFunction = onCall(
-  {region: "europe-west1"},
-  (req) => {
-    const logMarker = "MIN";
-    logger.info(`${logMarker}:Called.`, {d:req.data});
-    if (!db) {
-      logger.warn(`${logMarker}:DB not init.`);
-      return {
-        success: false,
-        m: "DB UMF KO.",
-        d: req.data,
-      };
-    }
-    return {
-      success: true,
-      m: "UMF OK.",
-      d: req.data,
-    };
-  }
-);
+const db = admin.firestore();
 
-const requestInvitationOptions: HttpsOptions = {
-  region: "europe-west1",
-  invoker: "public",
-};
 
+/**
+ * Gère une nouvelle demande d'invitation d'un utilisateur.
+ * Attend un e-mail dans les données de la requête.
+ * Crée un nouveau document dans la collection 'invitationRequests'.
+ */
 export const requestInvitation = onCall(
-  requestInvitationOptions,
-  async (req) => {
-    const logMarker = "REQ";
-    logger.info(`${logMarker}:Called.`, {d:req.data});
-
-    if (!adminApp) {
-      logger.error(`${logMarker}:AdminApp !init! Crit.`);
-    }
-    if (!db) {
-      logger.warn(`${logMarker}:DB not init.`);
-      return {
-        success: false,
-        m: "Srv.DB KO.",
-        d: req.data,
-      };
-    }
-
-    const email = req.data.email;
+  {region: "europe-west1", invoker: "public"},
+  async (request) => {
+    const email = request.data.email;
     if (!email || typeof email !== "string" || !email.includes("@")) {
-      logger.error(`${logMarker}:Invalid mail.`, {e:String(email).slice(0,3)});
-      return {
-        success: false,
-        m: "Mail inv.",
-        d: req.data,
-      };
+      logger.error("requestInvitation: E-mail invalide ou manquant.", {email});
+      throw new onCall.HttpsError("invalid-argument", "L'adresse e-mail fournie est invalide.");
     }
-    const emailShort = String(email);
 
     try {
-      const coll = "invitationRequests";
-      const query = db.collection(coll)
+      const collectionRef = db.collection("invitationRequests");
+      const existingQuery = collectionRef
         .where("email", "==", email)
         .where("status", "==", "pending");
-      const snap = await query.get();
 
-      if (!snap.empty) {
-        logger.info(`${logMarker}:Pend.req ${emailShort.slice(0,3)} exists.`);
-        return {
-          success: false,
-          m: `Req ${emailShort.slice(0,3)} att.`,
-          d: req.data,
-        };
+      const existingSnapshot = await existingQuery.get();
+
+      if (!existingSnapshot.empty) {
+        logger.info(`requestInvitation: Une demande pour ${email} existe déjà.`);
+        throw new onCall.HttpsError("already-exists", `Une demande pour l'adresse ${email} est déjà en attente.`);
       }
 
-      const newRef = db.collection(coll).doc();
-      await newRef.set({
+      const newRequestRef = collectionRef.doc();
+      await newRequestRef.set({
         email: email,
         requestedAt: admin.firestore.FieldValue.serverTimestamp(),
         status: "pending",
         notifiedAt: null,
       });
 
-      logger.info(`${logMarker}:OK ${emailShort.slice(0,3)} ID:${newRef.id.slice(0,1)}`);
+      logger.info(`requestInvitation: Demande créée pour ${email} avec l'ID: ${newRequestRef.id}`);
       return {
         success: true,
-        m: `Req ${emailShort.slice(0,3)} OK.`,
-        d: req.data,
+        message: `Votre demande pour ${email} a été enregistrée.`,
       };
-    } catch (eCatch: unknown) {
-      let errMsg = "Unk FS write err.";
-      if (eCatch instanceof Error) {
-        errMsg = eCatch.message;
+    } catch (error) {
+      if (error instanceof onCall.HttpsError) {
+        throw error;
       }
-      logger.error(`${logMarker}:FS KO ${emailShort.slice(0,3)}`, {e:errMsg.slice(0,3),o:String(eCatch).slice(0,3)});
-      return {
-        success: false,
-        m: `Save KO: ${errMsg.slice(0,3)}`,
-        d: req.data,
-      };
+      logger.error(`requestInvitation: Échec de l'écriture pour ${email}.`, {error});
+      throw new onCall.HttpsError("internal", "Une erreur est survenue lors de l'enregistrement de votre demande.");
     }
   }
 );
 
-const listPendingInvitationsOptions: HttpsOptions = {
-  region: "europe-west1",
-  invoker: "public",
-};
-
+/**
+ * Liste toutes les demandes d'invitation, triées par date de demande (plus récentes en premier).
+ * Destinée à l'interface d'administration.
+ */
 export const listPendingInvitations = onCall(
-  listPendingInvitationsOptions,
-  async () => {
-    const logMarker = "LST";
-    logger.info(`${logMarker}:Func start. Listing all invites.`);
-
-    if (!db) {
-      logger.warn(`${logMarker}:DB not init.`);
-      return {
-        success: false,
-        m: "Err srv: DB KO.",
-        invitations: [],
-      };
+  {region: "europe-west1"},
+  async (request) => {
+    if (request.auth?.token?.email !== 'florent.romero@ac-montpellier.fr') {
+        throw new onCall.HttpsError('permission-denied', 'Vous n\'avez pas la permission d\'exécuter cette action.');
     }
 
     try {
-      const query = db.collection("invitationRequests")
-        .orderBy("requestedAt", "desc");
-      const snapshot = await query.get();
+      const snapshot = await db.collection("invitationRequests")
+        .orderBy("requestedAt", "desc")
+        .get();
 
       if (snapshot.empty) {
-        logger.info(`${logMarker}:No inv found.`);
         return {
           success: true,
-          m: "0 inv.",
+          message: "Aucune demande d'invitation trouvée.",
           invitations: [],
         };
       }
 
       const invitations = snapshot.docs.map((doc) => {
-        const dData = doc.data();
-        const reqTs = dData.requestedAt as admin.firestore.Timestamp;
-        let reqAtISO: string;
-        if (reqTs && typeof reqTs.toDate === "function") {
-          reqAtISO = reqTs.toDate().toISOString();
-        } else {
-          logger.warn(`${logMarker}:BadRA ${doc.id.slice(0,3)}`, {ts:String(reqTs).slice(0,3)});
-          reqAtISO = new Date(0).toISOString();
-        }
-
-        const notifTs = dData.notifiedAt as admin.firestore.Timestamp;
-        let notifAtISO: string | undefined;
-        if (notifTs && typeof notifTs.toDate === "function") {
-          notifAtISO = notifTs.toDate().toISOString();
-        }
+        const data = doc.data();
+        const requestedAt = data.requestedAt as admin.firestore.Timestamp;
+        const notifiedAt = data.notifiedAt as admin.firestore.Timestamp;
 
         return {
           id: doc.id,
-          email: dData.email,
-          requestedAt: reqAtISO,
-          status: dData.status,
-          notifiedAt: notifAtISO,
+          email: data.email,
+          status: data.status,
+          requestedAt: requestedAt?.toDate().toISOString() || new Date(0).toISOString(),
+          notifiedAt: notifiedAt?.toDate().toISOString(),
         };
       });
-      logger.info(`${logMarker}:Found ${invitations.length} inv.`, {c:invitations.length});
+
       return {
         success: true,
-        m: "Liste OK.",
+        message: "Invitations récupérées avec succès.",
         invitations: invitations,
       };
-    } catch (eCatch: unknown) {
-      let errMsg = "Unk err listing.";
-      if (eCatch instanceof Error) {
-        errMsg = eCatch.message;
-      }
-      logger.error(`${logMarker}:Lst KO ${errMsg.slice(0,3)}`, {o:String(eCatch).slice(0,3)});
-      return {
-        success: false,
-        m: `Lst KO: ${errMsg.slice(0,3)}`,
-        invitations: [],
-      };
+    } catch (error) {
+      logger.error("listPendingInvitations: Échec de la récupération des invitations.", {error});
+      throw new onCall.HttpsError("internal", "Une erreur est survenue lors de la récupération des invitations.");
     }
   }
 );
 
-
-const approveInvitationOptions: HttpsOptions = {
-  region: "europe-west1",
-  invoker: "public",
-};
+/**
+ * Approuve une demande d'invitation.
+ * Attend un invitationId dans les données de la requête.
+ * Met à jour le statut à 'approved' et crée un utilisateur Firebase Auth.
+ */
 export const approveInvitation = onCall(
-  approveInvitationOptions,
-  async (req) => {
-    const logMarker = "APR";
-    logger.info(`${logMarker}:Called.`, {d:req.data});
-
-    if (!db || !adminApp) {
-      logger.warn(`${logMarker}:DB/Adm KO.`, {db:!db,adm:!adminApp});
-      return {success: false, m: "Srv.DB/Adm KO."};
+  {region: "europe-west1"},
+  async (request) => {
+    if (request.auth?.token?.email !== 'florent.romero@ac-montpellier.fr') {
+        throw new onCall.HttpsError('permission-denied', 'Vous n\'avez pas la permission d\'exécuter cette action.');
     }
 
-    const invId = req.data.invitationId;
-    if (!invId || typeof invId !== "string") {
-      logger.error(`${logMarker}:Inv ID.`, {id:String(invId).slice(0,8)});
-      return {success: false, m: "ID inv."};
+    const invitationId = request.data.invitationId;
+    if (!invitationId || typeof invitationId !== "string") {
+      throw new onCall.HttpsError("invalid-argument", "L'ID d'invitation est manquant ou invalide.");
     }
-    const invIdShort = String(invId);
+
+    const inviteRef = db.collection("invitationRequests").doc(invitationId);
 
     try {
-      const invRef = db.collection("invitationRequests").doc(invId);
-      const invDoc = await invRef.get();
+      const inviteDoc = await inviteRef.get();
 
-      if (!invDoc.exists) {
-        logger.warn(`${logMarker}:Inv ${invIdShort.slice(0,3)} !found.`);
-        return {success: false, m: "Inv no find."};
+      if (!inviteDoc.exists) {
+        throw new onCall.HttpsError("not-found", "L'invitation spécifiée n'a pas été trouvée.");
       }
 
-      const dData = invDoc.data();
-      if (dData?.status !== "pending") {
-        logger.warn(`${logMarker}:Inv ${invIdShort.slice(0,1)}!pend`, {s:dData?.status?.slice(0,1)});
-        return {
-          success: false,
-          m: `Inv done (${dData?.status}).`,
-        };
+      const inviteData = inviteDoc.data();
+      if (inviteData?.status !== "pending") {
+        throw new onCall.HttpsError("failed-precondition", `Cette invitation a déjà été traitée (statut: ${inviteData?.status}).`);
       }
 
-      const email = dData?.email;
-      if (!email || typeof email !== "string") {
-        logger.error(`${logMarker}:Mail miss ${invIdShort.slice(0,3)}`, {id:invIdShort});
-        return {success: false, m: "Mail miss."};
+      const emailToApprove = inviteData?.email;
+      if (!emailToApprove) {
+        throw new onCall.HttpsError("internal", "L'invitation est corrompue et n'a pas d'e-mail associé.");
       }
-      const emailShort = String(email);
 
-      let userCrMsg = "";
-      let userMsgShort = "";
-
+      let userCreationMessage = "";
       try {
-        const tmpPwd = crypto.randomBytes(16).toString("hex");
-        const userRec: UserRecord = await admin.auth().createUser({
-          email: email,
+        const tempPassword = crypto.randomBytes(16).toString("hex");
+        await admin.auth().createUser({
+          email: emailToApprove,
           emailVerified: true,
-          password: tmpPwd,
+          password: tempPassword,
           disabled: false,
         });
-        logger.info(`${logMarker}:Usr ${userRec.uid.slice(0,1)}OK`);
-        userCrMsg = "Cpt créé. Mdp via 'Oublié'.";
-        userMsgShort = "Usr ok.";
-      } catch (authErrorUnknown: unknown) {
-        const authErr = authErrorUnknown as {code?: string; message?: string};
-        if (authErr.code === "auth/email-already-exists") {
-          logger.warn(`${logMarker}:Usr ${emailShort.slice(0,3)} exists.`);
-          userCrMsg = "Cpt existant.";
-          userMsgShort = "Usr exist.";
+        userCreationMessage = "Compte créé. Utilisez 'Mot de passe oublié' pour vous connecter.";
+        logger.info(`approveInvitation: Compte utilisateur créé pour ${emailToApprove}.`);
+      } catch (authError: any) {
+        if (authError.code === "auth/email-already-exists") {
+          userCreationMessage = "Un compte avec cet e-mail existe déjà.";
+          logger.warn(`approveInvitation: Le compte pour ${emailToApprove} existe déjà.`);
         } else {
-          const errMsg = authErr.message || "Auth err";
-          logger.error(`${logMarker}:Auth KO ${emailShort.slice(0,3)}`, {e:errMsg.slice(0,8)});
-          return {success: false, m: `Auth KO: ${errMsg.slice(0,3)}`};
+          logger.error(`approveInvitation: Échec de création pour ${emailToApprove}.`, {authError});
+          throw new onCall.HttpsError("internal", `La création de l'utilisateur a échoué: ${authError.message}`);
         }
       }
 
-      await invRef.update({
+      await inviteRef.update({
         status: "approved",
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const invIdS = invIdShort.slice(0,1);
-      const uMsgSh = userMsgShort.slice(0,1);
-      logger.info(`${logMarker}:OK ${invIdS} ${uMsgSh}`, {i:invIdShort.slice(0,3),u:userMsgShort.slice(0,3)});
-      return {
-        success: true,
-        m: `Approuvé. ${userCrMsg.slice(0,10)}`,
-      };
-    } catch (eCatch: unknown) {
-      let errMsg = "Unk err approving.";
-      if (eCatch instanceof Error) {
-        errMsg = eCatch.message;
-      }
-      logger.error(`${logMarker}:Appr KO ${invIdShort.slice(0,3)}`, {e:errMsg.slice(0,3),o:String(eCatch).slice(0,3)});
-      return {success: false, m: `App. KO: ${errMsg.slice(0,3)}`};
+      return { success: true, message: `Invitation approuvée. ${userCreationMessage}` };
+    } catch (error) {
+      if (error instanceof onCall.HttpsError) throw error;
+      logger.error(`approveInvitation: Échec pour l'invitation ${invitationId}.`, {error});
+      throw new onCall.HttpsError("internal", "Une erreur interne est survenue lors de l'approbation.");
     }
   }
 );
 
-const rejectInvitationOptions: HttpsOptions = {
-  region: "europe-west1",
-  invoker: "public",
-};
+/**
+ * Rejette une demande d'invitation.
+ * Attend un invitationId dans les données de la requête.
+ * Met à jour le statut à 'rejected'.
+ */
 export const rejectInvitation = onCall(
-  rejectInvitationOptions,
-  async (req) => {
-    const logMarker = "REJ";
-    logger.info(`${logMarker}:Called.`, {d:req.data});
-
-    if (!db) {
-      logger.warn(`${logMarker}:DB not init.`);
-      return {success: false, m: "Srv.DB KO."};
+  {region: "europe-west1"},
+  async (request) => {
+    if (request.auth?.token?.email !== 'florent.romero@ac-montpellier.fr') {
+        throw new onCall.HttpsError('permission-denied', 'Vous n\'avez pas la permission d\'exécuter cette action.');
     }
 
-    const invId = req.data.invitationId;
-    const reason = req.data.reason;
-
-    if (!invId || typeof invId !== "string") {
-      logger.error(`${logMarker}:Inv ID.`, {id:String(invId).slice(0,8)});
-      return {success: false, m: "ID inv."};
+    const { invitationId, reason } = request.data;
+    if (!invitationId || typeof invitationId !== "string") {
+      throw new onCall.HttpsError("invalid-argument", "L'ID d'invitation est manquant ou invalide.");
     }
-    const invIdShort = String(invId);
+
+    const inviteRef = db.collection("invitationRequests").doc(invitationId);
 
     try {
-      const invRef = db.collection("invitationRequests").doc(invId);
-      const invDoc = await invRef.get();
-
-      if (!invDoc.exists) {
-        logger.warn(`${logMarker}:Inv ${invIdShort.slice(0,3)} !found.`);
-        return {success: false, m: "Inv no find."};
+      const inviteDoc = await inviteRef.get();
+      if (!inviteDoc.exists) {
+        throw new onCall.HttpsError("not-found", "L'invitation spécifiée n'a pas été trouvée.");
+      }
+      
+      const inviteData = inviteDoc.data();
+      if (inviteData?.status !== "pending") {
+        throw new onCall.HttpsError("failed-precondition", `Cette invitation a déjà été traitée (statut: ${inviteData?.status}).`);
       }
 
-      const dData = invDoc.data();
-      if (dData?.status !== "pending") {
-        logger.warn(`${logMarker}:Inv ${invIdShort.slice(0,1)}!pend`, {s:dData?.status?.slice(0,1)});
-        return {
-          success: false,
-          m: `Inv done (${dData?.status}).`,
-        };
-      }
-
-      const payload: {
-        status: string;
-        rejectedAt: admin.firestore.FieldValue;
-        rejectionReason?: string;
-      } = {
+      const updatePayload: { status: string; rejectedAt: admin.firestore.FieldValue; rejectionReason?: string; } = {
         status: "rejected",
         rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
       if (reason && typeof reason === "string" && reason.trim() !== "") {
-        payload.rejectionReason = reason.substring(0, 20); // Shorter reason
+        updatePayload.rejectionReason = reason.substring(0, 200);
       }
 
-      await invRef.update(payload);
-
-      const emailS = (dData?.email || "[no_mail]").slice(0,3);
-      const invIdS = invIdShort.slice(0,3);
-      logger.info(`${logMarker}:KO ${invIdS} for ${emailS}.`, {i:invIdS,e:emailS});
-      return {success: true, m: `${emailS} Rej.`};
-    } catch (eCatch: unknown) {
-      let errMsg = "Unk err rej.";
-      if (eCatch instanceof Error) {
-        errMsg = eCatch.message;
-      }
-      logger.error(`${logMarker}:Rej KO ${invIdShort.slice(0,3)}`, {e:errMsg.slice(0,3),o:String(eCatch).slice(0,3)});
-      return {success: false, m: `RejKO:${errMsg.slice(0,3)}`};
+      await inviteRef.update(updatePayload);
+      return { success: true, message: "L'invitation a été rejetée." };
+    } catch (error) {
+      if (error instanceof onCall.HttpsError) throw error;
+      logger.error(`rejectInvitation: Échec pour l'invitation ${invitationId}.`, {error});
+      throw new onCall.HttpsError("internal", "Une erreur interne est survenue lors du rejet.");
     }
   }
 );
 
-const markInvitationAsNotifiedOptions: HttpsOptions = {
-  region: "europe-west1",
-  invoker: "public",
-};
+/**
+ * Marque une invitation approuvée comme 'notifiée'.
+ * Attend un invitationId dans les données de la requête.
+ */
 export const markInvitationAsNotified = onCall(
-  markInvitationAsNotifiedOptions,
-  async (req) => {
-    const logMarker = "NTF";
-    logger.info(`${logMarker}:Called.`, {d:req.data});
-
-    if (!db) {
-      logger.warn(`${logMarker}:DB not init.`);
-      return {success: false, m: "Srv.DB KO."};
+  {region: "europe-west1"},
+  async (request) => {
+    if (request.auth?.token?.email !== 'florent.romero@ac-montpellier.fr') {
+        throw new onCall.HttpsError('permission-denied', 'Vous n\'avez pas la permission d\'exécuter cette action.');
     }
 
-    const invId = req.data.invitationId;
-    if (!invId || typeof invId !== "string") {
-      logger.error(`${logMarker}:Inv ID.`, {id:String(invId).slice(0,8)});
-      return {success: false, m: "ID inv."};
+    const invitationId = request.data.invitationId;
+    if (!invitationId || typeof invitationId !== "string") {
+      throw new onCall.HttpsError("invalid-argument", "L'ID d'invitation est manquant ou invalide.");
     }
-    const invIdShort = String(invId);
+
+    const inviteRef = db.collection("invitationRequests").doc(invitationId);
 
     try {
-      const invRef = db.collection("invitationRequests").doc(invId);
-      const invDoc = await invRef.get();
+        const inviteDoc = await inviteRef.get();
+        if (!inviteDoc.exists) {
+            throw new onCall.HttpsError("not-found", "L'invitation spécifiée n'a pas été trouvée.");
+        }
+        
+        const inviteData = inviteDoc.data();
+        if (inviteData?.status !== 'approved') {
+            throw new onCall.HttpsError("failed-precondition", "Seules les invitations approuvées peuvent être marquées comme notifiées.");
+        }
 
-      if (!invDoc.exists) {
-        logger.warn(`${logMarker}:Inv ${invIdShort.slice(0,3)} !found.`);
-        return {success: false, m: "Inv no find."};
-      }
+        if (inviteData?.notifiedAt) {
+            return { success: true, message: "Cette invitation est déjà marquée comme notifiée." };
+        }
 
-      const dData = invDoc.data();
-      if (dData?.status !== "approved") {
-        const currSt = dData?.status ?? "unk";
-        logger.warn(`${logMarker}:Inv ${invIdShort.slice(0,1)}!OK`, {s:currSt.slice(0,1)});
-        return {success: false, m: "Inv !appr."};
-      }
-      if (dData?.notifiedAt) {
-        logger.info(`${logMarker}:Inv ${invIdShort.slice(0,3)} already ntf.`);
-        return {success: true, m: "Inv !notif."};
-      }
-
-      await invRef.update({
-        notifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      const emailS = (dData?.email || "[no_mail]").slice(0,3);
-      const invIdS = invIdShort.slice(0,3);
-      logger.info(`${logMarker}:Ntf ${invIdS} ${emailS}.`, {i:invIdS,e:emailS});
-      return {success: true, m: `Notif ${emailS.slice(0,3)}.`};
-    } catch (eCatch: unknown) {
-      let errMsg = "Err mark notif.";
-      if (eCatch instanceof Error) {
-        errMsg = eCatch.message;
-      }
-      logger.error(`${logMarker}:Ntf KO ${invIdShort.slice(0,3)}`, {e:errMsg.slice(0,3),o:String(eCatch).slice(0,3)});
-      return {success: false, m: `NtfKO:${errMsg.slice(0,3)}`};
+        await inviteRef.update({
+            notifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        return { success: true, message: "L'invitation a été marquée comme 'notifiée'." };
+    } catch (error) {
+        if (error instanceof onCall.HttpsError) throw error;
+        logger.error(`markInvitationAsNotified: Échec pour l'invitation ${invitationId}.`, {error});
+        throw new onCall.HttpsError("internal", "Une erreur interne est survenue lors de la mise à jour.");
     }
   }
 );
 
-logger.info(`${LOG_PREFIX}:End. SDK OK.`);
+    
