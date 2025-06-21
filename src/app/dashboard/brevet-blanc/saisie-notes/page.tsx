@@ -382,7 +382,6 @@ export default function SaisieNotesPage() {
                           {!isYearsLoading && availableYears.map(year => (
                               <SelectItem key={year} value={year}>{year}</SelectItem>
                           ))}
-                          {isYearsLoading && <SelectItem value="" disabled>Chargement des années...</SelectItem>}
                       </SelectContent>
                   </Select>
                 </div>
