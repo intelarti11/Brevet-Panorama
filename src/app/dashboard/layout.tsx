@@ -23,7 +23,8 @@ import {
   SidebarGroupLabel,
   SidebarMenuSub,
   SidebarMenuSubItem,
-  SidebarMenuSubButton
+  SidebarMenuSubButton,
+  SidebarMenuSkeleton
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -206,11 +207,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [pathname, brevetBlancOpen, adminOpen]);
 
-  if (authLoading) {
-    // Optional: render a loading state for the whole page or just the sidebar
-    // For simplicity, we'll let it render and update. The isAdmin check will handle visibility.
-  }
-
   return (
     <FilterProvider>
       <DefaultSidebarProvider defaultOpen={true}>
@@ -305,7 +301,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 )}
               </SidebarMenuItem>
 
-              {isAdmin && (
+              {authLoading ? (
+                <SidebarMenuItem>
+                  <SidebarMenuSkeleton showIcon />
+                </SidebarMenuItem>
+              ) : isAdmin && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => setAdminOpen(!adminOpen)}
