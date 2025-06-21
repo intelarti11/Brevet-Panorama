@@ -201,7 +201,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     if (pathname.startsWith('/dashboard/brevet-blanc') && !brevetBlancOpen) {
       setBrevetBlancOpen(true);
     }
-    if (pathname.startsWith('/dashboard/admin') && !adminOpen) {
+    if ((pathname.startsWith('/dashboard/admin') || pathname === '/dashboard/import') && !adminOpen) {
       setAdminOpen(true);
     }
   }, [pathname, brevetBlancOpen, adminOpen]);
@@ -267,18 +267,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === '/dashboard/import'}
-                  tooltip={{ children: "Import", side: "right", align: "center" }}
-                >
-                  <Link href="/dashboard/import">
-                    <FileUp />
-                    <span>Import</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton
@@ -321,7 +309,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => setAdminOpen(!adminOpen)}
-                    isActive={pathname.startsWith('/dashboard/admin')}
+                    isActive={pathname.startsWith('/dashboard/admin') || pathname === '/dashboard/import'}
                     tooltip={{ children: "Administration", side: "right", align: "center" }}
                     className="flex w-full justify-between items-center"
                   >
@@ -349,6 +337,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         >
                           <Users />
                           <span>Gestion</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                       <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          href="/dashboard/import"
+                          isActive={pathname === '/dashboard/import'}
+                        >
+                          <FileUp />
+                          <span>Import</span>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
