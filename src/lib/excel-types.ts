@@ -80,11 +80,3 @@ export const studentBaseSchema = z.object({
   CLASSE: z.preprocess(preprocessToStringOptional, z.string().nullable().optional()), // Optional as per refinement
 });
 export type StudentBaseData = z.infer<typeof studentBaseSchema>;
-
-// Schema for Brevet Blanc NOTES entries from CSV
-export const brevetBlancEntrySchema = z.object({
-  INE: z.preprocess(preprocessToStringOptional, z.string().min(1, "L'INE est requis.")),
-  MATIERE: z.preprocess(preprocessToStringOptional, z.string().min(1, "La matière est requise.")),
-  NOTE: z.preprocess(preprocessOptionalStringToNumber, z.number({ required_error: "La note est requise.", invalid_type_error: "La note doit être un nombre." }).nullable()),
-});
-export type BrevetBlancEntry = z.infer<typeof brevetBlancEntrySchema>;
