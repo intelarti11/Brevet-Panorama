@@ -356,11 +356,10 @@ export default function ImportPage() {
         <CardHeader>
           <CardTitle className="text-xl flex items-center">
             <Users className="mr-2 h-5 w-5 text-primary" />
-            Importer Liste Élèves (CSV)
+            Importer Liste Élèves pour le brevet blanc (CSV)
           </CardTitle>
           <CardDescription>
-            Colonnes attendues: Nom;Prénom;Sexe;Classe. La colonne INE est également supportée si présente. Délimiteur: point-virgule ';'.
-            L'année scolaire sélectionnée ci-dessus sera utilisée pour cet import.
+            Colonnes attendues: Nom;Prénom;Sexe;Classe. La colonne INE est également supportée si présente. Délimiteur: point-virgule ';'. L'année scolaire sélectionnée ci-dessus sera utilisée pour cet import.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
